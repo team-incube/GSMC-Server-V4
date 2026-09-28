@@ -1,100 +1,126 @@
 ---
 name: database-schema
-description: 이 프로젝트의 DB 스키마 규칙 — xxxx_tb 단수 테이블명, 컬럼 네이밍, 인덱스 전략, Flyway 마이그레이션, JPA Entity 매핑 패턴. 테이블/컬럼 추가나 인덱스 설계 시 참조.
+description: Database schema design guide — table naming, column conventions, index strategy, and JPA entity mapping patterns.
+allowed-tools: AskUserQuestion
 ---
 
-# Database Schema 가이드
+# Database Schema Design Guide
 
-MySQL + Flyway(`V{n}__{description}.sql`, `src/main/resources/db/migration/`) + JPA(`ddl-auto: validate`) 조합을 사용한다.
-즉 **스키마 변경은 반드시 Flyway 마이그레이션 파일로 하고, JPA는 검증만 한다.**
+Before providing schema guidance, ask the user about their migration tooling:
 
-## 네이밍 규칙 (`.claude/skills/architecture/SKILL.md` 참고)
-
-- 테이블: `snake_case`, **단수**, `xxxx_tb` 접미사 — `alert_tb`, `score_tb`, `user_tb`
-- PK 컬럼: `{table}_id` (단순 `id`가 아님) — `alert_id`, `score_id`
-- 일반 컬럼: `snake_case` — `created_at`, `is_read`
-- FK 제약 이름: `fk_{table}_{ref}` — `fk_alert_user`, `fk_alert_score`
-- 인덱스 이름: `idx_{table}_{col1}_{col2}` — `idx_alert_user_id_created_at`
-
-## 표준 컬럼
-
-```sql
-CREATE TABLE example_tb (
-    example_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    ...
-    created_at DATETIME NOT NULL
-);
 ```
-`updated_at`은 필요한 엔티티에만 추가한다 (모든 테이블에 강제하지 않음 — 기존 마이그레이션 참고).
-
-## 실제 예시 — `V4__create_alert_table.sql`
-
-```sql
-CREATE TABLE alert_tb (
-    alert_id      BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id       BIGINT      NOT NULL,
-    score_id      BIGINT      NULL,
-    alert_type    VARCHAR(20) NOT NULL,
-    alert_content TEXT        NOT NULL,
-    is_read       BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_at    DATETIME    NOT NULL,
-    CONSTRAINT fk_alert_user  FOREIGN KEY (user_id)  REFERENCES user_tb (user_id),
-    CONSTRAINT fk_alert_score FOREIGN KEY (score_id) REFERENCES score_tb (score_id)
-);
-
-CREATE INDEX idx_alert_user_id_created_at ON alert_tb (user_id, created_at);
+AskUserQuestion: "DB 마이그레이션 도구로 무엇을 사용하고 있나요?"
+options:
+  - Flyway
+  - Liquibase
+  - 사용하지 않음 (JPA DDL auto)
 ```
 
-## 인덱스 전략
+Then provide the relevant migration section below along with the core conventions.
 
-- WHERE에 자주 쓰이는 단일 컬럼: 단순 인덱스
-- WHERE + ORDER BY 조합: 복합 인덱스 (WHERE 컬럼을 앞에)
-- FK 컬럼은 조회 패턴이 있으면 인덱스 추가를 검토 (자동 생성되지 않음)
-- `is_read`, `status` 같은 저카디널리티 컬럼은 단독 인덱스 효과가 적음 — 복합 인덱스의 뒤쪽에 배치
+---
 
-## Flyway 마이그레이션
+## Naming Conventions
 
-- 파일명: `V{다음 버전}__{설명}.sql` (기존 최댓값은 `find src/main/resources/db/migration -name "V*.sql"`로 확인)
-- 이미 적용된 버전 파일은 절대 수정하지 않는다 — 체크섬이 깨져 배포가 실패한다. 변경이 필요하면 새 버전 파일을 추가한다.
-- `application.yaml`: `flyway.baseline-on-migrate: true`, `baseline-version: 1` — 기존 DB에 베이스라인을 잡고 시작하는 설정이므로 로컬 초기화 시 유의.
+- Tables: `snake_case`, plural (`users`, `api_keys`)
+- Columns: `snake_case` (`created_at`, `is_active`)
+- FK columns: `{referenced_table_singular}_id` (`user_id`, `club_id`)
+- Index names: `idx_{table}_{columns}` (`idx_users_email`)
+- UK names: `uq_{table}_{columns}` (`uq_users_email`)
 
-## JPA Entity 매핑 (`adapter/out/persistence/entity/`)
+## Standard Columns
+
+Include in every entity table:
+
+```sql
+id         BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+created_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+updated_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+```
+
+## Index Strategy
+
+- Single column used frequently in WHERE: simple index
+- WHERE + ORDER BY combination: composite index (WHERE column first)
+- Low-cardinality columns (`is_active`, `status` enum): indexing rarely helps
+
+```sql
+-- Composite index example
+CREATE INDEX idx_posts_user_created ON posts (user_id, created_at DESC);
+```
+
+## Migration — Flyway
+
+_(Include this section if the user selected Flyway)_
+
+File naming: `V{version}__{description}.sql`
+
+```
+db/migration/
+  V1__create_users.sql
+  V2__add_api_keys.sql
+  V3__add_index_users_email.sql
+```
+
+```sql
+-- V2__add_api_keys.sql
+CREATE TABLE api_keys (
+    id         BIGINT      NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id    BIGINT      NOT NULL,
+    key_value  VARCHAR(64) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_api_keys_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT uq_api_keys_value UNIQUE (key_value)
+);
+```
+
+## Migration — Liquibase
+
+_(Include this section if the user selected Liquibase)_
+
+File naming: `db/changelog/{version}-{description}.yaml`
+
+```yaml
+# db/changelog/002-add-api-keys.yaml
+databaseChangeLog:
+  - changeSet:
+      id: 002-add-api-keys
+      author: dev
+      changes:
+        - createTable:
+            tableName: api_keys
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: key_value
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+                    unique: true
+```
+
+## JPA Entity Mapping
 
 ```kotlin
 @Entity
-@Table(name = "alert_tb")
-class AlertJpaEntity(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "alert_id")
-    val alertId: Long? = null,
+@Table(name = "api_keys")
+class ApiKey(
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    val user: User,
 
-    @Column(name = "user_id", nullable = false)
-    val userId: Long,
-
-    @Column(name = "alert_type", nullable = false, length = 20)
-    @Enumerated(EnumType.STRING)
-    val alertType: AlertType,
-
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime,
-)
+    @Column(name = "key_value", nullable = false, unique = true, length = 64)
+    val keyValue: String,
+) : BaseEntity()
 ```
-
-- 고유 식별자(unique key) 컬럼은 Kotlin 타입도 non-nullable로 맞추고 `unique = true, nullable = false`를 명시한다.
-- Enum은 반드시 `@Enumerated(EnumType.STRING)` — `ORDINAL`은 컬럼 순서 변경 시 데이터가 깨진다.
-- Entity ↔ Domain 변환은 확장 함수로 (`{Domain}JpaEntity.toDomain()`, `{Domain}.toEntity()`) — `.claude/skills/architecture/SKILL.md` 참고.
-
-## 참고 파일
-
-최근 마이그레이션 예시 (실제 최신 버전은 `src/main/resources/db/migration/` 디렉터리에서 다시 확인할 것):
-- `src/main/resources/db/migration/V3__add_file_uri_unique_constraint.sql`
-- `src/main/resources/db/migration/V4__create_alert_table.sql`
-- `src/main/resources/db/migration/V5__add_evidence_draft.sql`
-- `src/main/resources/db/migration/V6__create_project_tables.sql`
-- `src/main/resources/db/migration/V7__add_score_dg_project_id_index.sql`
-
-JPA Entity 예시:
-- `src/main/kotlin/team/incube/gsmc/domain/alert/adapter/out/persistence/entity/AlertJpaEntity.kt`
-- `src/main/kotlin/team/incube/gsmc/domain/category/adapter/out/persistence/entity/CategoryJpaEntity.kt`
-- `src/main/kotlin/team/incube/gsmc/domain/evidence/adapter/out/persistence/entity/EvidenceJpaEntity.kt`

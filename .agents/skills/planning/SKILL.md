@@ -1,6 +1,6 @@
 ---
 name: planning
-argument-hint: "[instructions]"
+argument-hint: [instructions]
 description: Conduct an in-depth structured interview with the user to uncover non-obvious requirements, tradeoffs, and constraints, then produce a detailed implementation spec file.
 ---
 
