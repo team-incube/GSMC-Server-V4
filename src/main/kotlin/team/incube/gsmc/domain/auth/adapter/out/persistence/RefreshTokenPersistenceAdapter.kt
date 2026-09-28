@@ -1,6 +1,7 @@
 package team.incube.gsmc.domain.auth.adapter.out.persistence
 
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.data.redis.core.types.Expiration
 import team.incube.gsmc.domain.auth.port.out.RefreshTokenPersistencePort
 import team.incube.gsmc.global.annotation.PortDirection
@@ -20,7 +21,22 @@ class RefreshTokenPersistenceAdapter(
 ) : RefreshTokenPersistencePort {
     companion object {
         private const val KEY_PREFIX = "refresh:"
+
+        private const val ROTATE_SCRIPT = """
+            local current = redis.call('GET', KEYS[1])
+            if current ~= ARGV[1] then
+                return 0
+            end
+            redis.call('SET', KEYS[1], ARGV[2], 'EX', __REFRESH_TOKEN_EXPIRY__)
+            return 1
+        """
     }
+
+    private val rotateScript =
+        DefaultRedisScript<Long>(
+            ROTATE_SCRIPT.replace("__REFRESH_TOKEN_EXPIRY__", jwtProperties.refreshTokenExpiry.toString()),
+            Long::class.java,
+        )
 
     /**
      * 리프레시 토큰을 Redis에 저장한다.
@@ -38,6 +54,18 @@ class RefreshTokenPersistenceAdapter(
             Expiration.from(jwtProperties.refreshTokenExpiry, TimeUnit.SECONDS),
         )
     }
+
+    override fun rotate(
+        userId: Long,
+        expectedToken: String,
+        newToken: String,
+    ): Boolean =
+        redisTemplate.execute(
+            rotateScript,
+            listOf(KEY_PREFIX + userId),
+            expectedToken,
+            newToken,
+        ) == 1L
 
     /**
      * 사용자 ID로 리프레시 토큰을 조회한다.

@@ -9,6 +9,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.data.redis.core.types.Expiration
 import team.incube.gsmc.global.security.jwt.JwtProperties
 import java.util.concurrent.TimeUnit
@@ -78,6 +79,37 @@ class RefreshTokenPersistenceAdapterTest :
                     adapter.delete(userId)
 
                     verify(exactly = 1) { redisTemplate.delete("refresh:$userId") }
+                }
+            }
+        }
+        Given("rotate로 리프레시 토큰을 교체할 때") {
+            When("저장 토큰과 expectedToken이 일치하면") {
+                Then("새 토큰으로 교체하고 true를 반환한다") {
+                    every {
+                        redisTemplate.execute<Long>(
+                            any<RedisScript<Long>>(),
+                            listOf("refresh:$userId"),
+                            "refresh-token",
+                            "new-refresh-token",
+                        )
+                    } returns 1L
+
+                    adapter.rotate(userId, "refresh-token", "new-refresh-token") shouldBe true
+                }
+            }
+
+            When("expectedToken이 일치하지 않으면") {
+                Then("교체하지 않고 false를 반환한다") {
+                    every {
+                        redisTemplate.execute<Long>(
+                            any<RedisScript<Long>>(),
+                            listOf("refresh:$userId"),
+                            "old-refresh-token",
+                            "new-refresh-token",
+                        )
+                    } returns 0L
+
+                    adapter.rotate(userId, "old-refresh-token", "new-refresh-token") shouldBe false
                 }
             }
         }
