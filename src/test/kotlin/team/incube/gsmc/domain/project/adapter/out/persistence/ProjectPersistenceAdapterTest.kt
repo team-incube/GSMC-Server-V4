@@ -10,6 +10,7 @@ import io.kotest.matchers.shouldBe
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import jakarta.persistence.EntityManager
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.FileJpaEntity
@@ -74,6 +75,18 @@ class ProjectPersistenceAdapterTest :
             every { query.fetchOne() } returns result
         }
 
+        fun mockFindAllByTitleQuery(entities: List<ProjectJpaEntity>): JPAQuery<ProjectJpaEntity> {
+            val query = mockk<JPAQuery<ProjectJpaEntity>>()
+            every { queryFactory.selectFrom(projectJpaEntity) } returns query
+            every { query.where(any<Predicate>()) } returns query
+            every { query.where(isNull<Predicate>()) } returns query
+            every { query.orderBy(any<OrderSpecifier<*>>()) } returns query
+            every { query.offset(0L) } returns query
+            every { query.limit(10L) } returns query
+            every { query.fetch() } returns entities
+            return query
+        }
+
         Given("findById로 조회할 때") {
             When("일치하는 프로젝트가 존재하면") {
                 Then("연결된 점수 ID를 병합해 도메인 객체로 반환한다") {
@@ -115,19 +128,34 @@ class ProjectPersistenceAdapterTest :
         }
 
         Given("findAllByTitleContaining으로 조회할 때") {
-            When("제목에 검색어가 포함된 프로젝트가 있으면") {
-                Then("페이지 단위로 요약 정보를 반환한다") {
-                    val query = mockk<JPAQuery<ProjectJpaEntity>>()
-                    every { queryFactory.selectFrom(projectJpaEntity) } returns query
-                    every { query.where(any<Predicate>()) } returns query
-                    every { query.orderBy(any<OrderSpecifier<*>>()) } returns query
-                    every { query.offset(0L) } returns query
-                    every { query.limit(10L) } returns query
-                    every { query.fetch() } returns listOf(projectEntity(30L))
+            When("검색어가 2글자 이상이면") {
+                Then("FULLTEXT match_against 조건으로 페이지 단위 요약 정보를 반환한다") {
+                    mockFindAllByTitleQuery(listOf(projectEntity(30L)))
 
                     val result = adapter.findAllByTitleContaining("제목", 0, 10)
 
                     result.map { it.projectId } shouldBe listOf(30L)
+                }
+            }
+
+            When("검색어가 한 글자면") {
+                Then("LIKE 조건으로 페이지 단위 요약 정보를 반환한다") {
+                    mockFindAllByTitleQuery(listOf(projectEntity(31L)))
+
+                    val result = adapter.findAllByTitleContaining("A", 0, 10)
+
+                    result.map { it.projectId } shouldBe listOf(31L)
+                }
+            }
+
+            When("검색어가 빈 문자열이거나 공백뿐이면") {
+                Then("조건 없이 페이지 단위로 전체 프로젝트를 반환한다") {
+                    val query = mockFindAllByTitleQuery(listOf(projectEntity(32L)))
+
+                    val result = adapter.findAllByTitleContaining("   ", 0, 10)
+
+                    result.map { it.projectId } shouldBe listOf(32L)
+                    verify(exactly = 1) { query.where(isNull<Predicate>()) }
                 }
             }
         }
@@ -154,6 +182,73 @@ class ProjectPersistenceAdapterTest :
                     every { query.fetchOne() } returns null
 
                     adapter.countByTitleContaining("없음") shouldBe 0L
+                }
+            }
+
+            When("검색어가 빈 문자열이거나 공백뿐이면") {
+                Then("조건 없이 전체 개수를 반환한다") {
+                    val query = mockk<JPAQuery<Long>>()
+                    every { queryFactory.select(projectJpaEntity.count()) } returns query
+                    every { query.from(projectJpaEntity) } returns query
+                    every { query.where(isNull<Predicate>()) } returns query
+                    every { query.fetchOne() } returns 42L
+
+                    adapter.countByTitleContaining("   ") shouldBe 42L
+                    verify(exactly = 1) { query.where(isNull<Predicate>()) }
+                }
+            }
+        }
+
+        Given("findAllByTitleContaining과 countByTitleContaining이 같은 검색어를 받으면") {
+            When("검색어가 2글자 이상이면") {
+                Then("두 메서드가 동일한 FULLTEXT match_against 조건을 사용한다") {
+                    val findQuery = mockk<JPAQuery<ProjectJpaEntity>>()
+                    val countQuery = mockk<JPAQuery<Long>>()
+                    val findWhereSlot = slot<Predicate>()
+                    val countWhereSlot = slot<Predicate>()
+
+                    every { queryFactory.selectFrom(projectJpaEntity) } returns findQuery
+                    every { findQuery.where(capture(findWhereSlot)) } returns findQuery
+                    every { findQuery.orderBy(any<OrderSpecifier<*>>()) } returns findQuery
+                    every { findQuery.offset(any()) } returns findQuery
+                    every { findQuery.limit(any()) } returns findQuery
+                    every { findQuery.fetch() } returns emptyList()
+
+                    every { queryFactory.select(projectJpaEntity.count()) } returns countQuery
+                    every { countQuery.from(projectJpaEntity) } returns countQuery
+                    every { countQuery.where(capture(countWhereSlot)) } returns countQuery
+                    every { countQuery.fetchOne() } returns 0L
+
+                    adapter.findAllByTitleContaining("검색어", 0, 10)
+                    adapter.countByTitleContaining("검색어")
+
+                    findWhereSlot.captured shouldBe countWhereSlot.captured
+                }
+            }
+
+            When("검색어가 한 글자면") {
+                Then("두 메서드가 동일한 LIKE 조건을 사용한다") {
+                    val findQuery = mockk<JPAQuery<ProjectJpaEntity>>()
+                    val countQuery = mockk<JPAQuery<Long>>()
+                    val findWhereSlot = slot<Predicate>()
+                    val countWhereSlot = slot<Predicate>()
+
+                    every { queryFactory.selectFrom(projectJpaEntity) } returns findQuery
+                    every { findQuery.where(capture(findWhereSlot)) } returns findQuery
+                    every { findQuery.orderBy(any<OrderSpecifier<*>>()) } returns findQuery
+                    every { findQuery.offset(any()) } returns findQuery
+                    every { findQuery.limit(any()) } returns findQuery
+                    every { findQuery.fetch() } returns emptyList()
+
+                    every { queryFactory.select(projectJpaEntity.count()) } returns countQuery
+                    every { countQuery.from(projectJpaEntity) } returns countQuery
+                    every { countQuery.where(capture(countWhereSlot)) } returns countQuery
+                    every { countQuery.fetchOne() } returns 0L
+
+                    adapter.findAllByTitleContaining("A", 0, 10)
+                    adapter.countByTitleContaining("A")
+
+                    findWhereSlot.captured shouldBe countWhereSlot.captured
                 }
             }
         }
