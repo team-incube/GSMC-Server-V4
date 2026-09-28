@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
+import io.mockk.verify
 import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
@@ -141,6 +142,27 @@ class AppendMyScoreWithValueServiceTest :
                     val result = service.execute(CategoryType.ACADEMIC_GRADE, "3")
 
                     result.scoreValue shouldBe 7
+                }
+            }
+
+            When("등급에 NaN을 입력하면") {
+                Then("내부 오류 대신 INVALID_SCORE_VALUE 예외가 발생하고 저장하지 않는다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every {
+                        appendScoreSupport.resolveUnrequiredCategory(
+                            CategoryType.ACADEMIC_GRADE,
+                            ScoreCalculationType.SCORE_BASED,
+                        )
+                    } returns academicGradeCategory
+                    every { memberPersistencePort.findByUserId(userId) } returns student(grade = 3)
+
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(CategoryType.ACADEMIC_GRADE, "NaN")
+                        }
+
+                    exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
                 }
             }
 
