@@ -151,7 +151,24 @@ class AppendScoreSupportTest :
             When("변환이 필요 없는 카테고리에 숫자 문자열이 주어지면") {
                 Then("정수로 파싱한 값을 그대로 반환한다") {
                     val cat = category(EvidenceType.FILE, ScoreCalculationType.COUNT_BASED)
-                    support.parseScoreValue("850", cat) shouldBe 850
+                    support.parseScoreValue(" 7 ", cat) shouldBe 7
+                }
+            }
+
+            listOf("-1", "NaN", "Infinity", "-Infinity", "1e308", "15").forEach { value ->
+                When("봉사활동에 허용 범위 밖의 값 '$value'가 주어지면") {
+                    Then("INVALID_SCORE_VALUE 예외가 발생한다") {
+                        val cat =
+                            category(
+                                EvidenceType.UNREQUIRED,
+                                ScoreCalculationType.SCORE_BASED,
+                                isAccumulated = true,
+                                categoryType = CategoryType.VOLUNTEER,
+                                categoryMaximumValue = 10,
+                            )
+                        val exception = shouldThrow<GsmcException> { support.parseScoreValue(value, cat) }
+                        exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
+                    }
                 }
             }
 

@@ -19,7 +19,7 @@ import team.incube.gsmc.global.util.MemberUtil
  * 값 기반 점수 추가 유스케이스 구현 클래스입니다.
  * [AppendMyScoreWithValueUseCase]를 구현하며, 증빙이 필요 없고 집계 방식이 SCORE_BASED인
  * 카테고리에 대해 숫자 값을 입력해 점수를 신청한다. 교과성적([team.incube.gsmc.domain.category.CategoryType.ACADEMIC_GRADE])은
- * 학생 학년별 등급제 범위를 벗어나지 않는지 추가로 검증한다. PENDING 상태로 새로 생성되므로 해당
+ * 학생 학년별 등급제 범위를 벗어나지 않는지 공통 검증([AppendScoreSupport.parseScoreValue]) 뒤에 추가로 검증한다. PENDING 상태로 새로 생성되므로 해당
  * 학생의 반/학년 백분위 캐시([ScoreTotalCacheInvalidator])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
@@ -38,15 +38,16 @@ class AppendMyScoreWithValueService(
         val userId = memberUtil.getCurrentUserId()
         val category = appendScoreSupport.resolveUnrequiredCategory(categoryType, ScoreCalculationType.SCORE_BASED)
 
+        val scoreValue = appendScoreSupport.parseScoreValue(value, category)
+
         if (categoryType == CategoryType.ACADEMIC_GRADE) {
             val studentGrade =
                 memberPersistencePort.findByUserId(userId)?.userGrade
                     ?: throw GsmcException(ErrorCode.USER_NOT_FOUND)
-            val rawValue = value?.trim()?.toDoubleOrNull() ?: throw GsmcException(ErrorCode.INVALID_SCORE_VALUE)
-            ScoreValueConverterRegistry.resolve(categoryType).validate(rawValue, studentGrade)
+            ScoreValueConverterRegistry
+                .resolve(categoryType)
+                .validate(appendScoreSupport.parseRawScoreValue(value), studentGrade)
         }
-
-        val scoreValue = appendScoreSupport.parseScoreValue(value, category)
 
         val target = appendScoreSupport.findOrCreateScore(userId, category)
         val saved =
