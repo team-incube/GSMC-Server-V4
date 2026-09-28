@@ -6,13 +6,14 @@ import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+import team.incube.gsmc.global.util.MYSQL_TEXT_MAX_BYTES
+import team.incube.gsmc.global.util.utf8ByteLength
 
 private const val MIN_TITLE_LENGTH = 1
 private const val MAX_TITLE_LENGTH = 100
 private const val MIN_CONTENT_LENGTH = 300
 private const val MAX_CONTENT_LENGTH = 2000
 private const val MAX_DRAFT_TITLE_LENGTH = 255
-private const val MAX_DRAFT_CONTENT_LENGTH = 65_535
 
 /**
  * Evidence 서비스에서 공통으로 사용하는 지원 기능을 제공합니다.
@@ -38,7 +39,7 @@ class EvidenceServiceSupport(
         title: String,
         content: String,
     ) {
-        if (title.length > MAX_DRAFT_TITLE_LENGTH || content.length > MAX_DRAFT_CONTENT_LENGTH) {
+        if (title.length > MAX_DRAFT_TITLE_LENGTH || content.utf8ByteLength() > MYSQL_TEXT_MAX_BYTES) {
             throw GsmcException(ErrorCode.INVALID_EVIDENCE_INPUT)
         }
     }
