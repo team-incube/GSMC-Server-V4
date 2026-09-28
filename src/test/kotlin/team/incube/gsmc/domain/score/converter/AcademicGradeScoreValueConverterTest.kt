@@ -75,6 +75,14 @@ class AcademicGradeScoreValueConverterTest :
         }
 
         Given("validate") {
+            When("1등급보다 작은 등급이 주어지면") {
+                Then("INVALID_SCORE_VALUE 예외가 발생한다") {
+                    val exception = shouldThrow<GsmcException> { converter.validate(0.0, 3) }
+
+                    exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
+                }
+            }
+
             When("NaN이 주어지면") {
                 Then("내부 오류 대신 INVALID_SCORE_VALUE 예외가 발생한다") {
                     val exception = shouldThrow<GsmcException> { converter.validate(Double.NaN, 3) }

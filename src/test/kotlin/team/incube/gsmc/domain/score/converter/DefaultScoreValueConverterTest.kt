@@ -1,5 +1,6 @@
 package team.incube.gsmc.domain.score.converter
 
+import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
@@ -72,6 +73,14 @@ class DefaultScoreValueConverterTest :
 
                         exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
                     }
+                }
+            }
+        }
+
+        Given("validate") {
+            When("학년별 검증이 없는 카테고리에 값이 주어지면") {
+                Then("아무 검증 없이 통과한다") {
+                    shouldNotThrowAny { converter.validate(100.0, 1) }
                 }
             }
         }

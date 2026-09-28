@@ -146,6 +146,33 @@ class AppendMyScoreWithValueServiceTest :
                 }
             }
 
+            listOf(
+                "학생 정보가 없으면" to null,
+                "학생의 학년 정보가 비어 있으면" to student(grade = 1).copy(userGrade = null),
+            ).forEach { (condition, member) ->
+                When(condition) {
+                    Then("USER_NOT_FOUND 예외가 발생하고 저장하지 않는다") {
+                        every { memberUtil.getCurrentUserId() } returns userId
+                        every {
+                            appendScoreSupport.resolveUnrequiredCategory(
+                                CategoryType.ACADEMIC_GRADE,
+                                ScoreCalculationType.SCORE_BASED,
+                            )
+                        } returns academicGradeCategory
+                        every { appendScoreSupport.parseScoreValue("3", academicGradeCategory) } returns 7
+                        every { memberPersistencePort.findByUserId(userId) } returns member
+
+                        val exception =
+                            shouldThrow<GsmcException> {
+                                service.execute(CategoryType.ACADEMIC_GRADE, "3")
+                            }
+
+                        exception.errorCode shouldBe ErrorCode.USER_NOT_FOUND
+                        verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    }
+                }
+            }
+
             When("등급에 NaN을 입력하면") {
                 Then("공통 검증에서 INVALID_SCORE_VALUE로 거부되어 학년 조회·저장을 하지 않는다") {
                     every { memberUtil.getCurrentUserId() } returns userId
