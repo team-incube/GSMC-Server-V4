@@ -47,14 +47,16 @@ class FileStorageDeletionTaskPersistenceAdapterTest :
                 nextAttemptAt = now.minusMinutes(1),
                 lastError = null,
                 lastAttemptedAt = null,
+                leaseToken = null,
             )
 
-        fun mockUpdateClause(): JPAUpdateClause {
+        fun mockUpdateClause(updatedRows: Long = 1L): JPAUpdateClause {
             val clause = mockk<JPAUpdateClause>()
             every { queryFactory.update(fileStorageDeletionTaskJpaEntity) } returns clause
             every { clause.set(any<com.querydsl.core.types.Path<Any>>(), any<Any>()) } returns clause
+            every { clause.setNull(any<com.querydsl.core.types.Path<*>>()) } returns clause
             every { clause.where(*anyVararg<Predicate>()) } returns clause
-            every { clause.execute() } returns 1L
+            every { clause.execute() } returns updatedRows
             return clause
         }
 
@@ -98,42 +100,45 @@ class FileStorageDeletionTaskPersistenceAdapterTest :
             }
         }
 
-        Given("updateNextAttemptAt으로 선점 만료 시각을 갱신할 때") {
+        Given("lease로 작업을 선점할 때") {
             When("작업 ID 목록이 비어 있으면") {
                 Then("쿼리를 보내지 않는다") {
-                    adapter.updateNextAttemptAt(emptyList(), now)
+                    adapter.lease(emptyList(), now, "token-a")
 
                     verify(exactly = 0) { queryFactory.update(any<EntityPath<*>>()) }
                 }
             }
 
             When("작업 ID 목록이 있으면") {
-                Then("다음 시도 시각을 벌크 갱신한다") {
+                Then("해당 작업들의 선점 만료 시각과 선점 토큰을 벌크 갱신한다") {
                     val clause = mockUpdateClause()
 
-                    adapter.updateNextAttemptAt(listOf(1L, 2L), now.plusMinutes(5))
+                    adapter.lease(listOf(1L, 2L), now.plusMinutes(5), "token-a")
 
                     verify(
                         exactly = 1,
                     ) { clause.set(fileStorageDeletionTaskJpaEntity.nextAttemptAt, now.plusMinutes(5)) }
+                    verify(exactly = 1) { clause.set(fileStorageDeletionTaskJpaEntity.leaseToken, "token-a") }
+                    verify(exactly = 1) { clause.where(fileStorageDeletionTaskJpaEntity.taskId.`in`(listOf(1L, 2L))) }
                     verify(exactly = 1) { clause.execute() }
                 }
             }
         }
 
         Given("updateFailure로 실패를 기록할 때") {
-            When("실패가 기록된 작업을 전달하면") {
-                Then("상태·시도 횟수·다음 시도 시각·오류·실패 시각을 벌크 갱신한다") {
-                    val clause = mockUpdateClause()
-                    val failed =
-                        FileStorageDeletionTask
-                            .pending(
-                                "file/key.png",
-                                now,
-                            ).copy(taskId = 3L)
-                            .recordFailure("boom", now)
+            val failed =
+                FileStorageDeletionTask
+                    .pending(
+                        "file/key.png",
+                        now,
+                    ).copy(taskId = 3L)
+                    .recordFailure("boom", now)
 
-                    adapter.updateFailure(failed)
+            When("선점 토큰이 일치하는 행이 있으면") {
+                Then("실패 기록을 반영하고 선점을 풀며 true를 반환한다") {
+                    val clause = mockUpdateClause(updatedRows = 1L)
+
+                    adapter.updateFailure(failed, "token-a") shouldBe true
 
                     verify(
                         exactly = 1,
@@ -144,30 +149,49 @@ class FileStorageDeletionTaskPersistenceAdapterTest :
                     ) { clause.set(fileStorageDeletionTaskJpaEntity.nextAttemptAt, now.plusMinutes(1)) }
                     verify(exactly = 1) { clause.set(fileStorageDeletionTaskJpaEntity.lastError, "boom") }
                     verify(exactly = 1) { clause.set(fileStorageDeletionTaskJpaEntity.lastAttemptedAt, now) }
-                    verify(exactly = 1) { clause.execute() }
+                    verify(exactly = 1) { clause.setNull(fileStorageDeletionTaskJpaEntity.leaseToken) }
+                    verify(exactly = 1) {
+                        clause.where(
+                            fileStorageDeletionTaskJpaEntity.taskId.eq(3L),
+                            fileStorageDeletionTaskJpaEntity.leaseToken.eq("token-a"),
+                        )
+                    }
+                }
+            }
+
+            When("다른 워커가 다시 선점해 토큰이 바뀌었거나 행이 없으면") {
+                Then("0건 갱신으로 끝나 false를 반환한다") {
+                    mockUpdateClause(updatedRows = 0L)
+
+                    adapter.updateFailure(failed, "token-a") shouldBe false
                 }
             }
         }
 
-        Given("deleteAllById로 완료한 작업을 삭제할 때") {
+        Given("deleteAllByIdAndLeaseToken으로 완료한 작업을 삭제할 때") {
             When("작업 ID 목록이 비어 있으면") {
-                Then("쿼리를 보내지 않는다") {
-                    adapter.deleteAllById(emptyList())
+                Then("쿼리를 보내지 않고 0을 반환한다") {
+                    adapter.deleteAllByIdAndLeaseToken(emptyList(), "token-a") shouldBe 0L
 
                     verify(exactly = 0) { queryFactory.delete(any<EntityPath<*>>()) }
                 }
             }
 
             When("작업 ID 목록이 있으면") {
-                Then("한 번의 벌크 삭제로 지운다") {
+                Then("선점 토큰이 일치하는 작업만 한 번의 벌크 삭제로 지우고 삭제 건수를 반환한다") {
                     val clause = mockk<JPADeleteClause>()
                     every { queryFactory.delete(fileStorageDeletionTaskJpaEntity) } returns clause
                     every { clause.where(*anyVararg<Predicate>()) } returns clause
-                    every { clause.execute() } returns 2L
+                    every { clause.execute() } returns 1L
 
-                    adapter.deleteAllById(listOf(1L, 2L))
+                    adapter.deleteAllByIdAndLeaseToken(listOf(1L, 2L), "token-a") shouldBe 1L
 
-                    verify(exactly = 1) { clause.execute() }
+                    verify(exactly = 1) {
+                        clause.where(
+                            fileStorageDeletionTaskJpaEntity.taskId.`in`(listOf(1L, 2L)),
+                            fileStorageDeletionTaskJpaEntity.leaseToken.eq("token-a"),
+                        )
+                    }
                 }
             }
         }

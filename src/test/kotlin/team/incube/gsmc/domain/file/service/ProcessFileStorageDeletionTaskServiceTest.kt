@@ -48,9 +48,10 @@ class ProcessFileStorageDeletionTaskServiceTest :
             every { transactionManager.getTransaction(any()) } returns SimpleTransactionStatus()
             every { transactionManager.commit(any()) } just runs
             every { transactionManager.rollback(any()) } just runs
-            every { taskPersistencePort.updateNextAttemptAt(any(), any()) } just runs
-            every { taskPersistencePort.deleteAllById(any()) } just runs
-            every { taskPersistencePort.updateFailure(any()) } just runs
+            every { taskPersistencePort.lease(any(), any(), any()) } just runs
+            every { taskPersistencePort.deleteAllByIdAndLeaseToken(any(), any()) } answers
+                { firstArg<Collection<Long>>().size.toLong() }
+            every { taskPersistencePort.updateFailure(any(), any()) } returns true
         }
 
         Given("삭제 작업을 처리할 때") {
@@ -61,7 +62,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
                     service.execute()
 
                     verify(exactly = 0) { fileStoragePort.deleteObject(any()) }
-                    verify(exactly = 0) { taskPersistencePort.deleteAllById(any()) }
+                    verify(exactly = 0) { taskPersistencePort.deleteAllByIdAndLeaseToken(any(), any()) }
                 }
             }
 
@@ -74,7 +75,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
 
                     verify(
                         exactly = 1,
-                    ) { taskPersistencePort.updateNextAttemptAt(listOf(1L, 2L), start.plusMinutes(5)) }
+                    ) { taskPersistencePort.lease(listOf(1L, 2L), start.plusMinutes(5), any()) }
                 }
             }
 
@@ -87,8 +88,8 @@ class ProcessFileStorageDeletionTaskServiceTest :
 
                     verify(exactly = 1) { fileStoragePort.deleteObject("key-1") }
                     verify(exactly = 1) { fileStoragePort.deleteObject("key-2") }
-                    verify(exactly = 1) { taskPersistencePort.deleteAllById(listOf(1L, 2L)) }
-                    verify(exactly = 0) { taskPersistencePort.updateFailure(any()) }
+                    verify(exactly = 1) { taskPersistencePort.deleteAllByIdAndLeaseToken(listOf(1L, 2L), any()) }
+                    verify(exactly = 0) { taskPersistencePort.updateFailure(any(), any()) }
                 }
             }
 
@@ -99,7 +100,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
                     every { fileStoragePort.deleteObject("key-1") } just runs
                     every { fileStoragePort.deleteObject("key-2") } throws RuntimeException("s3 down")
                     val failureSlot = slot<FileStorageDeletionTask>()
-                    every { taskPersistencePort.updateFailure(capture(failureSlot)) } just runs
+                    every { taskPersistencePort.updateFailure(capture(failureSlot), any()) } returns true
 
                     service.execute()
 
@@ -108,7 +109,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
                     failureSlot.captured.attemptCount shouldBe 1
                     failureSlot.captured.nextAttemptAt shouldBe start.plusMinutes(1)
                     failureSlot.captured.lastError!! shouldContain "RuntimeException: s3 down"
-                    verify(exactly = 1) { taskPersistencePort.deleteAllById(listOf(1L)) }
+                    verify(exactly = 1) { taskPersistencePort.deleteAllByIdAndLeaseToken(listOf(1L), any()) }
                     verify(exactly = 0) { fileStoragePort.deleteObject("key-3") }
                 }
             }
@@ -120,8 +121,8 @@ class ProcessFileStorageDeletionTaskServiceTest :
 
                     service.execute()
 
-                    verify(exactly = 1) { taskPersistencePort.updateFailure(any()) }
-                    verify(exactly = 0) { taskPersistencePort.deleteAllById(any()) }
+                    verify(exactly = 1) { taskPersistencePort.updateFailure(any(), any()) }
+                    verify(exactly = 0) { taskPersistencePort.deleteAllByIdAndLeaseToken(any(), any()) }
                 }
             }
 
@@ -135,8 +136,8 @@ class ProcessFileStorageDeletionTaskServiceTest :
                     service.execute()
 
                     verify(exactly = 2) { fileStoragePort.deleteObject("key-1") }
-                    verify(exactly = 1) { taskPersistencePort.updateFailure(any()) }
-                    verify(exactly = 1) { taskPersistencePort.deleteAllById(listOf(1L)) }
+                    verify(exactly = 1) { taskPersistencePort.updateFailure(any(), any()) }
+                    verify(exactly = 1) { taskPersistencePort.deleteAllByIdAndLeaseToken(listOf(1L), any()) }
                 }
             }
 
@@ -146,7 +147,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
                         listOf(task(1L, attemptCount = FILE_STORAGE_DELETION_MAX_ATTEMPTS - 1))
                     every { fileStoragePort.deleteObject("key-1") } throws RuntimeException("s3 down")
                     val failureSlot = slot<FileStorageDeletionTask>()
-                    every { taskPersistencePort.updateFailure(capture(failureSlot)) } just runs
+                    every { taskPersistencePort.updateFailure(capture(failureSlot), any()) } returns true
 
                     service.execute()
 
@@ -166,8 +167,8 @@ class ProcessFileStorageDeletionTaskServiceTest :
                     verify(exactly = 1) { fileStoragePort.deleteObject("key-1") }
                     verify(exactly = 1) { fileStoragePort.deleteObject("key-2") }
                     verify(exactly = 0) { fileStoragePort.deleteObject("key-3") }
-                    verify(exactly = 1) { taskPersistencePort.deleteAllById(listOf(1L, 2L)) }
-                    verify(exactly = 0) { taskPersistencePort.updateFailure(any()) }
+                    verify(exactly = 1) { taskPersistencePort.deleteAllByIdAndLeaseToken(listOf(1L, 2L), any()) }
+                    verify(exactly = 0) { taskPersistencePort.updateFailure(any(), any()) }
                 }
             }
 
@@ -176,11 +177,73 @@ class ProcessFileStorageDeletionTaskServiceTest :
                     every { taskPersistencePort.findAllDueForUpdate(any(), any()) } returns listOf(task(1L), task(2L))
                     every { fileStoragePort.deleteObject("key-1") } just runs
                     every { fileStoragePort.deleteObject("key-2") } throws RuntimeException("s3 down")
-                    every { taskPersistencePort.updateFailure(any()) } throws IllegalStateException("db down")
+                    every { taskPersistencePort.updateFailure(any(), any()) } throws IllegalStateException("db down")
 
                     shouldThrow<IllegalStateException> { service.execute() }
 
-                    verify(exactly = 1) { taskPersistencePort.deleteAllById(listOf(1L)) }
+                    verify(exactly = 1) { taskPersistencePort.deleteAllByIdAndLeaseToken(listOf(1L), any()) }
+                }
+            }
+        }
+
+        Given("선점 토큰을 사용할 때") {
+            When("작업을 선점하고 일부는 완료, 하나는 실패하면") {
+                Then("선점·완료·실패 기록에 모두 같은 토큰을 쓴다") {
+                    every { taskPersistencePort.findAllDueForUpdate(any(), any()) } returns listOf(task(1L), task(2L))
+                    every { fileStoragePort.deleteObject("key-1") } just runs
+                    every { fileStoragePort.deleteObject("key-2") } throws RuntimeException("s3 down")
+                    val leaseSlot = slot<String>()
+                    every { taskPersistencePort.lease(any(), any(), capture(leaseSlot)) } just runs
+                    val failureTokenSlot = slot<String>()
+                    every { taskPersistencePort.updateFailure(any(), capture(failureTokenSlot)) } returns true
+                    val completeTokenSlot = slot<String>()
+                    every { taskPersistencePort.deleteAllByIdAndLeaseToken(any(), capture(completeTokenSlot)) } returns
+                        1L
+
+                    service.execute()
+
+                    failureTokenSlot.captured shouldBe leaseSlot.captured
+                    completeTokenSlot.captured shouldBe leaseSlot.captured
+                }
+            }
+
+            When("두 번 실행하면") {
+                Then("실행마다 다른 토큰으로 선점한다") {
+                    every { taskPersistencePort.findAllDueForUpdate(any(), any()) } returns listOf(task(1L))
+                    every { fileStoragePort.deleteObject(any()) } just runs
+                    val tokens = mutableListOf<String>()
+                    every { taskPersistencePort.lease(any(), any(), capture(tokens)) } just runs
+
+                    service.execute()
+                    service.execute()
+
+                    tokens.size shouldBe 2
+                    (tokens[0] != tokens[1]) shouldBe true
+                }
+            }
+
+            When("다른 워커가 다시 선점해 실패 기록이 반영되지 않으면") {
+                Then("예외 없이 묶음 처리를 멈춘다") {
+                    every { taskPersistencePort.findAllDueForUpdate(any(), any()) } returns listOf(task(1L), task(2L))
+                    every { fileStoragePort.deleteObject("key-1") } throws RuntimeException("s3 down")
+                    every { taskPersistencePort.updateFailure(any(), any()) } returns false
+
+                    service.execute()
+
+                    verify(exactly = 0) { fileStoragePort.deleteObject("key-2") }
+                    verify(exactly = 0) { taskPersistencePort.deleteAllByIdAndLeaseToken(any(), any()) }
+                }
+            }
+
+            When("다른 워커가 다시 선점해 완료 삭제가 일부만 반영되면") {
+                Then("예외 없이 끝낸다") {
+                    every { taskPersistencePort.findAllDueForUpdate(any(), any()) } returns listOf(task(1L), task(2L))
+                    every { fileStoragePort.deleteObject(any()) } just runs
+                    every { taskPersistencePort.deleteAllByIdAndLeaseToken(listOf(1L, 2L), any()) } returns 1L
+
+                    service.execute()
+
+                    verify(exactly = 1) { taskPersistencePort.deleteAllByIdAndLeaseToken(listOf(1L, 2L), any()) }
                 }
             }
         }

@@ -23,8 +23,13 @@ class FileStorageDeletionTaskTest :
 
         Given("삭제 실패를 기록할 때") {
             When("최대 시도 횟수에 못 미치면") {
-                Then("PENDING을 유지하고 시도 횟수·오류·백오프된 다음 시도 시각을 기록한다") {
-                    val task = FileStorageDeletionTask.pending("key-1", now).copy(taskId = 1L, attemptCount = 2)
+                Then("PENDING을 유지하고 시도 횟수·오류·백오프된 다음 시도 시각을 기록하며 선점을 푼다") {
+                    val task =
+                        FileStorageDeletionTask
+                            .pending(
+                                "key-1",
+                                now,
+                            ).copy(taskId = 1L, attemptCount = 2, leaseToken = "token-a")
 
                     val failed = task.recordFailure("S3Exception: down", now)
 
@@ -33,6 +38,7 @@ class FileStorageDeletionTaskTest :
                     failed.nextAttemptAt shouldBe now.plusMinutes(4)
                     failed.lastError shouldBe "S3Exception: down"
                     failed.lastAttemptedAt shouldBe now
+                    failed.leaseToken shouldBe null
                 }
             }
 

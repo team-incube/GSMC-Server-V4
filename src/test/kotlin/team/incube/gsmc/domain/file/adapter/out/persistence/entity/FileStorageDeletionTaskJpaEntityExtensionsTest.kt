@@ -23,6 +23,7 @@ class FileStorageDeletionTaskJpaEntityExtensionsTest :
                             nextAttemptAt = nextAttemptAt,
                             lastError = "S3Exception: down",
                             lastAttemptedAt = lastAttemptedAt,
+                            leaseToken = "token-a",
                         )
 
                     task.toEntity().toDomain() shouldBe task
@@ -40,6 +41,7 @@ class FileStorageDeletionTaskJpaEntityExtensionsTest :
                     entity.nextAttemptAt shouldBe nextAttemptAt
                     entity.lastError shouldBe null
                     entity.lastAttemptedAt shouldBe null
+                    entity.leaseToken shouldBe null
                     entity.createdAt = nextAttemptAt
                     entity.createdAt shouldBe nextAttemptAt
                 }
