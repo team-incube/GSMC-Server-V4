@@ -49,16 +49,24 @@ interface FileStorageDeletionTaskPersistencePort {
     fun updateFailure(task: FileStorageDeletionTask)
 
     /**
-     * 완료된 작업을 삭제한다. 이미 없으면 아무것도 하지 않는다.
+     * 완료된 작업들을 삭제한다. 이미 없는 작업은 건너뛴다.
      *
-     * @param taskId 삭제할 작업 ID
+     * @param taskIds 삭제할 작업 ID 목록
      */
-    fun deleteById(taskId: Long)
+    fun deleteAllById(taskIds: Collection<Long>)
 
     /**
-     * 상태별 작업 수를 센다. 적체·수동 복구 대상 규모를 관측하는 데 사용한다.
+     * 해당 key의 삭제 작업이 상태와 무관하게 남아 있는지 확인한다. 삭제 예정인 객체를 다시 파일로
+     * 등록(confirm)하지 못하게 막는 데 사용한다.
      *
-     * @param status 셀 상태
+     * @param fileKey 확인할 스토리지 객체 key
      */
-    fun countByStatus(status: FileStorageDeletionTaskStatus): Long
+    fun existsByFileKey(fileKey: String): Boolean
+
+    /**
+     * 상태별 작업 수를 한 번에 센다. 작업이 없는 상태는 결과에 포함되지 않는다.
+     *
+     * @return 상태별 작업 수
+     */
+    fun countGroupByStatus(): Map<FileStorageDeletionTaskStatus, Long>
 }

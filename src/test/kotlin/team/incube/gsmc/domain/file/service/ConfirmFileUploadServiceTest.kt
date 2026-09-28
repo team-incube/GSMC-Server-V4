@@ -7,9 +7,11 @@ import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.file.MAX_FILE_SIZE_BYTES
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
+import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistencePort
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
@@ -19,10 +21,20 @@ class ConfirmFileUploadServiceTest :
     BehaviorSpec({
         val filePersistencePort = mockk<FilePersistencePort>()
         val fileStoragePort = mockk<FileStoragePort>()
+        val fileStorageDeletionTaskPersistencePort = mockk<FileStorageDeletionTaskPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
-        val service = ConfirmFileUploadService(filePersistencePort, fileStoragePort, memberUtil)
+        val service =
+            ConfirmFileUploadService(
+                filePersistencePort,
+                fileStoragePort,
+                fileStorageDeletionTaskPersistencePort,
+                memberUtil,
+            )
 
-        beforeEach { clearAllMocks() }
+        beforeEach {
+            clearAllMocks()
+            every { fileStorageDeletionTaskPersistencePort.existsByFileKey(any()) } returns false
+        }
 
         val fileKey = "file/uuid_original.png"
 
@@ -41,6 +53,19 @@ class ConfirmFileUploadServiceTest :
                     val exception = shouldThrow<GsmcException> { service.execute(fileKey, "original.png") }
 
                     exception.errorCode shouldBe ErrorCode.FILE_ALREADY_CONFIRMED
+                }
+            }
+
+            When("삭제된 파일의 key라 스토리지 삭제 작업이 남아 있으면") {
+                Then("곧 지워질 객체이므로 S3_OBJECT_NOT_FOUND 예외를 던지고 저장하지 않는다") {
+                    every { filePersistencePort.findByFileKey(fileKey) } returns null
+                    every { fileStorageDeletionTaskPersistencePort.existsByFileKey(fileKey) } returns true
+
+                    val exception = shouldThrow<GsmcException> { service.execute(fileKey, "original.png") }
+
+                    exception.errorCode shouldBe ErrorCode.S3_OBJECT_NOT_FOUND
+                    verify(exactly = 0) { fileStoragePort.getObjectSize(any()) }
+                    verify(exactly = 0) { filePersistencePort.save(any()) }
                 }
             }
 

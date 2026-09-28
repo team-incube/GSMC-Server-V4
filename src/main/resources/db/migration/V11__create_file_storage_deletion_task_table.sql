@@ -16,3 +16,7 @@ CREATE TABLE file_storage_deletion_task_tb (
 -- 워커의 "처리 시각이 된 PENDING 작업" 조회(FOR UPDATE SKIP LOCKED)와 상태별 적체 집계용
 CREATE INDEX idx_file_storage_deletion_task_status_next_attempt_at
     ON file_storage_deletion_task_tb (task_status, next_attempt_at);
+
+-- 업로드 확인(confirm) 시 삭제 예정 key인지 확인하는 조회용
+CREATE INDEX idx_file_storage_deletion_task_file_key
+    ON file_storage_deletion_task_tb (file_key);

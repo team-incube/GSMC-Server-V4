@@ -17,8 +17,8 @@ import java.time.LocalDateTime
 
 /**
  * 스토리지 객체 삭제 작업 영속성 처리를 담당하는 아웃바운드 어댑터 클래스입니다.
- * [FileStorageDeletionTaskPersistencePort]를 구현하며, 신규 저장과 상태별 집계는
- * [FileStorageDeletionTaskJpaRepository]에, 잠금 조회와 벌크 갱신/삭제는 QueryDSL(`JPAQueryFactory`)에
+ * [FileStorageDeletionTaskPersistencePort]를 구현하며, 신규 저장과 key 존재 확인은
+ * [FileStorageDeletionTaskJpaRepository]에, 잠금 조회·벌크 갱신/삭제·상태별 집계는 QueryDSL(`JPAQueryFactory`)에
  * 위임합니다.
  *
  * 신규 저장 외의 변경을 엔티티 병합(save)이 아니라 벌크 쿼리로 처리하는 이유는, 그사이 다른 워커가
@@ -78,13 +78,24 @@ class FileStorageDeletionTaskPersistenceAdapter(
             .execute()
     }
 
-    override fun deleteById(taskId: Long) {
+    override fun deleteAllById(taskIds: Collection<Long>) {
+        if (taskIds.isEmpty()) return
         queryFactory
             .delete(fileStorageDeletionTaskJpaEntity)
-            .where(fileStorageDeletionTaskJpaEntity.taskId.eq(taskId))
+            .where(fileStorageDeletionTaskJpaEntity.taskId.`in`(taskIds))
             .execute()
     }
 
-    override fun countByStatus(status: FileStorageDeletionTaskStatus): Long =
-        fileStorageDeletionTaskJpaRepository.countByStatus(status)
+    override fun existsByFileKey(fileKey: String): Boolean =
+        fileStorageDeletionTaskJpaRepository.existsByFileKey(fileKey)
+
+    override fun countGroupByStatus(): Map<FileStorageDeletionTaskStatus, Long> {
+        val taskCount = fileStorageDeletionTaskJpaEntity.taskId.count()
+        return queryFactory
+            .select(fileStorageDeletionTaskJpaEntity.status, taskCount)
+            .from(fileStorageDeletionTaskJpaEntity)
+            .groupBy(fileStorageDeletionTaskJpaEntity.status)
+            .fetch()
+            .associate { it.get(fileStorageDeletionTaskJpaEntity.status)!! to (it.get(taskCount) ?: 0L) }
+    }
 }
