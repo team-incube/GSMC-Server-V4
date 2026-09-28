@@ -1,31 +1,32 @@
 package team.incube.gsmc.domain.file.service
 
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.transaction.support.TransactionSynchronization
-import org.springframework.transaction.support.TransactionSynchronizationManager
+import team.incube.gsmc.domain.file.FileStorageDeletionTask
 import team.incube.gsmc.domain.file.port.`in`.RemoveFileUseCase
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
-import team.incube.gsmc.domain.file.port.out.FileStoragePort
+import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistencePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
-import team.themoment.sdk.logging.logger.logger
+import java.time.LocalDateTime
 
 /**
  * 파일 삭제 유스케이스 구현 클래스입니다.
  * [RemoveFileUseCase]를 구현하며, 소유자 본인만 호출을 허용합니다. 승인(`APPROVED`) 상태의
  * 점수 요청에 연결된 파일은 감사 추적 보존을 위해 삭제를 거부하며, 그 외 점수 요청/근거 자료
- * 연결 여부와는 무관하게 삭제합니다. DB row를 먼저 삭제하고, 트랜잭션이 커밋된 뒤에 오브젝트
- * 스토리지 객체를 삭제합니다. 스토리지 삭제는 트랜잭션 롤백 대상이 아니므로, DB 삭제(커밋)가
- * 실패해도 스토리지 객체는 그대로 남아 깨진 링크가 발생하지 않습니다. 커밋 후 스토리지 삭제가
- * 실패하면 고아 객체만 남을 수 있으며, 이 경우 로그로 남긴다.
+ * 연결 여부와는 무관하게 삭제합니다.
+ *
+ * 스토리지 객체는 여기서 직접 지우지 않고, DB row 삭제와 같은 트랜잭션에 삭제 작업
+ * ([FileStorageDeletionTask])만 기록합니다. DB 삭제가 롤백되면 작업도 함께 사라져 객체가 남으므로
+ * 깨진 링크가 생기지 않고, 커밋되면 S3 장애나 프로세스 종료가 있어도 작업이 남아
+ * [ProcessFileStorageDeletionTaskService]가 재시도합니다.
  */
 @Port(direction = PortDirection.INBOUND)
 class RemoveFileService(
     private val filePersistencePort: FilePersistencePort,
-    private val fileStoragePort: FileStoragePort,
+    private val fileStorageDeletionTaskPersistencePort: FileStorageDeletionTaskPersistencePort,
     private val memberUtil: MemberUtil,
 ) : RemoveFileUseCase {
     @Transactional
@@ -38,22 +39,7 @@ class RemoveFileService(
 
         filePersistencePort.deleteById(fileId)
 
-        TransactionSynchronizationManager.registerSynchronization(
-            object : TransactionSynchronization {
-                override fun afterCommit() {
-                    try {
-                        fileStoragePort.deleteObject(file.fileKey)
-                    } catch (e: Exception) {
-                        this@RemoveFileService.logger().error(
-                            "스토리지 객체 삭제 실패로 고아 객체가 남았습니다. fileId={}, fileKey={}",
-                            file.fileId,
-                            file.fileKey,
-                            e,
-                        )
-                    }
-                }
-            },
-        )
+        fileStorageDeletionTaskPersistencePort.save(FileStorageDeletionTask.pending(file.fileKey, LocalDateTime.now()))
 
         return true
     }
