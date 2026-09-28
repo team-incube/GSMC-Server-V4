@@ -8,6 +8,7 @@ import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import java.util.Date
+import java.util.UUID
 import javax.crypto.SecretKey
 
 @Component
@@ -38,6 +39,7 @@ class JwtTokenProvider(
         Jwts
             .builder()
             .subject(userId.toString())
+            .id(UUID.randomUUID().toString())
             .issuedAt(Date())
             .expiration(Date(System.currentTimeMillis() + jwtProperties.refreshTokenExpiry * 1000))
             .signWith(signingKey)

@@ -35,8 +35,7 @@ class RefreshTokenService(
             runCatching { authTokenPort.getUserIdFromToken(refreshToken) }
                 .getOrElse { throw GsmcException(ErrorCode.INVALID_REFRESH_TOKEN) }
 
-        val storedToken = refreshTokenPersistencePort.find(userId)
-        if (storedToken != refreshToken) {
+        if (refreshTokenPersistencePort.find(userId) != refreshToken) {
             throw GsmcException(ErrorCode.INVALID_REFRESH_TOKEN)
         }
 
@@ -47,7 +46,9 @@ class RefreshTokenService(
         val newAccessToken = authTokenPort.generateAccessToken(user.userId, user.userRole)
         val newRefreshToken = authTokenPort.generateRefreshToken(user.userId)
 
-        refreshTokenPersistencePort.save(user.userId, newRefreshToken)
+        if (!refreshTokenPersistencePort.rotate(user.userId, refreshToken, newRefreshToken)) {
+            throw GsmcException(ErrorCode.INVALID_REFRESH_TOKEN)
+        }
 
         val now = System.currentTimeMillis()
 

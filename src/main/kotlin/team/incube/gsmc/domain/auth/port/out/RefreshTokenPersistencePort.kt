@@ -18,6 +18,17 @@ interface RefreshTokenPersistencePort {
     )
 
     /**
+     * 저장된 토큰이 [expectedToken]과 일치할 때만 새 토큰으로 원자적으로 교체한다.
+     *
+     * @return 교체에 성공하면 true, 토큰이 없거나 이미 바뀌었으면 false
+     */
+    fun rotate(
+        userId: Long,
+        expectedToken: String,
+        newToken: String,
+    ): Boolean
+
+    /**
      * 사용자 ID로 리프레시 토큰을 조회한다.
      *
      * @param userId 조회할 사용자 ID
