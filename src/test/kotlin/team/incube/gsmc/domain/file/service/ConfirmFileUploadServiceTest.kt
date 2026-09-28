@@ -69,6 +69,23 @@ class ConfirmFileUploadServiceTest :
                 }
             }
 
+            When("파일 삭제 뒤 워커의 스토리지 삭제와 같은 key의 confirm이 교차 실행되면") {
+                Then("워커가 작업을 끝내기 전에도, 끝낸 뒤에도 confirm은 거부되어 삭제될 객체를 참조하는 파일이 생기지 않는다") {
+                    every { filePersistencePort.findByFileKey(fileKey) } returns null
+                    // 1) 파일 행 삭제와 함께 기록된 작업이 남아 있는 동안(워커의 S3 삭제 전후 모두)
+                    every { fileStorageDeletionTaskPersistencePort.existsByFileKey(fileKey) } returns true
+                    val whileTaskRemains = shouldThrow<GsmcException> { service.execute(fileKey, "original.png") }
+                    // 2) 워커가 S3 객체를 지우고 작업 행까지 삭제한 뒤
+                    every { fileStorageDeletionTaskPersistencePort.existsByFileKey(fileKey) } returns false
+                    every { fileStoragePort.getObjectSize(fileKey) } returns null
+                    val afterWorkerCompleted = shouldThrow<GsmcException> { service.execute(fileKey, "original.png") }
+
+                    whileTaskRemains.errorCode shouldBe ErrorCode.S3_OBJECT_NOT_FOUND
+                    afterWorkerCompleted.errorCode shouldBe ErrorCode.S3_OBJECT_NOT_FOUND
+                    verify(exactly = 0) { filePersistencePort.save(any()) }
+                }
+            }
+
             When("오브젝트 스토리지에 실제 객체가 없으면") {
                 Then("S3_OBJECT_NOT_FOUND 예외를 던진다") {
                     every { filePersistencePort.findByFileKey(fileKey) } returns null
