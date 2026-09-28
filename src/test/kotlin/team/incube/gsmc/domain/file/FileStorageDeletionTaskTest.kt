@@ -50,6 +50,24 @@ class FileStorageDeletionTaskTest :
                 }
             }
 
+            When("자르는 위치가 이모지 같은 서로게이트 쌍의 가운데면") {
+                Then("깨진 반쪽 문자를 남기지 않도록 한 글자 더 버린다") {
+                    val error = "x".repeat(FILE_STORAGE_DELETION_LAST_ERROR_MAX_LENGTH - 1) + "\uD83D\uDE00" + "tail"
+
+                    val truncated = FileStorageDeletionTask.truncateLastError(error)
+
+                    truncated shouldBe "x".repeat(FILE_STORAGE_DELETION_LAST_ERROR_MAX_LENGTH - 1)
+                }
+            }
+
+            When("오류 메시지가 컬럼 길이 이하면") {
+                Then("그대로 저장한다") {
+                    val error = "x".repeat(FILE_STORAGE_DELETION_LAST_ERROR_MAX_LENGTH - 2) + "\uD83D\uDE00"
+
+                    FileStorageDeletionTask.truncateLastError(error) shouldBe error
+                }
+            }
+
             When("오류 메시지가 컬럼 길이보다 길면") {
                 Then("컬럼 길이만큼 자른다") {
                     val task = FileStorageDeletionTask.pending("key-1", now)
