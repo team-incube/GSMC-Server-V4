@@ -16,6 +16,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  task:
+    scheduling:
+      pool:
+        # 알림 Heartbeat와 스토리지 객체 삭제 워커가 같은 스레드를 기다리지 않도록 분리한다.
+        # 스토리지 장애 중 삭제 호출이 타임아웃까지 걸리면 Heartbeat가 밀려 SSE 연결이 끊길 수 있다.
+        size: 2
   data:
     redis:
       host: ${REDIS_HOST}
