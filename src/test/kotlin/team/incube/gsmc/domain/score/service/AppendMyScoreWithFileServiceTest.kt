@@ -113,6 +113,28 @@ class AppendMyScoreWithFileServiceTest :
             }
         }
 
+        Given("SCORE_BASED 카테고리에 허용 범위 밖의 값으로 제출할 때") {
+            When("값 검증에 실패하면") {
+                Then("INVALID_SCORE_VALUE를 반환하고 기존 파일 연결 해제·저장·새 파일 연결을 하지 않는다") {
+                    val cat = category(ScoreCalculationType.SCORE_BASED)
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.CERTIFICATE, EvidenceType.FILE) } returns
+                        cat
+                    every { filePersistencePort.findById(10L) } returns file(10L)
+                    every { appendScoreSupport.parseScoreValue("-1", cat) } throws
+                        GsmcException(ErrorCode.INVALID_SCORE_VALUE)
+
+                    val exception = shouldThrow<GsmcException> { service.execute(CategoryType.CERTIFICATE, "-1", 10L) }
+
+                    exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
+                    verify(exactly = 0) { appendScoreSupport.findOrCreateScore(any(), any()) }
+                    verify(exactly = 0) { filePersistencePort.unlinkFromScore(any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { filePersistencePort.linkToScore(any(), any()) }
+                }
+            }
+        }
+
         Given("COUNT_BASED 카테고리에 새로 제출할 때") {
             When("텍스트 값과 파일을 첨부하면") {
                 Then("activityName에 저장된다") {

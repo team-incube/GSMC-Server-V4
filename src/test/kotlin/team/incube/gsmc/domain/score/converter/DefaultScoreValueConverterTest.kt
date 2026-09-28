@@ -42,18 +42,18 @@ class DefaultScoreValueConverterTest :
                             calculationType = ScoreCalculationType.SCORE_BASED,
                         )
 
-                    converter.convert(cat, 7.0) shouldBe 7
+                    converter.toScoreValue(cat, 7.0) shouldBe 7
                 }
             }
         }
 
         Given("toScoreValue") {
-            When("0 이상 최대 점수 이하의 값이 주어지면") {
+            When("0 이상 최대 점수 이하의 원점수가 주어지면") {
                 Then("반올림한 인정점수를 반환한다") {
                     converter.toScoreValue(volunteer, 0.0) shouldBe 0
                     converter.toScoreValue(volunteer, 2.4) shouldBe 2
+                    converter.toScoreValue(volunteer, 9.6) shouldBe 10
                     converter.toScoreValue(volunteer, 10.0) shouldBe 10
-                    converter.toScoreValue(volunteer, 10.4) shouldBe 10
                 }
             }
 
@@ -64,7 +64,7 @@ class DefaultScoreValueConverterTest :
                 Double.POSITIVE_INFINITY,
                 Double.NEGATIVE_INFINITY,
                 Double.MAX_VALUE,
-                10.5,
+                10.4,
             ).forEach { rawValue ->
                 When("허용 범위 밖의 값 $rawValue 가 주어지면") {
                     Then("INVALID_SCORE_VALUE 예외가 발생한다") {

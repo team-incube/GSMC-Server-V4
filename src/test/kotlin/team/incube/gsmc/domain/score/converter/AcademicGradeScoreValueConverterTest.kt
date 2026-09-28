@@ -34,9 +34,10 @@ class AcademicGradeScoreValueConverterTest :
                 Then("(categoryMaximumValue+1)-등급으로 변환한다") {
                     val cat = category(CategoryType.ACADEMIC_GRADE, categoryMaximumValue = 9)
 
-                    converter.convert(cat, 1.0) shouldBe 9
-                    converter.convert(cat, 2.4) shouldBe 8
-                    converter.convert(cat, 9.0) shouldBe 1
+                    converter.toScoreValue(cat, 1.0) shouldBe 9
+                    converter.toScoreValue(cat, 2.4) shouldBe 8
+                    converter.toScoreValue(cat, 2.5) shouldBe 7
+                    converter.toScoreValue(cat, 9.0) shouldBe 1
                 }
             }
 
@@ -44,8 +45,8 @@ class AcademicGradeScoreValueConverterTest :
                 Then("(categoryMaximumValue+1)-등급으로 변환한다") {
                     val cat = category(CategoryType.NCS, categoryMaximumValue = 5)
 
-                    converter.convert(cat, 1.0) shouldBe 5
-                    converter.convert(cat, 3.6) shouldBe 2
+                    converter.toScoreValue(cat, 1.0) shouldBe 5
+                    converter.toScoreValue(cat, 3.6) shouldBe 2
                 }
             }
         }
@@ -60,7 +61,7 @@ class AcademicGradeScoreValueConverterTest :
                 }
             }
 
-            listOf(0.0, 6.0, 100.0, Double.NaN).forEach { rawValue ->
+            listOf(0.0, 0.6, 5.4, 6.0, 100.0, Double.NaN).forEach { rawValue ->
                 When("NCS에 존재하지 않는 등급 $rawValue 가 주어지면") {
                     Then("INVALID_SCORE_VALUE 예외가 발생한다") {
                         val cat = category(CategoryType.NCS, categoryMaximumValue = 5)

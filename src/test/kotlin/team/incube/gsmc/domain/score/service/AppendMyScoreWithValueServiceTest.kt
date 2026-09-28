@@ -43,6 +43,7 @@ class AppendMyScoreWithValueServiceTest :
         beforeEach {
             clearAllMocks()
             every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { appendScoreSupport.parseRawScoreValue(any()) } answers { firstArg<String>().toDouble() }
         }
 
         val userId = 1L
@@ -146,7 +147,7 @@ class AppendMyScoreWithValueServiceTest :
             }
 
             When("등급에 NaN을 입력하면") {
-                Then("내부 오류 대신 INVALID_SCORE_VALUE 예외가 발생하고 저장하지 않는다") {
+                Then("공통 검증에서 INVALID_SCORE_VALUE로 거부되어 학년 조회·저장을 하지 않는다") {
                     every { memberUtil.getCurrentUserId() } returns userId
                     every {
                         appendScoreSupport.resolveUnrequiredCategory(
@@ -154,7 +155,9 @@ class AppendMyScoreWithValueServiceTest :
                             ScoreCalculationType.SCORE_BASED,
                         )
                     } returns academicGradeCategory
-                    every { memberPersistencePort.findByUserId(userId) } returns student(grade = 3)
+                    every {
+                        appendScoreSupport.parseScoreValue("NaN", academicGradeCategory)
+                    } throws GsmcException(ErrorCode.INVALID_SCORE_VALUE)
 
                     val exception =
                         shouldThrow<GsmcException> {
@@ -162,6 +165,7 @@ class AppendMyScoreWithValueServiceTest :
                         }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
+                    verify(exactly = 0) { memberPersistencePort.findByUserId(any()) }
                     verify(exactly = 0) { scorePersistencePort.save(any()) }
                 }
             }
@@ -176,6 +180,7 @@ class AppendMyScoreWithValueServiceTest :
                         )
                     } returns academicGradeCategory
                     every { memberPersistencePort.findByUserId(userId) } returns student(grade = 2)
+                    every { appendScoreSupport.parseScoreValue("7", academicGradeCategory) } returns 3
 
                     val exception =
                         shouldThrow<GsmcException> {
@@ -183,6 +188,7 @@ class AppendMyScoreWithValueServiceTest :
                         }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
                 }
             }
 
