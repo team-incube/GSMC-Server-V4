@@ -1,5 +1,7 @@
 package team.incube.gsmc.domain.project.adapter.out.persistence
 
+import com.querydsl.core.types.Predicate
+import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.FileJpaEntity
@@ -56,7 +58,7 @@ class ProjectPersistenceAdapter(
     ): List<Project> =
         queryFactory
             .selectFrom(projectJpaEntity)
-            .where(projectJpaEntity.title.containsIgnoreCase(title))
+            .where(titleSearchCondition(title))
             .orderBy(projectJpaEntity.projectId.desc())
             .offset((page * size).toLong())
             .limit(size.toLong())
@@ -68,8 +70,35 @@ class ProjectPersistenceAdapter(
         queryFactory
             .select(projectJpaEntity.count())
             .from(projectJpaEntity)
-            .where(projectJpaEntity.title.containsIgnoreCase(title))
+            .where(titleSearchCondition(title))
             .fetchOne() ?: 0L
+
+    /**
+     * 제목 검색 조건을 구성합니다.
+     * 공백이면 조건 없음, 한 글자면 LIKE(ngram 최소 토큰 미만), 두 글자 이상이면 FULLTEXT ngram 검색을 사용합니다.
+     */
+    private fun titleSearchCondition(title: String): Predicate? {
+        val trimmedTitle = title.trim()
+        return when {
+            trimmedTitle.isEmpty() -> null
+            trimmedTitle.length == 1 -> projectJpaEntity.title.containsIgnoreCase(trimmedTitle)
+            else -> matchAgainstPredicate(trimmedTitle)
+        }
+    }
+
+    /**
+     * relevance 비교(`> 0`) 없이 `match_against` 함수 호출 자체를 predicate로 사용합니다.
+     * InnoDB FULLTEXT는 모든 행에 등장하는 단어의 relevance를 0으로 계산하므로,
+     * 비교 연산을 두면 실제 매치된 행이 조건에서 제외될 수 있습니다.
+     */
+    private fun matchAgainstPredicate(trimmedTitle: String): Predicate =
+        Expressions.booleanTemplate(
+            "match_against({0}, {1})",
+            projectJpaEntity.title,
+            toBooleanModePhrase(trimmedTitle),
+        )
+
+    private fun toBooleanModePhrase(trimmedTitle: String): String = "\"${trimmedTitle.replace("\"", "")}\""
 
     /** 프로젝트와 참여자·파일 관계를 저장하고 저장된 도메인을 반환합니다. */
     override fun save(project: Project): Project {
