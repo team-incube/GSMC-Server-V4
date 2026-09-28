@@ -5,7 +5,6 @@ import org.springframework.transaction.support.TransactionTemplate
 import team.incube.gsmc.domain.file.FileStorageDeletionTask
 import team.incube.gsmc.domain.file.FileStorageDeletionTaskStatus
 import team.incube.gsmc.domain.file.port.`in`.ProcessFileStorageDeletionTaskUseCase
-import team.incube.gsmc.domain.file.port.out.FilePersistencePort
 import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistencePort
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
 import team.incube.gsmc.global.annotation.PortDirection
@@ -24,6 +23,12 @@ private const val BATCH_SIZE = 50
 private val LEASE_DURATION: Duration = Duration.ofMinutes(5)
 
 /**
+ * 선점 후 새 작업을 시작할 수 있는 시간. [LEASE_DURATION]보다 짧게 두어, 마지막으로 시작한 스토리지
+ * 호출이 선점 만료 전에 끝날 여유를 남긴다.
+ */
+private val PROCESSING_WINDOW: Duration = Duration.ofMinutes(3)
+
+/**
  * 스토리지 객체 삭제 작업 처리 유스케이스 구현 클래스입니다.
  * [ProcessFileStorageDeletionTaskUseCase]를 구현합니다.
  *
@@ -31,49 +36,64 @@ private val LEASE_DURATION: Duration = Duration.ofMinutes(5)
  *    선점 만료 시각으로 밀어 둔 뒤 커밋한다. 여러 인스턴스가 동시에 돌아도 같은 작업을 나눠 갖지 않는다.
  * 2. 트랜잭션 밖에서 작업마다 스토리지 객체를 삭제한다. 네트워크 호출 동안 DB 커넥션과 행 잠금을
  *    쥐고 있지 않기 위해서다.
- * 3. 성공하면 작업 행을 지우고, 실패하면 시도 횟수·마지막 오류와 백오프된 다음 시도 시각을 기록한다.
- *    최대 시도 횟수에 도달하면 [FileStorageDeletionTaskStatus.FAILED]로 바꿔 수동 복구 대상으로 남긴다.
+ * 3. 실패하면 시도 횟수·마지막 오류와 백오프된 다음 시도 시각을 기록한다. 최대 시도 횟수에 도달하면
+ *    [FileStorageDeletionTaskStatus.FAILED]로 바꿔 수동 복구 대상으로 남긴다.
+ * 4. 삭제에 성공한 작업은 묶음이 끝날 때 한 번에 지운다. 중간에 예외가 나도 그때까지 완료한 작업은 지운다.
  *
- * 스토리지 삭제가 한 번 실패하면 그 묶음의 남은 작업은 시도하지 않는다. 스토리지 장애 중에 호출마다
- * 타임아웃을 기다리며 스케줄러 스레드를 붙잡지 않기 위해서다. 남은 작업은 선점 만료 뒤 시도 횟수를
- * 늘리지 않은 채 다시 처리된다.
+ * 다음 경우에는 묶음의 남은 작업을 시도하지 않고, 선점 만료 뒤 시도 횟수를 늘리지 않은 채 다시 처리한다.
+ * - 스토리지 삭제가 한 번 실패했을 때: 장애 중에 호출마다 타임아웃을 기다리며 스케줄러 스레드를 붙잡지 않는다.
+ * - 선점 후 [PROCESSING_WINDOW]가 지났을 때: 스토리지가 느려 묶음 처리가 선점 만료를 넘기면 다른 워커가
+ *   같은 작업을 다시 가져가 중복 호출하게 되는 것을 막는다.
  *
  * 멱등성: S3 `DeleteObject`는 없는 key에도 성공을 돌려주므로, 선점 만료로 두 워커가 같은 작업을
  * 처리하거나 삭제 후 완료 기록 전에 종료돼 재처리되어도 안전하다. 완료·실패 기록은 행이 이미 없으면
  * 0건 갱신으로 끝난다.
  *
- * 삭제 안전성: 삭제 직전 같은 key를 참조하는 파일 행이 다시 생겼는지 확인하고, 있으면 객체를 지우지
- * 않고 작업만 완료 처리한다. 업로드 확인(confirm)이 key 소유자를 검증하지 않아, 파일 삭제 뒤 같은
- * key로 다시 confirm되면 살아 있는 파일의 객체를 지우게 되는 것을 막는다.
+ * 삭제 안전성: 삭제 작업이 남아 있는 key는 [ConfirmFileUploadService]가 다시 등록하지 못하게 막으므로,
+ * 워커가 지우는 객체를 참조하는 파일 행은 생기지 않는다.
+ *
+ * @param currentTime 현재 시각. 테스트에서 시간 흐름을 제어하기 위해 주입할 수 있다.
  */
 @Port(direction = PortDirection.INBOUND)
 class ProcessFileStorageDeletionTaskService(
     private val fileStorageDeletionTaskPersistencePort: FileStorageDeletionTaskPersistencePort,
-    private val filePersistencePort: FilePersistencePort,
     private val fileStoragePort: FileStoragePort,
     transactionManager: PlatformTransactionManager,
+    private val currentTime: () -> LocalDateTime = LocalDateTime::now,
 ) : ProcessFileStorageDeletionTaskUseCase {
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
     override fun execute() {
-        val tasks = claimDueTasks(LocalDateTime.now())
+        val claimedAt = currentTime()
+        val tasks = claimDueTasks(claimedAt)
         if (tasks.isEmpty()) return
 
-        var completed = 0
-        for (task in tasks) {
-            if (!process(task)) break
-            completed++
+        val deadline = claimedAt.plus(PROCESSING_WINDOW)
+        val completedTaskIds = mutableListOf<Long>()
+        var failed = 0
+        try {
+            for (task in tasks) {
+                if (!currentTime().isBefore(deadline)) break
+                if (!deleteObject(task)) {
+                    failed = 1
+                    break
+                }
+                completedTaskIds += task.taskId
+            }
+        } finally {
+            if (completedTaskIds.isNotEmpty()) {
+                transactionTemplate.executeWithoutResult {
+                    fileStorageDeletionTaskPersistencePort.deleteAllById(completedTaskIds)
+                }
+            }
         }
-        val failed = if (completed < tasks.size) 1 else 0
 
         logger().info(
-            "스토리지 객체 삭제 작업 처리: 선점={}, 완료={}, 실패={}, 보류={}, 대기 작업={}, 수동 복구 대상={}",
+            "스토리지 객체 삭제 작업 처리: 선점={}, 완료={}, 실패={}, 보류={}",
             tasks.size,
-            completed,
+            completedTaskIds.size,
             failed,
-            tasks.size - completed - failed,
-            fileStorageDeletionTaskPersistencePort.countByStatus(FileStorageDeletionTaskStatus.PENDING),
-            fileStorageDeletionTaskPersistencePort.countByStatus(FileStorageDeletionTaskStatus.FAILED),
+            tasks.size - completedTaskIds.size - failed,
         )
     }
 
@@ -88,36 +108,20 @@ class ProcessFileStorageDeletionTaskService(
         } ?: emptyList()
 
     /**
-     * 작업 하나를 처리한다.
+     * 작업의 스토리지 객체를 삭제한다. 실패하면 실패를 기록한다.
      *
-     * @return 작업을 완료했으면 true, 스토리지 삭제에 실패했으면 false
+     * @return 삭제에 성공했으면 true
      */
-    private fun process(task: FileStorageDeletionTask): Boolean {
-        if (filePersistencePort.findByFileKey(task.fileKey) != null) {
-            logger().warn(
-                "같은 key를 참조하는 파일이 다시 존재해 스토리지 객체를 삭제하지 않고 작업을 완료 처리합니다. taskId={}, fileKey={}",
-                task.taskId,
-                task.fileKey,
-            )
-            complete(task)
-            return true
-        }
-
+    private fun deleteObject(task: FileStorageDeletionTask): Boolean {
         try {
             fileStoragePort.deleteObject(task.fileKey)
+            return true
         } catch (e: Exception) {
-            val failed = task.recordFailure("${e.javaClass.simpleName}: ${e.message}", LocalDateTime.now())
+            val failed = task.recordFailure("${e.javaClass.simpleName}: ${e.message}", currentTime())
             transactionTemplate.executeWithoutResult { fileStorageDeletionTaskPersistencePort.updateFailure(failed) }
             logFailure(failed, e)
             return false
         }
-
-        complete(task)
-        return true
-    }
-
-    private fun complete(task: FileStorageDeletionTask) {
-        transactionTemplate.executeWithoutResult { fileStorageDeletionTaskPersistencePort.deleteById(task.taskId) }
     }
 
     private fun logFailure(

@@ -56,7 +56,7 @@ data class FileStorageDeletionTask(
             status = if (exhausted) FileStorageDeletionTaskStatus.FAILED else FileStorageDeletionTaskStatus.PENDING,
             attemptCount = attempts,
             nextAttemptAt = if (exhausted) now else now.plus(backoffAfter(attempts)),
-            lastError = error.take(FILE_STORAGE_DELETION_LAST_ERROR_MAX_LENGTH),
+            lastError = truncateLastError(error),
             lastAttemptedAt = now,
         )
     }
@@ -81,6 +81,19 @@ data class FileStorageDeletionTask(
                 lastError = null,
                 lastAttemptedAt = null,
             )
+
+        /**
+         * [error]를 `last_error` 컬럼 길이에 맞게 자른다. 자른 끝이 서로게이트 쌍의 앞쪽이면 깨진 문자가
+         * 저장되지 않도록 그 한 글자를 더 버린다.
+         */
+        fun truncateLastError(error: String): String {
+            val truncated = error.take(FILE_STORAGE_DELETION_LAST_ERROR_MAX_LENGTH)
+            return if (truncated.length < error.length && truncated.last().isHighSurrogate()) {
+                truncated.dropLast(1)
+            } else {
+                truncated
+            }
+        }
 
         /**
          * [attempts]번째 실패 뒤의 재시도 대기 시간. [FILE_STORAGE_DELETION_INITIAL_BACKOFF]에서 시작해
