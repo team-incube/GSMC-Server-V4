@@ -23,7 +23,8 @@ import java.time.LocalDateTime
  *
  * 신규 저장 외의 변경을 엔티티 병합(save)이 아니라 벌크 쿼리로 처리하는 이유는, 그사이 다른 워커가
  * 작업을 완료해 행이 지워졌을 때 병합이 행을 되살리거나 예외를 내지 않고 0건 갱신으로 끝나게 하기
- * 위해서입니다.
+ * 위해서입니다. 실패 기록과 완료 삭제는 선점 토큰까지 조건에 넣어, 선점이 만료된 이전 워커의 결과가
+ * 다시 선점한 워커의 상태를 덮어쓰지 못하게 합니다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class FileStorageDeletionTaskPersistenceAdapter(
@@ -54,19 +55,24 @@ class FileStorageDeletionTaskPersistenceAdapter(
             .fetch()
             .map { it.toDomain() }
 
-    override fun updateNextAttemptAt(
+    override fun lease(
         taskIds: Collection<Long>,
-        nextAttemptAt: LocalDateTime,
+        leaseUntil: LocalDateTime,
+        leaseToken: String,
     ) {
         if (taskIds.isEmpty()) return
         queryFactory
             .update(fileStorageDeletionTaskJpaEntity)
-            .set(fileStorageDeletionTaskJpaEntity.nextAttemptAt, nextAttemptAt)
+            .set(fileStorageDeletionTaskJpaEntity.nextAttemptAt, leaseUntil)
+            .set(fileStorageDeletionTaskJpaEntity.leaseToken, leaseToken)
             .where(fileStorageDeletionTaskJpaEntity.taskId.`in`(taskIds))
             .execute()
     }
 
-    override fun updateFailure(task: FileStorageDeletionTask) {
+    override fun updateFailure(
+        task: FileStorageDeletionTask,
+        leaseToken: String,
+    ): Boolean =
         queryFactory
             .update(fileStorageDeletionTaskJpaEntity)
             .set(fileStorageDeletionTaskJpaEntity.status, task.status)
@@ -74,16 +80,23 @@ class FileStorageDeletionTaskPersistenceAdapter(
             .set(fileStorageDeletionTaskJpaEntity.nextAttemptAt, task.nextAttemptAt)
             .set(fileStorageDeletionTaskJpaEntity.lastError, task.lastError)
             .set(fileStorageDeletionTaskJpaEntity.lastAttemptedAt, task.lastAttemptedAt)
-            .where(fileStorageDeletionTaskJpaEntity.taskId.eq(task.taskId))
-            .execute()
-    }
+            .setNull(fileStorageDeletionTaskJpaEntity.leaseToken)
+            .where(
+                fileStorageDeletionTaskJpaEntity.taskId.eq(task.taskId),
+                fileStorageDeletionTaskJpaEntity.leaseToken.eq(leaseToken),
+            ).execute() > 0
 
-    override fun deleteAllById(taskIds: Collection<Long>) {
-        if (taskIds.isEmpty()) return
-        queryFactory
+    override fun deleteAllByIdAndLeaseToken(
+        taskIds: Collection<Long>,
+        leaseToken: String,
+    ): Long {
+        if (taskIds.isEmpty()) return 0
+        return queryFactory
             .delete(fileStorageDeletionTaskJpaEntity)
-            .where(fileStorageDeletionTaskJpaEntity.taskId.`in`(taskIds))
-            .execute()
+            .where(
+                fileStorageDeletionTaskJpaEntity.taskId.`in`(taskIds),
+                fileStorageDeletionTaskJpaEntity.leaseToken.eq(leaseToken),
+            ).execute()
     }
 
     override fun existsByFileKey(fileKey: String): Boolean =

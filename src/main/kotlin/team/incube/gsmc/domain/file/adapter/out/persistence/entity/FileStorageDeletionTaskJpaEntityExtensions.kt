@@ -17,6 +17,7 @@ fun FileStorageDeletionTaskJpaEntity.toDomain(): FileStorageDeletionTask =
         nextAttemptAt = nextAttemptAt,
         lastError = lastError,
         lastAttemptedAt = lastAttemptedAt,
+        leaseToken = leaseToken,
     )
 
 /**
@@ -34,4 +35,5 @@ fun FileStorageDeletionTask.toEntity(): FileStorageDeletionTaskJpaEntity =
         nextAttemptAt = nextAttemptAt,
         lastError = lastError,
         lastAttemptedAt = lastAttemptedAt,
+        leaseToken = leaseToken,
     )

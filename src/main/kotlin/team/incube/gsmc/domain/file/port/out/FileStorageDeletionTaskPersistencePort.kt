@@ -30,30 +30,43 @@ interface FileStorageDeletionTaskPersistencePort {
     ): List<FileStorageDeletionTask>
 
     /**
-     * 작업들의 다음 시도 시각을 바꾼다. 워커가 작업을 선점(lease)할 때 사용한다.
+     * 작업들을 선점한다. 다음 시도 시각을 선점 만료 시각으로 밀고 선점 토큰을 기록한다.
      *
      * @param taskIds 대상 작업 ID 목록
-     * @param nextAttemptAt 새 다음 시도 시각
+     * @param leaseUntil 선점 만료 시각
+     * @param leaseToken 이번 선점을 식별하는 토큰
      */
-    fun updateNextAttemptAt(
+    fun lease(
         taskIds: Collection<Long>,
-        nextAttemptAt: LocalDateTime,
+        leaseUntil: LocalDateTime,
+        leaseToken: String,
     )
 
     /**
-     * 실패 기록(상태·시도 횟수·다음 시도 시각·마지막 오류)을 반영한다. 이미 다른 워커가 완료해 행이
-     * 없으면 아무것도 하지 않는다.
+     * 실패 기록(상태·시도 횟수·다음 시도 시각·마지막 오류)을 반영하고 선점을 푼다. [leaseToken]이 현재
+     * 선점 토큰과 같을 때만 반영하므로, 선점이 만료돼 다른 워커가 다시 가져간 작업은 건드리지 않는다.
      *
      * @param task 실패가 기록된 작업
+     * @param leaseToken 작업을 선점할 때 쓴 토큰
+     * @return 반영했으면 true, 행이 없거나 다른 워커가 다시 선점했으면 false
      */
-    fun updateFailure(task: FileStorageDeletionTask)
+    fun updateFailure(
+        task: FileStorageDeletionTask,
+        leaseToken: String,
+    ): Boolean
 
     /**
-     * 완료된 작업들을 삭제한다. 이미 없는 작업은 건너뛴다.
+     * 완료된 작업들을 삭제한다. [leaseToken]으로 선점한 작업만 지우므로, 다른 워커가 다시 선점한 작업은
+     * 남겨 그 워커가 마무리하게 한다.
      *
      * @param taskIds 삭제할 작업 ID 목록
+     * @param leaseToken 작업을 선점할 때 쓴 토큰
+     * @return 삭제한 작업 수
      */
-    fun deleteAllById(taskIds: Collection<Long>)
+    fun deleteAllByIdAndLeaseToken(
+        taskIds: Collection<Long>,
+        leaseToken: String,
+    ): Long
 
     /**
      * 해당 key의 삭제 작업이 상태와 무관하게 남아 있는지 확인한다. 삭제 예정인 객체를 다시 파일로

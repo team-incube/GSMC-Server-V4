@@ -51,6 +51,9 @@ class FileStorageDeletionTaskJpaEntity(
     /** 마지막으로 실패한 시각 */
     @Column(name = "last_attempted_at", nullable = true)
     val lastAttemptedAt: LocalDateTime?,
+    /** 작업을 선점한 워커의 토큰(선점 중이 아니면 null) */
+    @Column(name = "lease_token", nullable = true, length = 36)
+    val leaseToken: String?,
 ) {
     /** 생성 일시 */
     @CreatedDate

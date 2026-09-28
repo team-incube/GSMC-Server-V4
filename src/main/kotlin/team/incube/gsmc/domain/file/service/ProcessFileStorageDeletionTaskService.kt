@@ -12,6 +12,7 @@ import team.incube.gsmc.global.annotation.port.Port
 import team.themoment.sdk.logging.logger.logger
 import java.time.Duration
 import java.time.LocalDateTime
+import java.util.UUID
 
 /** 한 번에 선점해 처리하는 최대 작업 수 */
 private const val BATCH_SIZE = 50
@@ -45,9 +46,12 @@ private val PROCESSING_WINDOW: Duration = Duration.ofMinutes(3)
  * - 선점 후 [PROCESSING_WINDOW]가 지났을 때: 스토리지가 느려 묶음 처리가 선점 만료를 넘기면 다른 워커가
  *   같은 작업을 다시 가져가 중복 호출하게 되는 것을 막는다.
  *
+ * 선점 토큰: 실행마다 새 토큰으로 선점하고, 완료 삭제와 실패 기록은 그 토큰이 아직 행에 남아 있을 때만
+ * 반영한다. 스토리지 호출이 선점 만료를 넘겨 다른 워커가 같은 작업을 다시 가져가면 행의 토큰이 바뀌므로,
+ * 이전 워커의 결과는 버려지고 새 선점의 시도 횟수·다음 시도 시각이 보존된다.
+ *
  * 멱등성: S3 `DeleteObject`는 없는 key에도 성공을 돌려주므로, 선점 만료로 두 워커가 같은 작업을
- * 처리하거나 삭제 후 완료 기록 전에 종료돼 재처리되어도 안전하다. 완료·실패 기록은 행이 이미 없으면
- * 0건 갱신으로 끝난다.
+ * 처리하거나 삭제 후 완료 기록 전에 종료돼 재처리되어도 안전하다.
  *
  * 삭제 안전성: 삭제 작업이 남아 있는 key는 [ConfirmFileUploadService]가 다시 등록하지 못하게 막으므로,
  * 워커가 지우는 객체를 참조하는 파일 행은 생기지 않는다.
@@ -65,7 +69,8 @@ class ProcessFileStorageDeletionTaskService(
 
     override fun execute() {
         val claimedAt = currentTime()
-        val tasks = claimDueTasks(claimedAt)
+        val leaseToken = UUID.randomUUID().toString()
+        val tasks = claimDueTasks(claimedAt, leaseToken)
         if (tasks.isEmpty()) return
 
         val deadline = claimedAt.plus(PROCESSING_WINDOW)
@@ -74,18 +79,14 @@ class ProcessFileStorageDeletionTaskService(
         try {
             for (task in tasks) {
                 if (!currentTime().isBefore(deadline)) break
-                if (!deleteObject(task)) {
+                if (!deleteObject(task, leaseToken)) {
                     failed = 1
                     break
                 }
                 completedTaskIds += task.taskId
             }
         } finally {
-            if (completedTaskIds.isNotEmpty()) {
-                transactionTemplate.executeWithoutResult {
-                    fileStorageDeletionTaskPersistencePort.deleteAllById(completedTaskIds)
-                }
-            }
+            if (completedTaskIds.isNotEmpty()) completeTasks(completedTaskIds, leaseToken)
         }
 
         logger().info(
@@ -97,29 +98,59 @@ class ProcessFileStorageDeletionTaskService(
         )
     }
 
-    private fun claimDueTasks(now: LocalDateTime): List<FileStorageDeletionTask> =
+    private fun claimDueTasks(
+        now: LocalDateTime,
+        leaseToken: String,
+    ): List<FileStorageDeletionTask> =
         transactionTemplate.execute {
             val tasks = fileStorageDeletionTaskPersistencePort.findAllDueForUpdate(now, BATCH_SIZE)
-            fileStorageDeletionTaskPersistencePort.updateNextAttemptAt(
-                tasks.map { it.taskId },
-                now.plus(LEASE_DURATION),
-            )
+            fileStorageDeletionTaskPersistencePort.lease(tasks.map { it.taskId }, now.plus(LEASE_DURATION), leaseToken)
             tasks
         } ?: emptyList()
+
+    private fun completeTasks(
+        taskIds: List<Long>,
+        leaseToken: String,
+    ) {
+        val deleted =
+            transactionTemplate.execute {
+                fileStorageDeletionTaskPersistencePort.deleteAllByIdAndLeaseToken(taskIds, leaseToken)
+            } ?: 0L
+        if (deleted < taskIds.size) {
+            logger().warn(
+                "선점이 만료돼 다른 워커가 다시 가져간 작업은 완료 처리하지 않고 그 워커에 맡깁니다. 완료={}, 반영={}",
+                taskIds.size,
+                deleted,
+            )
+        }
+    }
 
     /**
      * 작업의 스토리지 객체를 삭제한다. 실패하면 실패를 기록한다.
      *
      * @return 삭제에 성공했으면 true
      */
-    private fun deleteObject(task: FileStorageDeletionTask): Boolean {
+    private fun deleteObject(
+        task: FileStorageDeletionTask,
+        leaseToken: String,
+    ): Boolean {
         try {
             fileStoragePort.deleteObject(task.fileKey)
             return true
         } catch (e: Exception) {
             val failed = task.recordFailure("${e.javaClass.simpleName}: ${e.message}", currentTime())
-            transactionTemplate.executeWithoutResult { fileStorageDeletionTaskPersistencePort.updateFailure(failed) }
-            logFailure(failed, e)
+            val recorded =
+                transactionTemplate.execute { fileStorageDeletionTaskPersistencePort.updateFailure(failed, leaseToken) }
+            if (recorded == true) {
+                logFailure(failed, e)
+            } else {
+                logger().warn(
+                    "선점이 만료돼 다른 워커가 다시 가져간 작업이라 실패를 기록하지 않습니다. taskId={}, fileKey={}",
+                    task.taskId,
+                    task.fileKey,
+                    e,
+                )
+            }
             return false
         }
     }

@@ -29,6 +29,7 @@ const val FILE_STORAGE_DELETION_LAST_ERROR_MAX_LENGTH = 1000
  * @param nextAttemptAt 다음 시도 가능 시각. 워커가 작업을 선점하는 동안에는 선점 만료 시각으로 쓰인다.
  * @param lastError 마지막 실패의 오류 메시지
  * @param lastAttemptedAt 마지막으로 실패한 시각
+ * @param leaseToken 작업을 선점한 워커의 토큰. 선점 중이 아니면 null이다.
  */
 data class FileStorageDeletionTask(
     val taskId: Long,
@@ -38,10 +39,11 @@ data class FileStorageDeletionTask(
     val nextAttemptAt: LocalDateTime,
     val lastError: String?,
     val lastAttemptedAt: LocalDateTime?,
+    val leaseToken: String? = null,
 ) {
     /**
      * 삭제 실패를 기록한 작업을 반환한다. 최대 시도 횟수에 도달하면 [FileStorageDeletionTaskStatus.FAILED]로
-     * 바꿔 자동 재시도를 멈추고, 아니면 지수 백오프로 다음 시도 시각을 정한다.
+     * 바꿔 자동 재시도를 멈추고, 아니면 지수 백오프로 다음 시도 시각을 정한다. 선점은 풀린다.
      *
      * @param error 실패 원인 메시지
      * @param now 실패 시각
@@ -58,6 +60,7 @@ data class FileStorageDeletionTask(
             nextAttemptAt = if (exhausted) now else now.plus(backoffAfter(attempts)),
             lastError = truncateLastError(error),
             lastAttemptedAt = now,
+            leaseToken = null,
         )
     }
 
