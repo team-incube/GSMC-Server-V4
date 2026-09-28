@@ -67,10 +67,16 @@ class AppendScoreSupport(
     fun parseScoreValue(
         value: String?,
         category: Category,
-    ): Int {
-        val raw = value?.trim()?.toDoubleOrNull() ?: throw GsmcException(ErrorCode.INVALID_SCORE_VALUE)
-        return ScoreValueConverterRegistry.resolve(category.categoryType).toScoreValue(category, raw)
-    }
+    ): Int =
+        ScoreValueConverterRegistry.resolve(category.categoryType).toScoreValue(category, parseRawScoreValue(value))
+
+    /**
+     * 문자열 [value]를 원점수로 파싱한다. 값의 유효성은 검증하지 않는다.
+     *
+     * @throws GsmcException 숫자로 파싱할 수 없으면 [ErrorCode.INVALID_SCORE_VALUE]
+     */
+    fun parseRawScoreValue(value: String?): Double =
+        value?.trim()?.toDoubleOrNull() ?: throw GsmcException(ErrorCode.INVALID_SCORE_VALUE)
 
     /**
      * 재사용할 기존 점수 요청이 있으면 그것을, 없으면 새로 저장할 빈 [Score]를 반환한다.
