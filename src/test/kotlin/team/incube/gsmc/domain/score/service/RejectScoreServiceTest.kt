@@ -107,12 +107,36 @@ class RejectScoreServiceTest :
                 }
             }
 
-            When("이미 REJECTED인 점수를 다시 거절하면") {
-                Then("락만 잡고 early return하며 save 이후 로직을 전부 스킵한다") {
+            When("이미 REJECTED인 점수를 다른 사유로 다시 거절하면") {
+                Then("새 사유로 save만 1회 수행하고 알림·publish·캐시 무효화는 스킵한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findByIdForUpdate(1L) } returns score(ScoreStatus.REJECTED)
+                    every {
+                        scorePersistencePort.findByIdForUpdate(1L)
+                    } returns score(ScoreStatus.REJECTED).copy(rejectionReason = "기존 사유")
+                    every { scorePersistencePort.save(any()) } answers { firstArg() }
 
-                    val result = service.execute(1L, "다른 사유")
+                    val result = service.execute(1L, "새 사유")
+
+                    result shouldBe true
+                    verify(exactly = 1) {
+                        scorePersistencePort.save(
+                            match { it.scoreStatus == ScoreStatus.REJECTED && it.rejectionReason == "새 사유" },
+                        )
+                    }
+                    verify(exactly = 0) { alertPersistencePort.save(any()) }
+                    verify(exactly = 0) { alertEventPublisherPort.publish(any()) }
+                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                }
+            }
+
+            When("이미 REJECTED인 점수를 같은 사유로 다시 거절하면") {
+                Then("save 없이 no-op이며 알림·publish·캐시 무효화도 스킵한다") {
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
+                    every {
+                        scorePersistencePort.findByIdForUpdate(1L)
+                    } returns score(ScoreStatus.REJECTED).copy(rejectionReason = "같은 사유")
+
+                    val result = service.execute(1L, "같은 사유")
 
                     result shouldBe true
                     verify(exactly = 0) { scorePersistencePort.save(any()) }
