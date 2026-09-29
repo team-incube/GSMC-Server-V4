@@ -221,3 +221,31 @@ jobs:
             **Validate PR:** ${{ needs.validate-pr.result }}
             **Setup Metadata:** ${{ needs.setup-pr-metadata.result }}
             **Build & Test:** ${{ needs.build-and-test.result }}
+  mention-backend:
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed' && needs.build-and-test.result == 'success'
+
+    needs:
+      - build-and-test
+
+    steps:
+      - name: Mention GSMC BE
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          ROLE_ID: ${{ secrets.DISCORD_BACKEND_ROLE_ID }}
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          NUM: ${{ github.event.pull_request.number }}
+        run: |
+          payload=$(jq -n \
+            --arg role "$ROLE_ID" \
+            --arg title "$TITLE" \
+            --arg url "$URL" \
+            --arg author "$AUTHOR" \
+            --arg num "$NUM" \
+            '{
+              content: "<@&\($role)> CI 통과! PR 확인 부탁해요\n**#\($num) \($title)** by `\($author)`\n\($url)",
+              allowed_mentions: { roles: [$role] }
+            }')
+          curl -sf -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"
