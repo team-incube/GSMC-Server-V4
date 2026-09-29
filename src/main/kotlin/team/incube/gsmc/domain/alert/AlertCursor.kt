@@ -23,6 +23,8 @@ data class AlertCursor(
 
     companion object {
         private const val MAX_ENCODED_LENGTH = 128
+        private val MIN_SUPPORTED_CREATED_AT = LocalDateTime.of(1000, 1, 1, 0, 0)
+        private val MAX_SUPPORTED_CREATED_AT = LocalDateTime.of(9999, 12, 31, 23, 59, 59)
 
         /**
          * 외부 커서를 해석합니다.
@@ -43,6 +45,7 @@ data class AlertCursor(
                 if (parts.size != 2) return null
 
                 val createdAt = LocalDateTime.parse(parts[0])
+                if (createdAt !in MIN_SUPPORTED_CREATED_AT..MAX_SUPPORTED_CREATED_AT) return null
                 val alertId = parts[1].toLongOrNull() ?: return null
                 if (alertId <= 0) return null
 

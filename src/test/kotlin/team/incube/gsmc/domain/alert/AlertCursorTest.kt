@@ -32,5 +32,15 @@ class AlertCursorTest :
             Then("숫자 오버플로 커서를 거부한다") {
                 AlertCursor.decode("MjAyNi0wOS0yOVQxMjozNDo1Nnx9223372036854775808").shouldBeNull()
             }
+
+            Then("MySQL DATETIME 범위를 벗어난 날짜를 거부한다") {
+                val beforeSupportedRange =
+                    AlertCursor(LocalDateTime.of(999, 12, 31, 23, 59, 59), 1L).encode()
+                val afterSupportedRange =
+                    AlertCursor(LocalDateTime.of(10_000, 1, 1, 0, 0), 1L).encode()
+
+                AlertCursor.decode(beforeSupportedRange).shouldBeNull()
+                AlertCursor.decode(afterSupportedRange).shouldBeNull()
+            }
         }
     })
