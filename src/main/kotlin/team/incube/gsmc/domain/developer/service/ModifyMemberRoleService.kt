@@ -1,6 +1,8 @@
 package team.incube.gsmc.domain.developer.service
 
 import org.springframework.transaction.annotation.Transactional
+import team.incube.gsmc.domain.auth.port.out.RefreshTokenPersistencePort
+import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.domain.developer.port.`in`.ModifyMemberRoleUseCase
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
 import team.incube.gsmc.domain.user.UserRole
@@ -20,6 +22,8 @@ import team.incube.gsmc.global.util.MemberUtil
 class ModifyMemberRoleService(
     private val developerPersistencePort: DeveloperPersistencePort,
     private val memberUtil: MemberUtil,
+    private val refreshTokenPersistencePort: RefreshTokenPersistencePort,
+    private val tokenInvalidationPort: TokenInvalidationPort,
 ) : ModifyMemberRoleUseCase {
     @Transactional
     override fun execute(
@@ -37,6 +41,8 @@ class ModifyMemberRoleService(
                 userRole = role,
             ),
         )
+        refreshTokenPersistencePort.delete(member.userId)
+        tokenInvalidationPort.invalidate(member.userId)
 
         return true
     }

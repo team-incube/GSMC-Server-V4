@@ -14,7 +14,7 @@ import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
-import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.sheet.ScoreSheetRow
 import team.incube.gsmc.domain.sheet.SheetStudent
@@ -26,6 +26,7 @@ import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import java.time.LocalDateTime
 
 class FetchScoreSheetServiceTest :
     BehaviorSpec({
@@ -47,11 +48,14 @@ class FetchScoreSheetServiceTest :
                 categoryType = CategoryType.ACADEMIC_GRADE,
                 calculationType = ScoreCalculationType.SCORE_BASED,
             )
-        val approvedScore = mockk<Score>()
-        every { approvedScore.userId } returns 1L
-        every { approvedScore.scoreStatus } returns ScoreStatus.APPROVED
-        every { approvedScore.scoreValue } returns 12
-        every { approvedScore.category } returns category
+        val approvedScore =
+            ScoreCalculationRow(
+                userId = 1L,
+                category = category,
+                scoreStatus = ScoreStatus.APPROVED,
+                scoreValue = 12,
+                updatedAt = LocalDateTime.now(),
+            )
         val students =
             listOf(
                 SheetStudent(2L, 2, 3, 2, "둘째", UserRole.STUDENT),

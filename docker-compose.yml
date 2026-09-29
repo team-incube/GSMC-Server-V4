@@ -3,37 +3,26 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: gsmc-backend
+    container_name: gsmc-server
     ports:
       - "8080:8080"
-    environment:
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
-    depends_on:
-      mysql:
-        condition: service_healthy
-        
-  mysql:
-    image: mysql:8.0
-    container_name: gsmc-mysql
+    env_file:
+      - .env
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: gsmc-redis
+    restart: always
     ports:
-      - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: ${RDB_PASSWORD}
-      MYSQL_DATABASE: ${RDB_SCHEMA}
-      MYSQL_USER: ${RDB_USERNAME}
-      MYSQL_PASSWORD: ${RDB_PASSWORD}
+      - "6379:6379"
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./db/mysql/init:/docker-entrypoint-initdb.d
+      - redis_data:/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${RDB_PASSWORD}"]
-      interval: 5s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 10s
+      retries: 5
 
 volumes:
-  mysql_data:
+  redis_data:

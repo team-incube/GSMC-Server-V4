@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
+import io.mockk.verify
 import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
@@ -42,6 +43,7 @@ class AppendMyScoreWithValueServiceTest :
         beforeEach {
             clearAllMocks()
             every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { appendScoreSupport.parseRawScoreValue(any()) } answers { firstArg<String>().toDouble() }
         }
 
         val userId = 1L
@@ -144,6 +146,57 @@ class AppendMyScoreWithValueServiceTest :
                 }
             }
 
+            listOf(
+                "학생 정보가 없으면" to null,
+                "학생의 학년 정보가 비어 있으면" to student(grade = 1).copy(userGrade = null),
+            ).forEach { (condition, member) ->
+                When(condition) {
+                    Then("USER_NOT_FOUND 예외가 발생하고 저장하지 않는다") {
+                        every { memberUtil.getCurrentUserId() } returns userId
+                        every {
+                            appendScoreSupport.resolveUnrequiredCategory(
+                                CategoryType.ACADEMIC_GRADE,
+                                ScoreCalculationType.SCORE_BASED,
+                            )
+                        } returns academicGradeCategory
+                        every { appendScoreSupport.parseScoreValue("3", academicGradeCategory) } returns 7
+                        every { memberPersistencePort.findByUserId(userId) } returns member
+
+                        val exception =
+                            shouldThrow<GsmcException> {
+                                service.execute(CategoryType.ACADEMIC_GRADE, "3")
+                            }
+
+                        exception.errorCode shouldBe ErrorCode.USER_NOT_FOUND
+                        verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    }
+                }
+            }
+
+            When("등급에 NaN을 입력하면") {
+                Then("공통 검증에서 INVALID_SCORE_VALUE로 거부되어 학년 조회·저장을 하지 않는다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every {
+                        appendScoreSupport.resolveUnrequiredCategory(
+                            CategoryType.ACADEMIC_GRADE,
+                            ScoreCalculationType.SCORE_BASED,
+                        )
+                    } returns academicGradeCategory
+                    every {
+                        appendScoreSupport.parseScoreValue("NaN", academicGradeCategory)
+                    } throws GsmcException(ErrorCode.INVALID_SCORE_VALUE)
+
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(CategoryType.ACADEMIC_GRADE, "NaN")
+                        }
+
+                    exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
+                    verify(exactly = 0) { memberPersistencePort.findByUserId(any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                }
+            }
+
             When("1·2학년 학생이 5등급제 범위를 벗어난 등급(예: 7)을 입력하면") {
                 Then("INVALID_SCORE_VALUE 예외가 발생한다") {
                     every { memberUtil.getCurrentUserId() } returns userId
@@ -154,6 +207,7 @@ class AppendMyScoreWithValueServiceTest :
                         )
                     } returns academicGradeCategory
                     every { memberPersistencePort.findByUserId(userId) } returns student(grade = 2)
+                    every { appendScoreSupport.parseScoreValue("7", academicGradeCategory) } returns 3
 
                     val exception =
                         shouldThrow<GsmcException> {
@@ -161,6 +215,7 @@ class AppendMyScoreWithValueServiceTest :
                         }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
                 }
             }
 

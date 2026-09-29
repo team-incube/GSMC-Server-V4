@@ -1,12 +1,12 @@
 package team.incube.gsmc.domain.alert.adapter.sse
 
 import jakarta.annotation.PreDestroy
-import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import team.incube.gsmc.domain.alert.port.out.AlertEmitterRegistryPort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
+import team.themoment.sdk.logging.logger.logger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -25,7 +25,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 class AlertEmitterRegistry(
     private val alertSseProperties: AlertSseProperties,
 ) : AlertEmitterRegistryPort {
-    private val log = LoggerFactory.getLogger(AlertEmitterRegistry::class.java)
     private val emittersByUserId = ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>>()
 
     override fun createAndRegister(userId: Long): SseEmitter {
@@ -66,7 +65,7 @@ class AlertEmitterRegistry(
      * `sse-team.incube.gsmc.domain.alert.adapter.sse.AlertSseProperties` 형태로 등록되므로,
      * 빈을 참조하는 `#{...}` 대신 프로퍼티 플레이스홀더 `${...}`를 사용한다.
      */
-    @Scheduled(fixedRateString = "\${sse.heartbeat-interval}")
+    @Scheduled(fixedRateString = $$"${sse.heartbeat-interval}")
     fun sendHeartbeat() {
         emittersByUserId.forEach { (userId, emitters) ->
             emitters.toList().forEach { emitter ->
@@ -75,7 +74,7 @@ class AlertEmitterRegistry(
                 } catch (e: Exception) {
                     // IOException(연결 끊김) 외에도, 이미 완료된 Emitter에 전송을 시도하면
                     // IllegalStateException이 발생할 수 있어 두 경우 모두 정리 대상으로 처리한다.
-                    log.debug("Heartbeat 전송에 실패해 연결을 정리합니다. userId={}", userId, e)
+                    logger().debug("Heartbeat 전송에 실패해 연결을 정리합니다. userId={}", userId, e)
                     remove(userId, emitter)
                 }
             }

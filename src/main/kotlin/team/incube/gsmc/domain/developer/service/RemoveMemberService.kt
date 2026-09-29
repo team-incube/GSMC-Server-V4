@@ -1,7 +1,6 @@
 package team.incube.gsmc.domain.developer.service
 
 import org.springframework.transaction.annotation.Transactional
-import team.incube.gsmc.domain.developer.port.`in`.ModifyMemberRoleUseCase
 import team.incube.gsmc.domain.developer.port.`in`.RemoveMemberUseCase
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
 import team.incube.gsmc.domain.user.UserRole

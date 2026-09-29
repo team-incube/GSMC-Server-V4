@@ -52,7 +52,7 @@ class ScoreJpaEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     val category: CategoryJpaEntity,
-    /** 연결된 근거 자료 — [EvidenceType.UNREQUIRED] 카테고리는 null */
+    /** 연결된 근거 자료 — [team.incube.gsmc.domain.category.EvidenceType.UNREQUIRED] 카테고리는 null */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "evidence_id", nullable = true)
     val evidence: EvidenceJpaEntity?,
@@ -60,7 +60,7 @@ class ScoreJpaEntity(
     @Enumerated(EnumType.STRING)
     @Column(name = "score_status", nullable = false, length = 20)
     val scoreStatus: ScoreStatus,
-    /** 활동명 — [EvidenceType.EVIDENCE] 카테고리에서 활동 내용을 직접 기재할 때 사용 */
+    /** 활동명 — [team.incube.gsmc.domain.category.EvidenceType.EVIDENCE] 카테고리에서 활동 내용을 직접 기재할 때 사용 */
     @Column(name = "activity_name", nullable = true, length = 255)
     val activityName: String?,
     /** 인정 점수 값 — 심사 전([ScoreStatus.INCOMPLETE]/[ScoreStatus.PENDING])에는 null일 수 있음 */

@@ -7,7 +7,7 @@ import team.incube.gsmc.domain.auth.TokenResult
 /**
  * 토큰 갱신 유스케이스 인터페이스입니다.
  * 인바운드 포트로서, 리프레시 토큰 검증 및 새 액세스 토큰 발급 계약을 정의합니다.
- * [RefreshTokenService]가 이 인터페이스를 구현하여 실제 로직을 수행합니다.
+ * [team.incube.gsmc.domain.auth.service.RefreshTokenService]가 이 인터페이스를 구현하여 실제 로직을 수행합니다.
  */
 interface RefreshTokenUseCase {
     /**

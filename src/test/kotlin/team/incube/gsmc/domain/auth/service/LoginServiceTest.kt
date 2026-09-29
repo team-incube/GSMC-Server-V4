@@ -10,6 +10,7 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.slot
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.SimpleTransactionStatus
@@ -114,6 +115,10 @@ class LoginServiceTest :
                     (result.refreshTokenExpiresIn in (before + 7200 * 1000)..(after + 7200 * 1000)) shouldBe true
                     verify(exactly = 0) { userPersistencePort.save(any()) }
                     verify(exactly = 1) { refreshTokenPersistencePort.save(user.userId, "refresh-token") }
+                    verifyOrder {
+                        transactionManager.commit(any())
+                        refreshTokenPersistencePort.save(user.userId, "refresh-token")
+                    }
                 }
             }
 

@@ -8,10 +8,12 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.filter.OncePerRequestFilter
 import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
+import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.global.auth.CustomUserDetails
 
 class JwtAuthenticationFilter(
     private val authTokenPort: AuthTokenPort,
+    private val tokenInvalidationPort: TokenInvalidationPort,
 ) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -20,11 +22,12 @@ class JwtAuthenticationFilter(
     ) {
         extractToken(request)
             ?.let { token -> authTokenPort.parseTokenClaims(token) }
-            ?.let { (userId, role) ->
-                val userDetails = CustomUserDetails(userId, role)
+            ?.takeUnless { claims -> tokenInvalidationPort.isInvalidated(claims.userId, claims.issuedAt) }
+            ?.let { claims ->
+                val userDetails = CustomUserDetails(claims.userId, claims.role)
                 SecurityContextHolder.getContext().authentication =
                     UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
-                MDC.put(MDC_USER_ID_KEY, userId.toString())
+                MDC.put(MDC_USER_ID_KEY, claims.userId.toString())
             }
         try {
             filterChain.doFilter(request, response)

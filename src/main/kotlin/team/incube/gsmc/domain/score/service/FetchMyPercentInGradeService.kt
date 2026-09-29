@@ -25,6 +25,7 @@ class FetchMyPercentInGradeService(
     private val scorePersistencePort: ScorePersistencePort,
     private val memberPersistencePort: MemberPersistencePort,
     private val scoreTotalCachePort: ScoreTotalCachePort,
+    private val scoreTotalCacheSingleFlight: ScoreTotalCacheSingleFlight,
     private val memberUtil: MemberUtil,
 ) : FetchMyPercentInGradeUseCase {
     override fun execute(includeApprovedOnly: Boolean): Percentile {
@@ -38,17 +39,32 @@ class FetchMyPercentInGradeService(
 
         val cached = scoreTotalCachePort.findGradeTotals(userGrade, includeApprovedOnly)
         val totalScoreByUserId =
-            cached?.takeIf { userId in it } ?: run {
-                val gradeMateIds =
-                    memberPersistencePort.findAllStudentsByUserGrade(userGrade).map { it.userId }.toSet() + userId
-                val scoresByUserId = scorePersistencePort.findAllByUserIdIn(gradeMateIds.toList()).groupBy { it.userId }
-                val computed =
-                    gradeMateIds.associateWith { id ->
-                        ScoreAggregator.totalScoreOf(scoresByUserId[id] ?: emptyList(), includeApprovedOnly, userGrade)
-                    }
-                scoreTotalCachePort.saveGradeTotals(userGrade, includeApprovedOnly, computed)
-                computed
-            }
+            cached?.takeIf { userId in it }
+                ?: scoreTotalCacheSingleFlight.load(
+                    key = ScoreTotalCacheSingleFlight.CacheKey.gradeTotals(userGrade, includeApprovedOnly),
+                    compute = {
+                        val gradeMateIds =
+                            memberPersistencePort
+                                .findAllStudentsByUserGrade(userGrade)
+                                .map { it.userId }
+                                .toSet() + userId
+                        val scoresByUserId =
+                            scorePersistencePort
+                                .findCalculationRowsByUserIdIn(
+                                    gradeMateIds.toList(),
+                                ).groupBy { it.userId }
+                        gradeMateIds.associateWith { id ->
+                            ScoreAggregator.totalScoreOf(
+                                scoresByUserId[id] ?: emptyList(),
+                                includeApprovedOnly,
+                                userGrade,
+                            )
+                        }
+                    },
+                    save = { computed ->
+                        scoreTotalCachePort.saveGradeTotals(userGrade, includeApprovedOnly, computed)
+                    },
+                )
 
         return ScoreAggregator.percentileOf(userId, totalScoreByUserId)
     }

@@ -28,7 +28,13 @@ class ScoreTotalCacheInvalidatorTest :
         beforeEach {
             clearAllMocks()
             // pendingGradeEvictions/pendingClassEvictions는 인스턴스 상태라 테스트마다 새로 만들어야 격리된다.
-            invalidator = ScoreTotalCacheInvalidator(memberPersistencePort, scoreTotalCachePort, taskScheduler)
+            invalidator =
+                ScoreTotalCacheInvalidator(
+                    memberPersistencePort,
+                    scoreTotalCachePort,
+                    taskScheduler,
+                    ScoreTotalCacheSingleFlight(),
+                )
         }
 
         fun studentOf(

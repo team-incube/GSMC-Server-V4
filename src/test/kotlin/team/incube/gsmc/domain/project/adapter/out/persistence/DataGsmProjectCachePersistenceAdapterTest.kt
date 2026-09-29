@@ -9,6 +9,7 @@ import io.mockk.runs
 import io.mockk.verify
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import org.springframework.data.redis.core.types.Expiration
 import team.incube.gsmc.domain.project.DataGsmProject
 import team.incube.gsmc.domain.project.DataGsmProjectStatus
 import tools.jackson.databind.ObjectMapper
@@ -61,13 +62,13 @@ class DataGsmProjectCachePersistenceAdapterTest :
             Then("전역 키와 24시간 TTL로 JSON을 저장한다") {
                 every { objectMapper.writeValueAsString(emptyList<DataGsmProject>()) } returns "[]"
                 every {
-                    valueOperations.set("dg-project:active-all", "[]", 24L, TimeUnit.HOURS)
+                    valueOperations.set("dg-project:active-all", "[]", Expiration.from(24L, TimeUnit.HOURS))
                 } just runs
 
                 adapter.saveAll(emptyList())
 
                 verify(exactly = 1) {
-                    valueOperations.set("dg-project:active-all", "[]", 24L, TimeUnit.HOURS)
+                    valueOperations.set("dg-project:active-all", "[]", Expiration.from(24L, TimeUnit.HOURS))
                 }
             }
         }
@@ -91,7 +92,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
 
                 every { objectMapper.writeValueAsString(projects) } returns "json"
                 every {
-                    valueOperations.set("dg-project:active-all", "json", 24L, TimeUnit.HOURS)
+                    valueOperations.set("dg-project:active-all", "json", Expiration.from(24L, TimeUnit.HOURS))
                 } throws RuntimeException("Redis 장애")
 
                 adapter.saveAll(projects)

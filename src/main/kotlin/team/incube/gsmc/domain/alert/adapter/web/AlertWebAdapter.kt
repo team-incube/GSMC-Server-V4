@@ -5,6 +5,7 @@ import org.springframework.graphql.data.method.annotation.MutationMapping
 import org.springframework.graphql.data.method.annotation.QueryMapping
 import org.springframework.stereotype.Controller
 import team.incube.gsmc.domain.alert.Alert
+import team.incube.gsmc.domain.alert.port.`in`.FetchMyAlertConnectionUseCase
 import team.incube.gsmc.domain.alert.port.`in`.FetchMyAlertsUseCase
 import team.incube.gsmc.domain.alert.port.`in`.ModifyMyAlertIsReadUseCase
 import team.incube.gsmc.domain.alert.port.`in`.RemoveMyAlertUseCase
@@ -16,11 +17,18 @@ import team.incube.gsmc.domain.alert.port.`in`.RemoveMyAlertUseCase
 @Controller
 class AlertWebAdapter(
     private val fetchMyAlertsUseCase: FetchMyAlertsUseCase,
+    private val fetchMyAlertConnectionUseCase: FetchMyAlertConnectionUseCase,
     private val modifyMyAlertIsReadUseCase: ModifyMyAlertIsReadUseCase,
     private val removeMyAlertUseCase: RemoveMyAlertUseCase,
 ) {
     @QueryMapping
     fun myAlerts(): List<Alert> = fetchMyAlertsUseCase.execute()
+
+    @QueryMapping
+    fun myAlertConnection(
+        @Argument first: Int?,
+        @Argument after: String?,
+    ): AlertConnectionPayload = fetchMyAlertConnectionUseCase.execute(first, after).toPayload()
 
     @MutationMapping
     fun patchAlertIsRead(

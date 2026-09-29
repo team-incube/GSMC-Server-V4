@@ -11,7 +11,7 @@ import team.incube.gsmc.global.util.MemberUtil
 
 /**
  * 내 알림 삭제 유스케이스 구현 클래스입니다.
- * [RemoveMyAlertUseCase]를 구현합니다. [alertId]가 존재하지 않거나 다른 사용자의 알림이면 동일하게
+ * [RemoveMyAlertUseCase]를 구현합니다. `alertId`가 존재하지 않거나 다른 사용자의 알림이면 동일하게
  * [ErrorCode.ALERT_NOT_FOUND]를 던져, 다른 사용자의 알림 존재 여부가 노출되지 않도록 합니다.
  */
 @Port(direction = PortDirection.INBOUND)

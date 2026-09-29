@@ -1,10 +1,11 @@
 package team.incube.gsmc.domain.score.adapter.out.persistence
 
-import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.types.Expiration
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
+import team.themoment.sdk.logging.logger.logger
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.ObjectMapper
 import java.util.concurrent.TimeUnit
@@ -25,7 +26,6 @@ class ScoreTotalCachePersistenceAdapter(
         private const val CLASS_KEY_PREFIX = "score:class-total:"
         private const val GRADE_KEY_PREFIX = "score:grade-total:"
         private const val TTL_MINUTES = 5L
-        private val log = LoggerFactory.getLogger(ScoreTotalCachePersistenceAdapter::class.java)
     }
 
     override fun findClassTotals(
@@ -70,7 +70,7 @@ class ScoreTotalCachePersistenceAdapter(
             redisTemplate.opsForValue().get(key)?.let {
                 objectMapper.readValue(it, object : TypeReference<Map<Long, Int>>() {})
             }
-        }.onFailure { log.warn("반/학년 백분위 캐시 조회 실패, DB 재계산으로 폴백 (key={})", key, it) }
+        }.onFailure { logger().warn("반/학년 백분위 캐시 조회 실패, DB 재계산으로 폴백 (key={})", key, it) }
             .getOrNull()
 
     private fun save(
@@ -78,8 +78,12 @@ class ScoreTotalCachePersistenceAdapter(
         totals: Map<Long, Int>,
     ) {
         runCatching {
-            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(totals), TTL_MINUTES, TimeUnit.MINUTES)
-        }.onFailure { log.warn("반/학년 백분위 캐시 저장 실패 (key={})", key, it) }
+            redisTemplate.opsForValue().set(
+                key,
+                objectMapper.writeValueAsString(totals),
+                Expiration.from(TTL_MINUTES, TimeUnit.MINUTES),
+            )
+        }.onFailure { logger().warn("반/학년 백분위 캐시 저장 실패 (key={})", key, it) }
     }
 
     private fun classKey(

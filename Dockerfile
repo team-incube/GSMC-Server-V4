@@ -2,7 +2,7 @@ FROM gradle:9.4-jdk25 AS builder
 
 WORKDIR /app
 COPY . .
-RUN ./gradlew bootJar --no-daemon
+RUN gradle bootJar --no-daemon
 
 FROM eclipse-temurin:25-jre-jammy
 WORKDIR /app

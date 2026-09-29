@@ -3,10 +3,14 @@ package team.incube.gsmc.domain.developer.service
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import io.mockk.Runs
 import io.mockk.clearAllMocks
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
+import team.incube.gsmc.domain.auth.port.out.RefreshTokenPersistencePort
+import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
@@ -18,7 +22,15 @@ class ModifyMemberRoleServiceTest :
     BehaviorSpec({
         val developerPersistencePort = mockk<DeveloperPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
-        val service = ModifyMemberRoleService(developerPersistencePort, memberUtil)
+        val refreshTokenPersistencePort = mockk<RefreshTokenPersistencePort>()
+        val tokenInvalidationPort = mockk<TokenInvalidationPort>()
+        val service =
+            ModifyMemberRoleService(
+                developerPersistencePort,
+                memberUtil,
+                refreshTokenPersistencePort,
+                tokenInvalidationPort,
+            )
 
         beforeEach { clearAllMocks() }
 
@@ -58,11 +70,15 @@ class ModifyMemberRoleServiceTest :
                     val exception = shouldThrow<GsmcException> { service.execute("none@gsm.hs.kr", UserRole.TEACHER) }
 
                     exception.errorCode shouldBe ErrorCode.USER_NOT_FOUND
+                    verify(exactly = 0) { refreshTokenPersistencePort.delete(any()) }
+                    verify(exactly = 0) { tokenInvalidationPort.invalidate(any()) }
                 }
             }
 
             When("존재하는 회원의 역할을 변경하면") {
                 Then("변경된 역할로 저장하고 true를 반환한다") {
+                    every { refreshTokenPersistencePort.delete(any()) } just Runs
+                    every { tokenInvalidationPort.invalidate(any()) } just Runs
                     every { memberUtil.getCurrentUserRole() } returns UserRole.ROOT
                     every { developerPersistencePort.findByEmail("student@gsm.hs.kr") } returns student()
                     every { developerPersistencePort.save(any()) } answers { firstArg() }
@@ -75,6 +91,8 @@ class ModifyMemberRoleServiceTest :
                             match { it.userRole == UserRole.TEACHER },
                         )
                     }
+                    verify(exactly = 1) { refreshTokenPersistencePort.delete(any()) }
+                    verify(exactly = 1) { tokenInvalidationPort.invalidate(any()) }
                 }
             }
         }

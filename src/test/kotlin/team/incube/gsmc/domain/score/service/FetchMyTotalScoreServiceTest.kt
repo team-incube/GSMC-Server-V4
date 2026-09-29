@@ -10,7 +10,7 @@ import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
-import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.TotalScore
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
@@ -52,18 +52,11 @@ class FetchMyTotalScoreServiceTest :
         fun scoreOf(
             status: ScoreStatus,
             categoryType: CategoryType,
-        ) = Score(
-            scoreId = 0,
+        ) = ScoreCalculationRow(
             userId = 1L,
             category = categoryOf(categoryType),
-            evidence = null,
-            file = null,
             scoreStatus = status,
-            activityName = null,
             scoreValue = null,
-            rejectionReason = null,
-            dgProjectId = null,
-            createdAt = LocalDateTime.now(),
             updatedAt = LocalDateTime.now(),
         )
 
@@ -89,7 +82,7 @@ class FetchMyTotalScoreServiceTest :
                 Then("허가된 점수만 포함된 총점이 반환된다") {
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1)
-                    every { scorePersistencePort.findAllByUserId(1L) } returns scores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns scores
 
                     val result = service.execute(true)
 
@@ -101,7 +94,7 @@ class FetchMyTotalScoreServiceTest :
                 Then("허가되지 않은 점수를 포함한 총점이 반환된다") {
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1)
-                    every { scorePersistencePort.findAllByUserId(1L) } returns scores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns scores
 
                     val result = service.execute(false)
 
@@ -123,7 +116,7 @@ class FetchMyTotalScoreServiceTest :
                 Then("총점이 0이 반환된다") {
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1)
-                    every { scorePersistencePort.findAllByUserId(1L) } returns emptyList()
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns emptyList()
 
                     val result = service.execute(true)
 
@@ -143,7 +136,7 @@ class FetchMyTotalScoreServiceTest :
                 Then("뉴로우가 제외된다") {
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(2)
-                    every { scorePersistencePort.findAllByUserId(1L) } returns scores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns scores
 
                     val result = service.execute(true)
 
@@ -155,7 +148,7 @@ class FetchMyTotalScoreServiceTest :
                 Then("뉴로우가 포함된다") {
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1)
-                    every { scorePersistencePort.findAllByUserId(1L) } returns scores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns scores
 
                     val result = service.execute(true)
 

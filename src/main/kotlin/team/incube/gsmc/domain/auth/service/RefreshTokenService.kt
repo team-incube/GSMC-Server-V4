@@ -1,6 +1,5 @@
 package team.incube.gsmc.domain.auth.service
 
-import org.springframework.transaction.annotation.Transactional
 import team.incube.gsmc.domain.auth.TokenResult
 import team.incube.gsmc.domain.auth.port.`in`.RefreshTokenUseCase
 import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
@@ -23,19 +22,20 @@ class RefreshTokenService(
     private val userPersistencePort: UserPersistencePort,
 ) : RefreshTokenUseCase {
     /**
+     * Redis 조회·저장과 JWT 서명이 네트워크/CPU 작업이라, DB 커넥션을 오래 점유하지
+     * 않도록 이 메서드는 트랜잭션을 열지 않습니다. `findByUserId`는 Spring Data JPA
+     * 리포지토리 메서드 자체가 개별 트랜잭션으로 실행되므로 별도 트랜잭션 선언이 필요 없습니다.
      * @param refreshToken 재발급에 사용할 리프레시 토큰
      * @return 갱신된 토큰 정보
      * @throws GsmcException 토큰이 유효하지 않거나 저장된 토큰과 불일치 시 [ErrorCode.INVALID_REFRESH_TOKEN]
      * @throws GsmcException 사용자를 찾을 수 없을 시 [ErrorCode.USER_NOT_FOUND]
      */
-    @Transactional(readOnly = true)
     override fun execute(refreshToken: String): TokenResult {
         val userId =
             runCatching { authTokenPort.getUserIdFromToken(refreshToken) }
                 .getOrElse { throw GsmcException(ErrorCode.INVALID_REFRESH_TOKEN) }
 
-        val storedToken = refreshTokenPersistencePort.find(userId)
-        if (storedToken != refreshToken) {
+        if (refreshTokenPersistencePort.find(userId) != refreshToken) {
             throw GsmcException(ErrorCode.INVALID_REFRESH_TOKEN)
         }
 
@@ -46,7 +46,9 @@ class RefreshTokenService(
         val newAccessToken = authTokenPort.generateAccessToken(user.userId, user.userRole)
         val newRefreshToken = authTokenPort.generateRefreshToken(user.userId)
 
-        refreshTokenPersistencePort.save(user.userId, newRefreshToken)
+        if (!refreshTokenPersistencePort.rotate(user.userId, refreshToken, newRefreshToken)) {
+            throw GsmcException(ErrorCode.INVALID_REFRESH_TOKEN)
+        }
 
         val now = System.currentTimeMillis()
 

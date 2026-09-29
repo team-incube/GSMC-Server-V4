@@ -7,7 +7,7 @@ import team.incube.gsmc.domain.auth.TokenResult
 /**
  * OAuth 로그인 유스케이스 인터페이스입니다.
  * 인바운드 포트로서, 인가 코드를 통한 JWT 토큰 발급 계약을 정의합니다.
- * [LoginService]가 이 인터페이스를 구현하여 실제 로직을 수행합니다.
+ * [team.incube.gsmc.domain.auth.service.LoginService]가 이 인터페이스를 구현하여 실제 로직을 수행합니다.
  */
 interface LoginUseCase {
     /**

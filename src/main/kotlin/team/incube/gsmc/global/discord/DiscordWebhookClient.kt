@@ -1,18 +1,17 @@
 package team.incube.gsmc.global.discord
 
-import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
+import team.themoment.sdk.logging.logger.logger
 
 @Component
 class DiscordWebhookClient(
-    private val restClient: RestClient,
+    @param:Qualifier("discordRestClient") private val restClient: RestClient,
 ) {
-    private val logger = LoggerFactory.getLogger(DiscordWebhookClient::class.java)
-
     fun sendAsync(
         webhookUrl: String,
         embed: DiscordEmbed,
@@ -36,7 +35,7 @@ class DiscordWebhookClient(
                 .body(mapOf("embeds" to listOf(embed.toPayload())))
                 .retrieve()
                 .toBodilessEntity()
-        }.onFailure { logger.warn("Discord webhook 전송 실패: {}", it.message) }
+        }.onFailure { logger().warn("Discord webhook 전송 실패: {}", it.message) }
     }
 
     private fun DiscordEmbed.toPayload(): Map<String, Any?> =

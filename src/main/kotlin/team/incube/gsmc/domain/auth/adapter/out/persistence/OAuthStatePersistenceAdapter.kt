@@ -1,6 +1,7 @@
 package team.incube.gsmc.domain.auth.adapter.out.persistence
 
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.types.Expiration
 import team.incube.gsmc.domain.auth.port.out.OAuthStatePersistencePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
@@ -33,8 +34,7 @@ class OAuthStatePersistenceAdapter(
         redisTemplate.opsForValue().set(
             KEY_PREFIX + state,
             codeVerifier,
-            TTL_MINUTES,
-            TimeUnit.MINUTES,
+            Expiration.from(TTL_MINUTES, TimeUnit.MINUTES),
         )
     }
 

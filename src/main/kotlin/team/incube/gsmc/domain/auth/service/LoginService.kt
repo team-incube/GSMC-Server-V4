@@ -52,25 +52,7 @@ class LoginService(
         val oAuthToken = oAuthPort.exchangeCodeForToken(code, redirectUri, codeVerifier)
         val oAuthUserInfo = oAuthPort.getUserInfo(oAuthToken.accessToken)
 
-        return transactionTemplate.execute { persistUserAndIssueTokens(oAuthUserInfo) }
-            ?: throw GsmcException(ErrorCode.INTERNAL_SERVER_ERROR)
-    }
-
-    private fun persistUserAndIssueTokens(oAuthUserInfo: OAuthUserInfo): TokenResult {
-        val user =
-            userPersistencePort.findByEmail(oAuthUserInfo.email)
-                ?: userPersistencePort.save(
-                    User(
-                        userId = 0,
-                        // 교사는 SDK에서 이름을 제공하지 않으므로 이메일을 대체 식별자로 사용
-                        userName = oAuthUserInfo.name ?: oAuthUserInfo.email,
-                        userEmail = oAuthUserInfo.email,
-                        userGrade = oAuthUserInfo.grade,
-                        userClassNumber = oAuthUserInfo.classNum,
-                        userNumber = oAuthUserInfo.number,
-                        userRole = if (oAuthUserInfo.isStudent) UserRole.STUDENT else UserRole.TEACHER,
-                    ),
-                )
+        val user = transactionTemplate.execute { persistUser(oAuthUserInfo) }
 
         val accessToken = authTokenPort.generateAccessToken(user.userId, user.userRole)
         val refreshToken = authTokenPort.generateRefreshToken(user.userId)
@@ -87,4 +69,25 @@ class LoginService(
             role = user.userRole,
         )
     }
+
+    /**
+     * 사용자 조회·저장만 트랜잭션으로 묶습니다.
+     *
+     * JWT 서명과 리프레시 토큰의 Redis 저장은 호출부에서 트랜잭션 커밋 이후에 수행합니다.
+     * 트랜잭션 안에서 처리하면 Redis 왕복 동안 DB 커넥션을 점유하게 되기 때문입니다.
+     */
+    private fun persistUser(oAuthUserInfo: OAuthUserInfo): User =
+        userPersistencePort.findByEmail(oAuthUserInfo.email)
+            ?: userPersistencePort.save(
+                User(
+                    userId = 0,
+                    // 교사는 SDK에서 이름을 제공하지 않으므로 이메일을 대체 식별자로 사용
+                    userName = oAuthUserInfo.name ?: oAuthUserInfo.email,
+                    userEmail = oAuthUserInfo.email,
+                    userGrade = oAuthUserInfo.grade,
+                    userClassNumber = oAuthUserInfo.classNum,
+                    userNumber = oAuthUserInfo.number,
+                    userRole = if (oAuthUserInfo.isStudent) UserRole.STUDENT else UserRole.TEACHER,
+                ),
+            )
 }

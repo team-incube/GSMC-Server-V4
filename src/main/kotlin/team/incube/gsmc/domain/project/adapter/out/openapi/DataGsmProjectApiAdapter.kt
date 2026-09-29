@@ -27,6 +27,7 @@ private const val ACTIVE_STATUS = "ACTIVE"
 class DataGsmProjectApiAdapter(
     private val dataGsmOpenApiRestClient: RestClient,
     private val dataGsmProjectCachePort: DataGsmProjectCachePort,
+    private val dataGsmProjectSingleFlight: DataGsmProjectSingleFlight,
 ) : DataGsmProjectApiPort {
     /** DataGSM에서 현재 사용자가 참여한 활성 프로젝트를 조회합니다. */
     override fun findActiveProjectsByParticipantEmail(email: String): List<DataGsmProject> =
@@ -36,10 +37,20 @@ class DataGsmProjectApiAdapter(
     override fun findProjectById(dgProjectId: Long): DataGsmProject? =
         fetchProjectPage(mapOf("projectId" to dgProjectId))?.projects?.firstOrNull()?.toDomain()
 
+    /**
+     * 캐시된 전체 ACTIVE 프로젝트 목록을 반환하고, 없으면 외부 API에서 다시 채웁니다.
+     *
+     * 캐시 미스 시 재조회는 [DataGsmProjectSingleFlight]로 합쳐 동시 요청 수만큼 외부 API 호출이
+     * 늘어나지 않게 합니다. 합류 블록 안에서 캐시를 한 번 더 확인하는 것은, 직전 대표 요청이 막
+     * 채워둔 결과가 있으면 외부 API를 부르지 않기 위해서입니다.
+     */
     private fun findAllActiveProjects(): List<DataGsmProject> {
         dataGsmProjectCachePort.findAll()?.let { return it }
 
-        return fetchAllActiveProjects().also(dataGsmProjectCachePort::saveAll)
+        return dataGsmProjectSingleFlight.load {
+            dataGsmProjectCachePort.findAll()
+                ?: fetchAllActiveProjects().also(dataGsmProjectCachePort::saveAll)
+        }
     }
 
     private fun fetchAllActiveProjects(): List<DataGsmProject> {

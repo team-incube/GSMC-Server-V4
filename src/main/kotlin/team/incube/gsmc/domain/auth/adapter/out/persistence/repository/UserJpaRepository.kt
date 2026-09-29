@@ -6,7 +6,7 @@ import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
 /**
  * 사용자 정보에 대한 JPA 기반 저장소 인터페이스입니다.
  * [UserJpaEntity]의 기본 CRUD를 [JpaRepository]에 위임하며, 이메일 기반 조회 기능을 추가로 정의합니다.
- * [AuthUserPersistenceAdapter]에서 사용됩니다.
+ * [team.incube.gsmc.domain.auth.adapter.out.persistence.AuthUserPersistenceAdapter]에서 사용됩니다.
  */
 interface UserJpaRepository : JpaRepository<UserJpaEntity, Long> {
     /**

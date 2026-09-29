@@ -16,7 +16,7 @@ object Libs {
 
     // Database
     const val MYSQL_CONNECTOR = "com.mysql:mysql-connector-j"
-    const val FLYWAY_CORE = "org.flywaydb:flyway-core"
+    const val SPRING_BOOT_FLYWAY = "org.springframework.boot:spring-boot-starter-flyway"
     const val FLYWAY_MYSQL = "org.flywaydb:flyway-mysql"
 
     // QueryDSL

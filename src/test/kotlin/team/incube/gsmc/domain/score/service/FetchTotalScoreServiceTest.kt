@@ -10,7 +10,7 @@ import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
-import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.TotalScore
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
@@ -52,18 +52,11 @@ class FetchTotalScoreServiceTest :
         fun scoreOf(
             status: ScoreStatus,
             categoryType: CategoryType,
-        ) = Score(
-            scoreId = 0,
+        ) = ScoreCalculationRow(
             userId = 1L,
             category = categoryOf(categoryType),
-            evidence = null,
-            file = null,
             scoreStatus = status,
-            activityName = null,
             scoreValue = null,
-            rejectionReason = null,
-            dgProjectId = null,
-            createdAt = LocalDateTime.now(),
             updatedAt = LocalDateTime.now(),
         )
 
@@ -91,7 +84,7 @@ class FetchTotalScoreServiceTest :
                 Then("허가된 점수들의 총점이 반환된다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1, UserRole.STUDENT)
-                    every { scorePersistencePort.findAllByUserId(1L) } returns scores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns scores
 
                     val result = service.execute(1L, true)
 
@@ -103,7 +96,7 @@ class FetchTotalScoreServiceTest :
                 Then("허가되지 않은 점수들을 포함한 총점이 반환된다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1, UserRole.STUDENT)
-                    every { scorePersistencePort.findAllByUserId(1L) } returns scores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns scores
 
                     val result = service.execute(1L, false)
 
@@ -134,7 +127,7 @@ class FetchTotalScoreServiceTest :
                 Then("총점 0이 반환된다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1, UserRole.STUDENT)
-                    every { scorePersistencePort.findAllByUserId(1L) } returns emptyList()
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns emptyList()
 
                     val result = service.execute(1L, false)
 

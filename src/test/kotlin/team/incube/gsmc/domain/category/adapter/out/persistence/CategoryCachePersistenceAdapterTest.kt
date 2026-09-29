@@ -1,7 +1,5 @@
 package team.incube.gsmc.domain.category.adapter.out.persistence
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.clearAllMocks
@@ -16,6 +14,8 @@ import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
 
 class CategoryCachePersistenceAdapterTest :
     BehaviorSpec({

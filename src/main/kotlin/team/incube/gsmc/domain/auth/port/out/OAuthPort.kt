@@ -6,7 +6,7 @@ import team.incube.gsmc.domain.auth.OAuthUserInfo
 /**
  * OAuth 외부 공급자 연동을 추상화하는 아웃바운드 포트 인터페이스입니다.
  * 인가 URL 생성, 인가 코드 교환, 사용자 정보 조회 기능의 계약을 정의합니다.
- * [DataGsmOAuthAdapter]가 이 인터페이스를 구현하여 DataGSM OAuth SDK에 실제 처리를 위임합니다.
+ * [team.incube.gsmc.domain.auth.adapter.out.oauth.DataGsmOAuthAdapter]가 이 인터페이스를 구현하여 DataGSM OAuth SDK에 실제 처리를 위임합니다.
  */
 interface OAuthPort {
     /**

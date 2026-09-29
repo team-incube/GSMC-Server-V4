@@ -7,13 +7,14 @@ import team.incube.gsmc.domain.project.port.out.ProjectMemberPersistencePort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+import team.incube.gsmc.global.util.MYSQL_TEXT_MAX_BYTES
+import team.incube.gsmc.global.util.utf8ByteLength
 
 private const val MIN_TITLE_LENGTH = 1
 private const val MAX_TITLE_LENGTH = 100
 private const val MIN_DESCRIPTION_LENGTH = 300
 private const val MAX_DESCRIPTION_LENGTH = 2000
 private const val MAX_DRAFT_TITLE_LENGTH = 255
-private const val MAX_DRAFT_DESCRIPTION_LENGTH = 65_535
 
 /**
  * 프로젝트 서비스에서 공통으로 사용하는 입력값과 관계 검증을 제공합니다.
@@ -52,7 +53,7 @@ class ProjectServiceSupport(
         title: String,
         description: String,
     ) {
-        if (title.length > MAX_DRAFT_TITLE_LENGTH || description.length > MAX_DRAFT_DESCRIPTION_LENGTH) {
+        if (title.length > MAX_DRAFT_TITLE_LENGTH || description.utf8ByteLength() > MYSQL_TEXT_MAX_BYTES) {
             invalidInput()
         }
     }

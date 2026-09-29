@@ -8,6 +8,9 @@ import team.incube.gsmc.global.annotation.adapter.Adapter
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.themoment.datagsm.sdk.oauth.DataGsmOAuthClient
+import team.themoment.datagsm.sdk.oauth.model.AccountObjectType
+
+private const val DEFAULT_OAUTH_TOKEN_EXPIRY_SECONDS = 3600L
 
 /**
  * DataGSM OAuth 공급자와의 연동을 담당하는 아웃바운드 어댑터 클래스입니다.
@@ -16,8 +19,6 @@ import team.themoment.datagsm.sdk.oauth.DataGsmOAuthClient
  *
  * @param client DataGSM OAuth 클라이언트 Bean
  */
-private const val DEFAULT_OAUTH_TOKEN_EXPIRY_SECONDS = 3600L
-
 @Adapter(direction = PortDirection.OUTBOUND)
 class DataGsmOAuthAdapter(
     private val client: DataGsmOAuthClient,
@@ -82,7 +83,7 @@ class DataGsmOAuthAdapter(
                 client.getUserInfo(accessToken)
             }.getOrElse { throw GsmcException(ErrorCode.OAUTH_USER_INFO_FETCH_FAILED) }
 
-        val isStudent = userInfo.getIsStudent() == true
+        val isStudent = userInfo.objectType == AccountObjectType.STUDENT
         val student = if (isStudent) userInfo.student else null
 
         return OAuthUserInfo(

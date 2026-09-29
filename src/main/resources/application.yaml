@@ -16,14 +16,23 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  task:
+    scheduling:
+      pool:
+        # 알림 Heartbeat와 스토리지 객체 삭제 워커가 같은 스레드를 기다리지 않도록 분리한다.
+        # 스토리지 장애 중 삭제 호출이 타임아웃까지 걸리면 Heartbeat가 밀려 SSE 연결이 끊길 수 있다.
+        size: 2
   data:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
   flyway:
     enabled: true
+    # 빈 스키마에서는 baseline-on-migrate가 동작하지 않으므로 V1부터 전부 적용된다.
+    # 이미 수동으로 SQL이 반영된 스키마(flyway_schema_history 없음)에서는
+    # baseline-version 다음 버전부터 실행되므로, 환경별 실제 반영 버전에 맞춰야 한다.
     baseline-on-migrate: true
-    baseline-version: 1
+    baseline-version: ${FLYWAY_BASELINE_VERSION:10}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}

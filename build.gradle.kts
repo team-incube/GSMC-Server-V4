@@ -50,7 +50,7 @@ dependencies {
     kapt(Libs.LOMBOK)
 
     runtimeOnly(Libs.MYSQL_CONNECTOR)
-    implementation(Libs.FLYWAY_CORE)
+    implementation(Libs.SPRING_BOOT_FLYWAY)
     implementation(Libs.FLYWAY_MYSQL)
 
     testImplementation(Libs.SPRING_BOOT_TEST)

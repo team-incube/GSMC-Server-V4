@@ -7,6 +7,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import org.springframework.data.redis.core.types.Expiration
 import tools.jackson.databind.ObjectMapper
 
 class ScoreTotalCachePersistenceAdapterTest :
@@ -45,7 +46,8 @@ class ScoreTotalCachePersistenceAdapterTest :
         Given("Redis 저장 중 장애가 발생할 때") {
             When("saveClassTotals를 호출하면") {
                 Then("예외를 밖으로 던지지 않고 삼킨다") {
-                    every { valueOperations.set(any(), any(), any(), any()) } throws RuntimeException("redis timeout")
+                    every { valueOperations.set(any(), any(), any<Expiration>()) } throws
+                        RuntimeException("redis timeout")
 
                     shouldNotThrowAny { adapter.saveClassTotals(1, 2, true, mapOf(1L to 100)) }
                 }

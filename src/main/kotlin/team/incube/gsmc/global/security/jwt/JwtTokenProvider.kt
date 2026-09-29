@@ -2,11 +2,13 @@ package team.incube.gsmc.global.security.jwt
 
 import io.jsonwebtoken.Jwts
 import org.springframework.stereotype.Component
+import team.incube.gsmc.domain.auth.TokenClaims
 import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import java.util.Date
+import java.util.UUID
 import javax.crypto.SecretKey
 
 @Component
@@ -37,6 +39,7 @@ class JwtTokenProvider(
         Jwts
             .builder()
             .subject(userId.toString())
+            .id(UUID.randomUUID().toString())
             .issuedAt(Date())
             .expiration(Date(System.currentTimeMillis() + jwtProperties.refreshTokenExpiry * 1000))
             .signWith(signingKey)
@@ -56,16 +59,15 @@ class JwtTokenProvider(
             .getOrElse { throw GsmcException(ErrorCode.INVALID_TOKEN) }
     }
 
-    override fun parseTokenClaims(token: String): Pair<Long, UserRole>? =
+    override fun parseTokenClaims(token: String): TokenClaims? =
         runCatching {
             val claims = parseClaims(token)
             val userId = claims.subject.toLong()
+            val issuedAt = claims.issuedAt.time
             val roleStr = claims.get("role", String::class.java) ?: return@runCatching null
             val role = runCatching { UserRole.valueOf(roleStr) }.getOrNull() ?: return@runCatching null
-            Pair(userId, role)
+            TokenClaims(userId, role, issuedAt)
         }.getOrNull()
-
-    fun getExpiryFromToken(token: String): Long = parseClaims(token).expiration.time
 
     private fun parseClaims(token: String) =
         Jwts

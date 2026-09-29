@@ -1,12 +1,12 @@
 package team.incube.gsmc.domain.alert.service
 
-import org.slf4j.LoggerFactory
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import team.incube.gsmc.domain.alert.port.`in`.ConnectMyAlertStreamUseCase
 import team.incube.gsmc.domain.alert.port.out.AlertEmitterRegistryPort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.util.MemberUtil
+import team.themoment.sdk.logging.logger.logger
 
 /**
  * 내 알림 실시간 스트림 연결 유스케이스 구현 클래스입니다.
@@ -20,8 +20,6 @@ class ConnectMyAlertStreamService(
     private val alertEmitterRegistryPort: AlertEmitterRegistryPort,
     private val memberUtil: MemberUtil,
 ) : ConnectMyAlertStreamUseCase {
-    private val log = LoggerFactory.getLogger(ConnectMyAlertStreamService::class.java)
-
     override fun execute(): SseEmitter {
         val userId = memberUtil.getCurrentUserId()
         val emitter = alertEmitterRegistryPort.createAndRegister(userId)
@@ -29,7 +27,7 @@ class ConnectMyAlertStreamService(
         try {
             emitter.send(SseEmitter.event().name("connected"))
         } catch (e: Exception) {
-            log.warn("SSE 연결 확인 이벤트 전송에 실패했습니다. userId={}", userId, e)
+            logger().warn("SSE 연결 확인 이벤트 전송에 실패했습니다. userId={}", userId, e)
             alertEmitterRegistryPort.remove(userId, emitter)
         }
 

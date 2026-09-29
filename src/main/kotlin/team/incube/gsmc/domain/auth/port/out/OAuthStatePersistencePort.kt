@@ -3,7 +3,7 @@ package team.incube.gsmc.domain.auth.port.out
 /**
  * OAuth state 임시 저장을 추상화하는 아웃바운드 포트 인터페이스입니다.
  * CSRF 방지용 state 값과 PKCE codeVerifier의 저장 및 조회 계약을 정의합니다.
- * [OAuthStatePersistenceAdapter]가 이 인터페이스를 구현하여 Redis에 실제 처리를 위임합니다.
+ * [team.incube.gsmc.domain.auth.adapter.out.persistence.OAuthStatePersistenceAdapter]가 이 인터페이스를 구현하여 Redis에 실제 처리를 위임합니다.
  */
 interface OAuthStatePersistencePort {
     /**

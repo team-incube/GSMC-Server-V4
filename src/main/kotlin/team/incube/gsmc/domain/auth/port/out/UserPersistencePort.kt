@@ -5,7 +5,7 @@ import team.incube.gsmc.domain.user.User
 /**
  * 사용자 영속성을 추상화하는 아웃바운드 포트 인터페이스입니다.
  * 인증 도메인의 로그인 흐름에서 필요한 사용자 조회 및 저장 기능의 계약을 정의합니다.
- * [AuthUserPersistenceAdapter]가 이 인터페이스를 구현하여 JPA 저장소에 실제 처리를 위임합니다.
+ * [team.incube.gsmc.domain.auth.adapter.out.persistence.AuthUserPersistenceAdapter]가 이 인터페이스를 구현하여 JPA 저장소에 실제 처리를 위임합니다.
  */
 interface UserPersistencePort {
     /**

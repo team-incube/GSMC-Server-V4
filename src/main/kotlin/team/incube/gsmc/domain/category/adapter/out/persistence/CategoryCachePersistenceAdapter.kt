@@ -1,8 +1,5 @@
 package team.incube.gsmc.domain.category.adapter.out.persistence
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Primary
 import org.springframework.data.redis.core.RedisTemplate
@@ -11,6 +8,8 @@ import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.port.out.CategoryPersistencePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
 
 /**
  * 카테고리 조회 결과의 캐싱을 담당하는 아웃바운드 어댑터 클래스입니다.

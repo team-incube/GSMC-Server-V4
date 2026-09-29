@@ -26,7 +26,7 @@ class DataGsmProjectApiAdapterTest :
         val requestSpec = mockk<RestClient.RequestHeadersSpec<*>>()
         val responseSpec = mockk<RestClient.ResponseSpec>()
         val cachePort = mockk<DataGsmProjectCachePort>()
-        val adapter = DataGsmProjectApiAdapter(restClient, cachePort)
+        val adapter = DataGsmProjectApiAdapter(restClient, cachePort, DataGsmProjectSingleFlight())
         val participant =
             DataGsmProjectParticipant(
                 10L,
@@ -97,6 +97,34 @@ class DataGsmProjectApiAdapterTest :
 
                 verify(exactly = 1) { restClient.get() }
                 verify(exactly = 1) { cachePort.saveAll(listOf(project)) }
+            }
+        }
+
+        Given("전체 프로젝트 캐시가 없어 재조회가 필요할 때") {
+            Then("재조회를 SingleFlight로 합쳐 수행한다") {
+                val singleFlight = mockk<DataGsmProjectSingleFlight>()
+                val adapterWithMock = DataGsmProjectApiAdapter(restClient, cachePort, singleFlight)
+                every { cachePort.findAll() } returns null
+                every { singleFlight.load(any()) } returns listOf(project)
+
+                adapterWithMock.findActiveProjectsByParticipantEmail("student@gsm.hs.kr") shouldBe listOf(project)
+
+                verify(exactly = 1) { singleFlight.load(any()) }
+                verify(exactly = 0) { restClient.get() }
+            }
+
+            Then("대표 요청이 막 채워둔 캐시가 있으면 외부 API를 호출하지 않는다") {
+                val singleFlight = mockk<DataGsmProjectSingleFlight>()
+                val adapterWithMock = DataGsmProjectApiAdapter(restClient, cachePort, singleFlight)
+                // 합류 블록을 그대로 실행시켜, 블록 안에서 캐시를 한 번 더 확인하는지 검증한다.
+                every { singleFlight.load(any()) } answers { firstArg<() -> List<DataGsmProject>>().invoke() }
+                every { cachePort.findAll() } returnsMany listOf(null, listOf(project))
+
+                adapterWithMock.findActiveProjectsByParticipantEmail("student@gsm.hs.kr") shouldBe listOf(project)
+
+                verify(exactly = 2) { cachePort.findAll() }
+                verify(exactly = 0) { restClient.get() }
+                verify(exactly = 0) { cachePort.saveAll(any()) }
             }
         }
 

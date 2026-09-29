@@ -3,14 +3,12 @@ package team.incube.gsmc.global.exception
 import graphql.GraphQLError
 import graphql.GraphqlErrorBuilder
 import graphql.schema.DataFetchingEnvironment
-import org.slf4j.LoggerFactory
 import org.springframework.graphql.execution.DataFetcherExceptionResolverAdapter
 import org.springframework.stereotype.Component
+import team.themoment.sdk.logging.logger.logger
 
 @Component
 class GsmcExceptionResolver : DataFetcherExceptionResolverAdapter() {
-    private val log = LoggerFactory.getLogger(GsmcExceptionResolver::class.java)
-
     override fun resolveToSingleError(
         ex: Throwable,
         env: DataFetchingEnvironment,
@@ -25,7 +23,7 @@ class GsmcExceptionResolver : DataFetcherExceptionResolverAdapter() {
             }
 
             else -> {
-                log.error("Unexpected exception occurred during GraphQL execution", ex)
+                logger().error("Unexpected exception occurred during GraphQL execution", ex)
                 GraphqlErrorBuilder
                     .newError(env)
                     .message(ErrorCode.INTERNAL_SERVER_ERROR.message)

@@ -1,12 +1,12 @@
 package team.incube.gsmc.domain.alert.adapter.sse
 
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import team.incube.gsmc.domain.alert.AlertCreatedEvent
 import team.incube.gsmc.domain.alert.port.out.AlertEmitterRegistryPort
+import team.themoment.sdk.logging.logger.logger
 
 /**
  * [AlertCreatedEvent]를 구독해 알림 수신자에게 SSE로 실시간 전달하는 리스너입니다.
@@ -21,8 +21,6 @@ import team.incube.gsmc.domain.alert.port.out.AlertEmitterRegistryPort
 class AlertSseNotifier(
     private val alertEmitterRegistryPort: AlertEmitterRegistryPort,
 ) {
-    private val log = LoggerFactory.getLogger(AlertSseNotifier::class.java)
-
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onAlertCreated(event: AlertCreatedEvent) {
         val alert = event.alert
@@ -38,7 +36,7 @@ class AlertSseNotifier(
             } catch (e: Exception) {
                 // IOException(연결 끊김) 외에도, 이미 완료된 Emitter에 전송을 시도하면
                 // IllegalStateException이 발생할 수 있어 두 경우 모두 정리 대상으로 처리한다.
-                log.warn("SSE 알림 전송에 실패해 연결을 정리합니다. userId={}, alertId={}", alert.userId, alert.alertId, e)
+                logger().warn("SSE 알림 전송에 실패해 연결을 정리합니다. userId={}, alertId={}", alert.userId, alert.alertId, e)
                 alertEmitterRegistryPort.remove(alert.userId, emitter)
             }
         }
