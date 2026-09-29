@@ -14,7 +14,7 @@ import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.score.Percentile
-import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
@@ -73,18 +73,11 @@ class FetchMyPercentInClassServiceTest :
             userId: Long,
             status: ScoreStatus,
             categoryType: CategoryType,
-        ) = Score(
-            scoreId = 0,
+        ) = ScoreCalculationRow(
             userId = userId,
             category = categoryOf(categoryType),
-            evidence = null,
-            file = null,
             scoreStatus = status,
-            activityName = null,
             scoreValue = null,
-            rejectionReason = null,
-            dgProjectId = null,
-            createdAt = LocalDateTime.now(),
             updatedAt = LocalDateTime.now(),
         )
 
@@ -132,7 +125,7 @@ class FetchMyPercentInClassServiceTest :
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1L, 2, UserRole.STUDENT, 3)
-                    every { scorePersistencePort.findAllByUserIdIn(any()) } returns allScores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(any()) } returns allScores
                     every { memberPersistencePort.findAllStudentsByUserGradeAndUserClassNumber(2, 3) } returns
                         classmates
 
@@ -147,7 +140,7 @@ class FetchMyPercentInClassServiceTest :
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1L, 2, UserRole.STUDENT, 3)
-                    every { scorePersistencePort.findAllByUserIdIn(any()) } returns allScores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(any()) } returns allScores
                     every { memberPersistencePort.findAllStudentsByUserGradeAndUserClassNumber(2, 3) } returns
                         classmates
 
@@ -220,7 +213,7 @@ class FetchMyPercentInClassServiceTest :
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1L, 2, UserRole.STUDENT, 3)
-                    every { scorePersistencePort.findAllByUserIdIn(any()) } returns allScores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(any()) } returns allScores
                     every { memberPersistencePort.findAllStudentsByUserGradeAndUserClassNumber(2, 3) } returns
                         classmates
 
@@ -253,7 +246,7 @@ class FetchMyPercentInClassServiceTest :
                     val result = service.execute(true)
 
                     result shouldBe percentileOf(50, 75)
-                    verify(exactly = 0) { scorePersistencePort.findAllByUserIdIn(any()) }
+                    verify(exactly = 0) { scorePersistencePort.findCalculationRowsByUserIdIn(any()) }
                     verify(exactly = 0) {
                         memberPersistencePort.findAllStudentsByUserGradeAndUserClassNumber(any(), any())
                     }
@@ -271,7 +264,7 @@ class FetchMyPercentInClassServiceTest :
                     every { scoreTotalCachePort.findClassTotals(2, 3, true) } returns mapOf(2L to 1)
                     every { memberPersistencePort.findAllStudentsByUserGradeAndUserClassNumber(2, 3) } returns
                         classmates
-                    every { scorePersistencePort.findAllByUserIdIn(any()) } returns allScores
+                    every { scorePersistencePort.findCalculationRowsByUserIdIn(any()) } returns allScores
 
                     val result = service.execute(true)
 

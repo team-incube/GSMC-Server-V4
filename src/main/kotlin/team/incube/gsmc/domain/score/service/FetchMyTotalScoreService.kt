@@ -25,7 +25,7 @@ class FetchMyTotalScoreService(
         val userId = memberUtil.getCurrentUserId()
         val me = memberPersistencePort.findByUserId(userId) ?: throw GsmcException(ErrorCode.USER_NOT_FOUND)
 
-        val scores = scorePersistencePort.findAllByUserId(userId)
+        val scores = scorePersistencePort.findCalculationRowsByUserIdIn(listOf(userId))
         return TotalScore(ScoreAggregator.totalScoreOf(scores, includeApprovedOnly, me.userGrade))
     }
 }

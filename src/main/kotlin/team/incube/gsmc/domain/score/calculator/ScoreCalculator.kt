@@ -2,11 +2,11 @@ package team.incube.gsmc.domain.score.calculator
 
 import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.ScoreCalculationType
-import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationSource
 
 abstract class ScoreCalculator {
     fun recognizedScore(
-        scoresByCategory: Map<Category, List<Score>>,
+        scoresByCategory: Map<Category, List<ScoreCalculationSource>>,
         category: Category,
     ): Int {
         val base = rawScoreOf(scoresByCategory[category].orEmpty(), category)
@@ -15,7 +15,7 @@ abstract class ScoreCalculator {
     }
 
     protected open fun rawScoreOf(
-        scoresInCategory: List<Score>,
+        scoresInCategory: List<ScoreCalculationSource>,
         category: Category,
     ): Int =
         when (category.calculationType) {
@@ -39,7 +39,7 @@ abstract class ScoreCalculator {
         }
 
     protected open fun bonusScore(
-        scoresByCategory: Map<Category, List<Score>>,
+        scoresByCategory: Map<Category, List<ScoreCalculationSource>>,
         category: Category,
     ): Int = 0
 }

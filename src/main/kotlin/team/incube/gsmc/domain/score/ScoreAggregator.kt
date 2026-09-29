@@ -50,7 +50,7 @@ object ScoreAggregator {
     }
 
     fun totalScoreOf(
-        allScores: List<Score>,
+        allScores: List<ScoreCalculationSource>,
         includeApprovedOnly: Boolean,
         userGrade: Int?,
     ): Int {

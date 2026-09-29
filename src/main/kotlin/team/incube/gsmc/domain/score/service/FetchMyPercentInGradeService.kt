@@ -49,7 +49,10 @@ class FetchMyPercentInGradeService(
                                 .map { it.userId }
                                 .toSet() + userId
                         val scoresByUserId =
-                            scorePersistencePort.findAllByUserIdIn(gradeMateIds.toList()).groupBy { it.userId }
+                            scorePersistencePort
+                                .findCalculationRowsByUserIdIn(
+                                    gradeMateIds.toList(),
+                                ).groupBy { it.userId }
                         gradeMateIds.associateWith { id ->
                             ScoreAggregator.totalScoreOf(
                                 scoresByUserId[id] ?: emptyList(),
