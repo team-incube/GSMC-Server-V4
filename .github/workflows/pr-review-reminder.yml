@@ -1,0 +1,41 @@
+name: PR Review Reminder
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remind stale PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          ROLE_ID: ${{ secrets.DISCORD_BACKEND_ROLE_ID }}
+        run: |
+          gh label create "🔔 Reminded" --color FBCA04 2>/dev/null || true
+          cutoff=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
+
+          gh pr list --state open --json number,title,url,author,createdAt,isDraft,reviews,labels \
+            | jq -c --arg cutoff "$cutoff" '.[]
+                | select(.isDraft == false)
+                | select(.createdAt < $cutoff)
+                | select((.reviews | length) == 0)
+                | select([.labels[].name] | index("📣 Mentioned"))
+                | select([.labels[].name] | index("🔔 Reminded") | not)' \
+            | while read -r pr; do
+                num=$(jq -r .number <<< "$pr")
+                payload=$(jq -n --arg role "$ROLE_ID" --argjson pr "$pr" '{
+                  content: "<@&\($role)> ⏰ 1시간째 리뷰 대기 중이에요!\n**#\($pr.number) \($pr.title)** by `\($pr.author.login)`\n\($pr.url)",
+                  allowed_mentions: { roles: [$role] }
+                }')
+                curl -sf -H "Content-Type: application/json" -d "$payload" "$WEBHOOK"
+                gh pr edit "$num" --add-label "🔔 Reminded"
+              done
