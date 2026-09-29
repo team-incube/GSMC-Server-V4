@@ -37,7 +37,7 @@ class GraphqlQueryLimitConfig {
         private val ROOT_TYPE_NAMES = setOf("Query", "Mutation")
 
         /** 루트 필드(서비스 호출)에 가중치를 주고, 그 아래 필드는 1로 세는 복잡도 계산기다. */
-        val ROOT_WEIGHTED_COMPLEXITY =
+        private val ROOT_WEIGHTED_COMPLEXITY =
             FieldComplexityCalculator { environment, childComplexity ->
                 val cost = if (environment.parentType.name in ROOT_TYPE_NAMES) ROOT_FIELD_COST else FIELD_COST
                 cost + childComplexity
