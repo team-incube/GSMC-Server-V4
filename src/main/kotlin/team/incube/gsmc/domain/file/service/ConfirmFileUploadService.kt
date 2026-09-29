@@ -4,7 +4,6 @@ import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.file.MAX_FILE_SIZE_BYTES
 import team.incube.gsmc.domain.file.port.`in`.ConfirmFileUploadUseCase
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
-import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistencePort
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
@@ -20,25 +19,21 @@ import team.incube.gsmc.global.util.MemberUtil
  * 삭제 작업([team.incube.gsmc.domain.file.FileStorageDeletionTask])이 남아 있는 key는 곧 지워질 객체이므로
  * [ErrorCode.S3_OBJECT_NOT_FOUND]로 거부합니다. 파일 행 삭제와 작업 기록이 같은 트랜잭션이라, 삭제된
  * key를 다시 confirm해 워커가 살아 있는 파일의 객체를 지우는 경우가 생기지 않습니다.
- * 오브젝트 스토리지 조회(`getObjectSize`)가 네트워크 호출이라, DB 커넥션을 오래 점유하지
- * 않도록 이 메서드는 트랜잭션을 열지 않습니다. `findByFileKey`/`save`는 각각 Spring Data
- * JPA 리포지토리 메서드 자체가 개별 트랜잭션으로 실행되므로 별도 트랜잭션 선언이 필요 없습니다.
+ * DB 확인은 짧은 읽기 전용 트랜잭션으로 먼저 수행하고, 오브젝트 스토리지 조회(`getObjectSize`)
+ * 는 트랜잭션 밖에서 수행합니다. 따라서 S3 지연이 DB 커넥션 점유로 전파되지 않습니다.
  */
 @Port(direction = PortDirection.INBOUND)
 class ConfirmFileUploadService(
-    private val filePersistencePort: FilePersistencePort,
+    private val confirmFileUploadServiceSupport: ConfirmFileUploadServiceSupport,
     private val fileStoragePort: FileStoragePort,
-    private val fileStorageDeletionTaskPersistencePort: FileStorageDeletionTaskPersistencePort,
+    private val filePersistencePort: FilePersistencePort,
     private val memberUtil: MemberUtil,
 ) : ConfirmFileUploadUseCase {
     override fun execute(
         fileKey: String,
         originalFileName: String,
     ): File {
-        if (filePersistencePort.findByFileKey(fileKey) != null) throw GsmcException(ErrorCode.FILE_ALREADY_CONFIRMED)
-        if (fileStorageDeletionTaskPersistencePort.existsByFileKey(fileKey)) {
-            throw GsmcException(ErrorCode.S3_OBJECT_NOT_FOUND)
-        }
+        confirmFileUploadServiceSupport.validate(fileKey)
 
         val objectSize = fileStoragePort.getObjectSize(fileKey) ?: throw GsmcException(ErrorCode.S3_OBJECT_NOT_FOUND)
         if (objectSize > MAX_FILE_SIZE_BYTES) throw GsmcException(ErrorCode.INVALID_FILE_SIZE)
