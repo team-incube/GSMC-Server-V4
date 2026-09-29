@@ -23,11 +23,16 @@ class ConfirmFileUploadServiceTest :
         val fileStoragePort = mockk<FileStoragePort>()
         val fileStorageDeletionTaskPersistencePort = mockk<FileStorageDeletionTaskPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
+        val confirmFileUploadServiceSupport =
+            ConfirmFileUploadServiceSupport(
+                filePersistencePort,
+                fileStorageDeletionTaskPersistencePort,
+            )
         val service =
             ConfirmFileUploadService(
-                filePersistencePort,
+                confirmFileUploadServiceSupport,
                 fileStoragePort,
-                fileStorageDeletionTaskPersistencePort,
+                filePersistencePort,
                 memberUtil,
             )
 
