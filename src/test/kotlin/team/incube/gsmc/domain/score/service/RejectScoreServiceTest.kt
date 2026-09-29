@@ -78,7 +78,7 @@ class RejectScoreServiceTest :
             When("PENDING 상태의 점수를 거절하면") {
                 Then("상태를 REJECTED로, 거절 사유를 함께 저장하고 사유가 포함된 REJECTED 알림을 생성한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(1L) } returns score(ScoreStatus.PENDING)
+                    every { scorePersistencePort.findByIdForUpdate(1L) } returns score(ScoreStatus.PENDING)
                     every { scorePersistencePort.save(any()) } answers { firstArg() }
                     every { alertPersistencePort.save(any()) } answers { firstArg<Alert>().copy(alertId = 200L) }
                     every { alertEventPublisherPort.publish(any()) } just runs
@@ -108,15 +108,14 @@ class RejectScoreServiceTest :
             }
 
             When("이미 REJECTED인 점수를 다시 거절하면") {
-                Then("상태는 다시 저장하지만 알림은 중복 생성하지 않는다") {
+                Then("락만 잡고 early return하며 save 이후 로직을 전부 스킵한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(1L) } returns score(ScoreStatus.REJECTED)
-                    every { scorePersistencePort.save(any()) } answers { firstArg() }
+                    every { scorePersistencePort.findByIdForUpdate(1L) } returns score(ScoreStatus.REJECTED)
 
                     val result = service.execute(1L, "다른 사유")
 
                     result shouldBe true
-                    verify(exactly = 1) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
                     verify(exactly = 0) { alertPersistencePort.save(any()) }
                     verify(exactly = 0) { alertEventPublisherPort.publish(any()) }
                     verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
@@ -126,7 +125,7 @@ class RejectScoreServiceTest :
             When("존재하지 않는 점수를 거절하면") {
                 Then("SCORE_NOT_FOUND 예외가 발생한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(999L) } returns null
+                    every { scorePersistencePort.findByIdForUpdate(999L) } returns null
 
                     val exception = shouldThrow<GsmcException> { service.execute(999L, "사유") }
 
@@ -143,7 +142,7 @@ class RejectScoreServiceTest :
                     val exception = shouldThrow<GsmcException> { service.execute(1L, "가".repeat(501)) }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_REJECTION_REASON
-                    verify(exactly = 0) { scorePersistencePort.findById(any()) }
+                    verify(exactly = 0) { scorePersistencePort.findByIdForUpdate(any()) }
                 }
             }
 

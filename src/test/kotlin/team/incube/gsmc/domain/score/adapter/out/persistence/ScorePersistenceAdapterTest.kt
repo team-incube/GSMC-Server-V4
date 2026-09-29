@@ -368,6 +368,33 @@ class ScorePersistenceAdapterTest :
             }
         }
 
+        Given("findByIdForUpdate로 조회할 때") {
+            When("일치하는 점수가 존재하면") {
+                Then("리포지토리의 락 쿼리로 조회해 첨부 파일을 병합한 도메인 객체를 반환한다") {
+                    val entity = scoreEntity(10L, ScoreStatus.PENDING)
+                    every { scoreJpaRepository.findByIdForUpdate(10L) } returns entity
+                    mockSingleFileQuery(fileEntity(1L, entity))
+
+                    val result = adapter.findByIdForUpdate(10L)
+
+                    result?.scoreId shouldBe 10L
+                    result?.file?.fileId shouldBe 1L
+                    verify(exactly = 1) { scoreJpaRepository.findByIdForUpdate(10L) }
+                    verify(exactly = 0) { queryFactory.selectFrom(scoreJpaEntity) }
+                }
+            }
+
+            When("일치하는 점수가 없으면") {
+                Then("null을 반환하고 파일을 조회하지 않는다") {
+                    every { scoreJpaRepository.findByIdForUpdate(999L) } returns null
+
+                    adapter.findByIdForUpdate(999L).shouldBeNull()
+
+                    verify(exactly = 0) { queryFactory.selectFrom(fileJpaEntity) }
+                }
+            }
+        }
+
         Given("findAllByUserId로 조회할 때") {
             When("사용자 ID 하나를 전달하면") {
                 Then("findAllByUserIdIn에 위임되어 해당 사용자의 점수 목록을 반환한다") {

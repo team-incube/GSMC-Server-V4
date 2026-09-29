@@ -38,6 +38,8 @@ import team.incube.gsmc.global.exception.GsmcException
  * 참조가 없어(역방향 연관관계), 첨부 파일은 별도 쿼리로 조회 후 병합합니다.
  * 총점 계산용 조회([findCalculationRowsByUserIdIn])는 예외로, 조인 없이 계산에 필요한 컬럼만 투영합니다.
  * 저장/삭제는 [ScoreJpaRepository]에, FK 참조 조립은 [EntityManager.getReference]에 위임합니다.
+ * [findByIdForUpdate]는 비관적 락 조회로, [ScoreJpaRepository]의 fetch join 없는 락 쿼리로 `score_tb`
+ * 행만 잠근 뒤 [findById]와 동일한 방식(연관 데이터 지연 로딩 + 별도 파일 조회)으로 도메인 객체를 조립합니다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class ScorePersistenceAdapter(
@@ -59,6 +61,11 @@ class ScorePersistenceAdapter(
                 .where(scoreJpaEntity.scoreId.eq(scoreId))
                 .fetchOne() ?: return null
 
+        return entity.toDomain(findFileByScoreId(scoreId))
+    }
+
+    override fun findByIdForUpdate(scoreId: Long): Score? {
+        val entity = scoreJpaRepository.findByIdForUpdate(scoreId) ?: return null
         return entity.toDomain(findFileByScoreId(scoreId))
     }
 
