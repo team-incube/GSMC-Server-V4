@@ -36,6 +36,7 @@ import team.incube.gsmc.global.exception.GsmcException
  * 읽는 것만으로도 초기화(추가 쿼리)가 유발될 수 있어 user도 fetch join 대상에 포함합니다.
  * [ScoreJpaEntity]는 [team.incube.gsmc.domain.file.adapter.out.persistence.entity.FileJpaEntity]에 대한
  * 참조가 없어(역방향 연관관계), 첨부 파일은 별도 쿼리로 조회 후 병합합니다.
+ * 총점 계산용 조회([findCalculationRowsByUserIdIn])는 예외로, 조인 없이 계산에 필요한 컬럼만 투영합니다.
  * 저장/삭제는 [ScoreJpaRepository]에, FK 참조 조립은 [EntityManager.getReference]에 위임합니다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)

@@ -6,7 +6,8 @@ import team.incube.gsmc.domain.score.ScoreCalculationRow
 
 /**
  * 점수 요청 영속성을 추상화하는 아웃바운드 포트 인터페이스입니다.
- * category/evidence/file은 항상 함께 조회되어 [Score] 도메인 객체에 채워진다.
+ * [Score]를 반환하는 조회는 category/evidence/file을 함께 채운다. 총점 계산만 필요한 경로는
+ * 증빙·첨부 파일을 싣지 않는 [findCalculationRowsByUserIdIn]을 사용한다.
  */
 interface ScorePersistencePort {
     /**
