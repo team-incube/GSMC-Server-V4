@@ -59,6 +59,49 @@ class ScoreAggregatorTest :
             updatedAt = LocalDateTime.now(),
         )
 
+        Given("집계 전용 ScoreCalculationRow로 총점을 계산할 때") {
+            fun rowOf(score: Score) =
+                ScoreCalculationRow(
+                    userId = score.userId,
+                    category = score.category,
+                    scoreStatus = score.scoreStatus,
+                    scoreValue = score.scoreValue,
+                    updatedAt = score.updatedAt,
+                )
+
+            When("상세 조회용 Score와 같은 값을 담으면") {
+                Then("두 입력의 총점이 같다") {
+                    val scores =
+                        listOf(
+                            score(toeicCategory, ScoreStatus.APPROVED, scoreValue = 8),
+                            score(academyCategory, ScoreStatus.APPROVED),
+                            score(toeicCategory, ScoreStatus.PENDING, scoreValue = 9),
+                            score(toeicCategory, ScoreStatus.REJECTED, scoreValue = 10),
+                        )
+
+                    listOf(true, false).forEach { includeApprovedOnly ->
+                        ScoreAggregator.totalScoreOf(scores.map(::rowOf), includeApprovedOnly, userGrade = 1) shouldBe
+                            ScoreAggregator.totalScoreOf(scores, includeApprovedOnly, userGrade = 1)
+                    }
+                }
+            }
+
+            When("비누적 SCORE_BASED 카테고리에 점수가 여러 건이면") {
+                Then("updatedAt이 가장 최신인 점수로 계산한다") {
+                    val base = LocalDateTime.of(2026, 9, 1, 0, 0)
+                    val rows =
+                        listOf(
+                            rowOf(score(toeicCategory, ScoreStatus.APPROVED, scoreValue = 9)).copy(updatedAt = base),
+                            rowOf(
+                                score(toeicCategory, ScoreStatus.APPROVED, scoreValue = 3),
+                            ).copy(updatedAt = base.plusDays(1)),
+                        )
+
+                    ScoreAggregator.totalScoreOf(rows, includeApprovedOnly = true, userGrade = 1) shouldBe 3
+                }
+            }
+        }
+
         Given("토익사관학교 가산점") {
             When("TOEIC 8점에 사관학교 참여가 승인되면") {
                 Then("TOEIC 인정점수에 1점이 가산된다") {

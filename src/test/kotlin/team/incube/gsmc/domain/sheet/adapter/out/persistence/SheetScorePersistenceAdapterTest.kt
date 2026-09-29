@@ -1,5 +1,7 @@
 package team.incube.gsmc.domain.sheet.adapter.out.persistence
 
+import com.querydsl.core.Tuple
+import com.querydsl.core.types.Expression
 import com.querydsl.core.types.Predicate
 import com.querydsl.jpa.impl.JPAQuery
 import com.querydsl.jpa.impl.JPAQueryFactory
@@ -9,15 +11,15 @@ import io.kotest.matchers.shouldBe
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.category.adapter.out.persistence.entity.CategoryJpaEntity
+import team.incube.gsmc.domain.category.adapter.out.persistence.entity.QCategoryJpaEntity.categoryJpaEntity
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreJpaEntity.scoreJpaEntity
-import team.incube.gsmc.domain.score.adapter.out.persistence.entity.ScoreJpaEntity
-import team.incube.gsmc.domain.user.UserRole
-import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
+import java.time.LocalDateTime
 
 class SheetScorePersistenceAdapterTest :
     BehaviorSpec({
@@ -27,17 +29,6 @@ class SheetScorePersistenceAdapterTest :
         beforeEach { clearAllMocks() }
 
         val categoryId = 2L
-
-        fun userEntity(userId: Long) =
-            UserJpaEntity(
-                userId = userId,
-                userName = "학생$userId",
-                userEmail = "student$userId@gsm.hs.kr",
-                userGrade = 2,
-                userClassNumber = 3,
-                userNumber = userId.toInt(),
-                userRole = UserRole.STUDENT,
-            )
 
         fun categoryEntity() =
             CategoryJpaEntity(
@@ -53,49 +44,46 @@ class SheetScorePersistenceAdapterTest :
                 conversionDivisor = 100,
             )
 
-        fun scoreEntity(
-            scoreId: Long,
+        fun tupleOf(
             userId: Long,
-        ) = ScoreJpaEntity(
-            scoreId = scoreId,
-            user = userEntity(userId),
-            category = categoryEntity(),
-            evidence = null,
-            scoreStatus = ScoreStatus.APPROVED,
-            activityName = null,
-            scoreValue = 900,
-            rejectionReason = null,
-            dgProjectId = null,
-        )
+            scoreValue: Int,
+        ): Tuple =
+            mockk {
+                every { get(scoreJpaEntity.user.userId) } returns userId
+                every { get(scoreJpaEntity.category.categoryId) } returns categoryId
+                every { get(scoreJpaEntity.scoreStatus) } returns ScoreStatus.APPROVED
+                every { get(scoreJpaEntity.scoreValue) } returns scoreValue
+                every { get(scoreJpaEntity.updatedAt) } returns LocalDateTime.of(2026, 9, 1, 0, 0)
+            }
 
         Given("findApprovedScoresByUserIds로 승인된 점수를 조회할 때") {
             When("전달된 사용자 ID 목록이 비어 있으면") {
                 Then("쿼리를 실행하지 않고 빈 맵을 반환한다") {
                     adapter.findApprovedScoresByUserIds(emptyList()).shouldBeEmpty()
+
+                    verify(exactly = 0) { queryFactory.select(*anyVararg<Expression<*>>()) }
                 }
             }
 
             When("여러 사용자의 승인된 점수가 존재하면") {
-                Then("사용자 ID별로 그룹화한 맵을 반환한다") {
-                    val query = mockk<JPAQuery<ScoreJpaEntity>>()
-                    every { queryFactory.selectFrom(scoreJpaEntity) } returns query
-                    every { query.join(scoreJpaEntity.user) } returns query
-                    every { query.join(scoreJpaEntity.category) } returns query
-                    every { query.leftJoin(scoreJpaEntity.evidence) } returns query
-                    every { query.fetchJoin() } returns query
-                    every { query.where(*anyVararg<Predicate>()) } returns query
-                    every { query.fetch() } returns
-                        listOf(
-                            scoreEntity(1L, userId = 10L),
-                            scoreEntity(2L, userId = 10L),
-                            scoreEntity(3L, userId = 20L),
-                        )
+                Then("계산에 필요한 값만 사용자 ID별로 그룹화해 반환한다") {
+                    val rowQuery = mockk<JPAQuery<Tuple>>()
+                    every { queryFactory.select(*anyVararg<Expression<*>>()) } returns rowQuery
+                    every { rowQuery.from(scoreJpaEntity) } returns rowQuery
+                    every { rowQuery.where(*anyVararg<Predicate>()) } returns rowQuery
+                    every { rowQuery.fetch() } returns listOf(tupleOf(10L, 7), tupleOf(10L, 8), tupleOf(20L, 9))
+
+                    val categoryQuery = mockk<JPAQuery<CategoryJpaEntity>>()
+                    every { queryFactory.selectFrom(categoryJpaEntity) } returns categoryQuery
+                    every { categoryQuery.where(any<Predicate>()) } returns categoryQuery
+                    every { categoryQuery.fetch() } returns listOf(categoryEntity())
 
                     val result = adapter.findApprovedScoresByUserIds(listOf(10L, 20L))
 
                     result.keys shouldBe setOf(10L, 20L)
-                    result[10L]?.map { it.scoreId } shouldBe listOf(1L, 2L)
-                    result[20L]?.map { it.scoreId } shouldBe listOf(3L)
+                    result[10L]?.map { it.scoreValue } shouldBe listOf(7, 8)
+                    result[20L]?.single()?.category?.categoryType shouldBe CategoryType.TOEIC
+                    verify(exactly = 0) { queryFactory.selectFrom(scoreJpaEntity) }
                 }
             }
         }

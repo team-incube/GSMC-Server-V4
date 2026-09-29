@@ -2,10 +2,12 @@ package team.incube.gsmc.domain.score.port.out
 
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationRow
 
 /**
  * 점수 요청 영속성을 추상화하는 아웃바운드 포트 인터페이스입니다.
- * category/evidence/file은 항상 함께 조회되어 [Score] 도메인 객체에 채워진다.
+ * [Score]를 반환하는 조회는 category/evidence/file을 함께 채운다. 총점 계산만 필요한 경로는
+ * 증빙·첨부 파일을 싣지 않는 [findCalculationRowsByUserIdIn]을 사용한다.
  */
 interface ScorePersistencePort {
     /**
@@ -32,6 +34,15 @@ interface ScorePersistencePort {
      * @return 해당 사용자들의 점수 요청 목록
      */
     fun findAllByUserIdIn(userIds: List<Long>): List<Score>
+
+    /**
+     * 여러 사용자의 점수를 총점 계산에 필요한 값만 담아 조회한다. 증빙·첨부 파일을 조인하지 않으므로
+     * 백분위·총점처럼 사용자당 총점만 필요한 경로에서 [findAllByUserIdIn] 대신 사용한다.
+     *
+     * @param userIds 조회할 사용자 ID 목록
+     * @return 해당 사용자들의 점수 계산용 행 목록
+     */
+    fun findCalculationRowsByUserIdIn(userIds: List<Long>): List<ScoreCalculationRow>
 
     /**
      * 특정 사용자가 특정 카테고리에 제출한 점수 요청 중 **아직 승인되지 않은** 건을 조회한다.

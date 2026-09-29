@@ -1,10 +1,10 @@
 package team.incube.gsmc.domain.sheet.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
-import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreJpaEntity.scoreJpaEntity
-import team.incube.gsmc.domain.score.adapter.out.persistence.entity.toDomain
+import team.incube.gsmc.domain.score.adapter.out.persistence.fetchScoreCalculationRows
 import team.incube.gsmc.domain.sheet.port.out.SheetScorePersistencePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
@@ -13,22 +13,13 @@ import team.incube.gsmc.global.annotation.adapter.Adapter
 class SheetScorePersistenceAdapter(
     private val queryFactory: JPAQueryFactory,
 ) : SheetScorePersistencePort {
-    override fun findApprovedScoresByUserIds(userIds: Collection<Long>): Map<Long, List<Score>> {
+    override fun findApprovedScoresByUserIds(userIds: Collection<Long>): Map<Long, List<ScoreCalculationRow>> {
         if (userIds.isEmpty()) return emptyMap()
 
         return queryFactory
-            .selectFrom(scoreJpaEntity)
-            .join(scoreJpaEntity.user)
-            .fetchJoin()
-            .join(scoreJpaEntity.category)
-            .fetchJoin()
-            .leftJoin(scoreJpaEntity.evidence)
-            .fetchJoin()
-            .where(
+            .fetchScoreCalculationRows(
                 scoreJpaEntity.user.userId.`in`(userIds),
                 scoreJpaEntity.scoreStatus.eq(ScoreStatus.APPROVED),
-            ).fetch()
-            .map { it.toDomain(null) }
-            .groupBy { it.userId }
+            ).groupBy { it.userId }
     }
 }

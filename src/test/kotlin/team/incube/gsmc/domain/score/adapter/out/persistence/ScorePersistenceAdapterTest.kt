@@ -1,5 +1,7 @@
 package team.incube.gsmc.domain.score.adapter.out.persistence
 
+import com.querydsl.core.Tuple
+import com.querydsl.core.types.Expression
 import com.querydsl.core.types.Predicate
 import com.querydsl.jpa.impl.JPADeleteClause
 import com.querydsl.jpa.impl.JPAQuery
@@ -21,6 +23,7 @@ import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.category.adapter.out.persistence.entity.CategoryJpaEntity
+import team.incube.gsmc.domain.category.adapter.out.persistence.entity.QCategoryJpaEntity.categoryJpaEntity
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.FileJpaEntity
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.QFileJpaEntity.fileJpaEntity
 import team.incube.gsmc.domain.score.Score
@@ -409,6 +412,85 @@ class ScorePersistenceAdapterTest :
 
                     result.find { it.scoreId == 30L }?.file?.fileId shouldBe 2L
                     result.find { it.scoreId == 31L }?.file.shouldBeNull()
+                }
+            }
+        }
+
+        fun calculationTupleOf(
+            scoreStatus: ScoreStatus,
+            scoreValue: Int?,
+        ): Tuple =
+            mockk {
+                every { get(scoreJpaEntity.user.userId) } returns userId
+                every { get(scoreJpaEntity.category.categoryId) } returns categoryId
+                every { get(scoreJpaEntity.scoreStatus) } returns scoreStatus
+                every { get(scoreJpaEntity.scoreValue) } returns scoreValue
+                every { get(scoreJpaEntity.updatedAt) } returns LocalDateTime.of(2026, 9, 1, 0, 0)
+            }
+
+        fun mockCalculationRowQuery(
+            rows: List<Tuple>,
+            categories: List<CategoryJpaEntity>,
+        ) {
+            val rowQuery = mockk<JPAQuery<Tuple>>()
+            every { queryFactory.select(*anyVararg<Expression<*>>()) } returns rowQuery
+            every { rowQuery.from(scoreJpaEntity) } returns rowQuery
+            every { rowQuery.where(*anyVararg<Predicate>()) } returns rowQuery
+            every { rowQuery.fetch() } returns rows
+
+            val categoryQuery = mockk<JPAQuery<CategoryJpaEntity>>()
+            every { queryFactory.selectFrom(categoryJpaEntity) } returns categoryQuery
+            every { categoryQuery.where(any<Predicate>()) } returns categoryQuery
+            every { categoryQuery.fetch() } returns categories
+        }
+
+        Given("findCalculationRowsByUserIdIn으로 총점 계산용 점수를 조회할 때") {
+            When("userIds가 비어있으면") {
+                Then("조회 없이 빈 리스트를 반환한다") {
+                    adapter.findCalculationRowsByUserIdIn(emptyList()) shouldBe emptyList()
+
+                    verify(exactly = 0) { queryFactory.select(*anyVararg<Expression<*>>()) }
+                }
+            }
+
+            When("조회된 점수가 없으면") {
+                Then("카테고리 조회 없이 빈 리스트를 반환한다") {
+                    mockCalculationRowQuery(emptyList(), emptyList())
+
+                    adapter.findCalculationRowsByUserIdIn(listOf(userId)) shouldBe emptyList()
+
+                    verify(exactly = 0) { queryFactory.selectFrom(categoryJpaEntity) }
+                }
+            }
+
+            When("점수가 조회되면") {
+                Then("계산에 필요한 값과 카테고리를 채워 반환한다") {
+                    mockCalculationRowQuery(
+                        listOf(
+                            calculationTupleOf(ScoreStatus.APPROVED, 900),
+                            calculationTupleOf(ScoreStatus.PENDING, null),
+                        ),
+                        listOf(categoryEntity(isAccumulated = false)),
+                    )
+
+                    val result = adapter.findCalculationRowsByUserIdIn(listOf(userId))
+
+                    result.map { it.scoreStatus } shouldBe listOf(ScoreStatus.APPROVED, ScoreStatus.PENDING)
+                    result.map { it.scoreValue } shouldBe listOf(900, null)
+                    result.map { it.userId }.distinct() shouldBe listOf(userId)
+                    result.first().category shouldBe category(isAccumulated = false)
+                }
+
+                Then("증빙·첨부 파일을 조인하는 엔티티 조회를 실행하지 않는다") {
+                    mockCalculationRowQuery(
+                        listOf(calculationTupleOf(ScoreStatus.APPROVED, 900)),
+                        listOf(categoryEntity(isAccumulated = false)),
+                    )
+
+                    adapter.findCalculationRowsByUserIdIn(listOf(userId))
+
+                    verify(exactly = 0) { queryFactory.selectFrom(scoreJpaEntity) }
+                    verify(exactly = 0) { queryFactory.selectFrom(fileJpaEntity) }
                 }
             }
         }

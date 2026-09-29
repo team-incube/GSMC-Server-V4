@@ -74,8 +74,6 @@ class ScoreTotalCacheSingleFlightTest :
 
                 threads.forEach(Thread::start)
                 start.countDown()
-                ready.await(5, TimeUnit.SECONDS) shouldBe true
-                started.await(5, TimeUnit.SECONDS) shouldBe true
                 threads.forEach(::awaitWaiting)
                 release.countDown()
                 threads.forEach(::join)

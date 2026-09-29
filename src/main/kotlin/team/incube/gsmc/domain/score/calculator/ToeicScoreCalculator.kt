@@ -2,11 +2,11 @@ package team.incube.gsmc.domain.score.calculator
 
 import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
-import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationSource
 
 class ToeicScoreCalculator : ScoreCalculator() {
     override fun bonusScore(
-        scoresByCategory: Map<Category, List<Score>>,
+        scoresByCategory: Map<Category, List<ScoreCalculationSource>>,
         category: Category,
     ): Int {
         val (academyCategory, academyScores) =

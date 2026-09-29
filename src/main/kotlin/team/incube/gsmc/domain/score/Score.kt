@@ -31,15 +31,15 @@ import java.time.LocalDateTime
 data class Score(
     val scoreId: Long,
     val userId: Long,
-    val category: Category,
+    override val category: Category,
     val evidence: Evidence?,
     val file: File?,
-    val scoreStatus: ScoreStatus,
+    override val scoreStatus: ScoreStatus,
     val activityName: String?,
-    val scoreValue: Int?,
+    override val scoreValue: Int?,
     val rejectionReason: String?,
     val dgProjectId: Long?,
     val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
+    override val updatedAt: LocalDateTime,
     val projectId: Long? = null,
-)
+) : ScoreCalculationSource
