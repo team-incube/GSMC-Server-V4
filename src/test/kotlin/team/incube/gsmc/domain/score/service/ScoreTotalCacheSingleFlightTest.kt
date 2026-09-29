@@ -46,12 +46,14 @@ class ScoreTotalCacheSingleFlightTest :
                 val started = CountDownLatch(1)
                 val release = CountDownLatch(1)
                 val start = CountDownLatch(1)
+                val ready = CountDownLatch(8)
                 val results = Collections.synchronizedList(mutableListOf<Map<Long, Int>>())
                 val failures = Collections.synchronizedList(mutableListOf<Throwable>())
                 val threads =
                     (1..8).map {
                         Thread {
                             start.await()
+                            ready.countDown()
                             try {
                                 results +=
                                     singleFlight.load(
@@ -72,7 +74,8 @@ class ScoreTotalCacheSingleFlightTest :
 
                 threads.forEach(Thread::start)
                 start.countDown()
-                started.await(1, TimeUnit.SECONDS) shouldBe true
+                ready.await(5, TimeUnit.SECONDS) shouldBe true
+                started.await(5, TimeUnit.SECONDS) shouldBe true
                 threads.forEach(::awaitWaiting)
                 release.countDown()
                 threads.forEach(::join)
