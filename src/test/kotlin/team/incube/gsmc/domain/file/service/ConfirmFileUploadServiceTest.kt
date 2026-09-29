@@ -7,9 +7,11 @@ import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.file.MAX_FILE_SIZE_BYTES
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
+import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistencePort
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
@@ -19,10 +21,20 @@ class ConfirmFileUploadServiceTest :
     BehaviorSpec({
         val filePersistencePort = mockk<FilePersistencePort>()
         val fileStoragePort = mockk<FileStoragePort>()
+        val fileStorageDeletionTaskPersistencePort = mockk<FileStorageDeletionTaskPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
-        val service = ConfirmFileUploadService(filePersistencePort, fileStoragePort, memberUtil)
+        val service =
+            ConfirmFileUploadService(
+                filePersistencePort,
+                fileStoragePort,
+                fileStorageDeletionTaskPersistencePort,
+                memberUtil,
+            )
 
-        beforeEach { clearAllMocks() }
+        beforeEach {
+            clearAllMocks()
+            every { fileStorageDeletionTaskPersistencePort.existsByFileKey(any()) } returns false
+        }
 
         val fileKey = "file/uuid_original.png"
 
@@ -41,6 +53,36 @@ class ConfirmFileUploadServiceTest :
                     val exception = shouldThrow<GsmcException> { service.execute(fileKey, "original.png") }
 
                     exception.errorCode shouldBe ErrorCode.FILE_ALREADY_CONFIRMED
+                }
+            }
+
+            When("삭제된 파일의 key라 스토리지 삭제 작업이 남아 있으면") {
+                Then("곧 지워질 객체이므로 S3_OBJECT_NOT_FOUND 예외를 던지고 저장하지 않는다") {
+                    every { filePersistencePort.findByFileKey(fileKey) } returns null
+                    every { fileStorageDeletionTaskPersistencePort.existsByFileKey(fileKey) } returns true
+
+                    val exception = shouldThrow<GsmcException> { service.execute(fileKey, "original.png") }
+
+                    exception.errorCode shouldBe ErrorCode.S3_OBJECT_NOT_FOUND
+                    verify(exactly = 0) { fileStoragePort.getObjectSize(any()) }
+                    verify(exactly = 0) { filePersistencePort.save(any()) }
+                }
+            }
+
+            When("파일 삭제 뒤 워커의 스토리지 삭제와 같은 key의 confirm이 교차 실행되면") {
+                Then("워커가 작업을 끝내기 전에도, 끝낸 뒤에도 confirm은 거부되어 삭제될 객체를 참조하는 파일이 생기지 않는다") {
+                    every { filePersistencePort.findByFileKey(fileKey) } returns null
+                    // 1) 파일 행 삭제와 함께 기록된 작업이 남아 있는 동안(워커의 S3 삭제 전후 모두)
+                    every { fileStorageDeletionTaskPersistencePort.existsByFileKey(fileKey) } returns true
+                    val whileTaskRemains = shouldThrow<GsmcException> { service.execute(fileKey, "original.png") }
+                    // 2) 워커가 S3 객체를 지우고 작업 행까지 삭제한 뒤
+                    every { fileStorageDeletionTaskPersistencePort.existsByFileKey(fileKey) } returns false
+                    every { fileStoragePort.getObjectSize(fileKey) } returns null
+                    val afterWorkerCompleted = shouldThrow<GsmcException> { service.execute(fileKey, "original.png") }
+
+                    whileTaskRemains.errorCode shouldBe ErrorCode.S3_OBJECT_NOT_FOUND
+                    afterWorkerCompleted.errorCode shouldBe ErrorCode.S3_OBJECT_NOT_FOUND
+                    verify(exactly = 0) { filePersistencePort.save(any()) }
                 }
             }
 

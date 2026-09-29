@@ -39,7 +39,7 @@ interface FileStoragePort {
     fun getObjectSize(key: String): Long?
 
     /**
-     * 객체를 삭제한다.
+     * 객체를 삭제한다. 이미 없는 key여도 성공으로 끝나야 한다(삭제 작업 재처리의 멱등성 전제).
      *
      * @param key 삭제할 객체의 key
      */
