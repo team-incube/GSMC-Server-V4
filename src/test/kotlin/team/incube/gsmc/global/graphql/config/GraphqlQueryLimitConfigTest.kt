@@ -90,6 +90,27 @@ class GraphqlQueryLimitConfigTest :
             }
         }
 
+        Given("Mutation 루트 필드를 alias로 반복하는 요청") {
+            fun deleteAlerts(count: Int) =
+                (0 until count).joinToString(
+                    " ",
+                    prefix = "mutation { ",
+                    postfix = " }",
+                ) { "a$it: deleteAlert(alertId: 1)" }
+
+            When("10번 반복해 복잡도가 한도와 같으면") {
+                Then("허용한다") {
+                    limitErrors(deleteAlerts(10)).shouldBeEmpty()
+                }
+            }
+
+            When("11번 반복하면") {
+                Then("Mutation 루트에도 가중치가 적용되어 거부한다") {
+                    limitErrors(deleteAlerts(11)).single() shouldContain "complexity"
+                }
+            }
+        }
+
         Given("깊이가 한도를 넘는 쿼리") {
             When("introspection 타입을 16단계로 중첩하면") {
                 Then("깊이 한도를 넘어 거부한다") {
