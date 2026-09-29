@@ -16,6 +16,7 @@ import io.mockk.slot
 import io.mockk.verify
 import jakarta.persistence.EntityManager
 import team.incube.gsmc.domain.alert.Alert
+import team.incube.gsmc.domain.alert.AlertCursor
 import team.incube.gsmc.domain.alert.AlertType
 import team.incube.gsmc.domain.alert.adapter.out.persistence.entity.AlertJpaEntity
 import team.incube.gsmc.domain.alert.adapter.out.persistence.entity.QAlertJpaEntity.alertJpaEntity
@@ -90,6 +91,7 @@ class AlertPersistenceAdapterTest :
             every { query.where(any<Predicate>()) } returns query
             every { query.where(*anyVararg<Predicate>()) } returns query
             every { query.orderBy(*anyVararg<OrderSpecifier<*>>()) } returns query
+            every { query.limit(any()) } returns query
             return query
         }
 
@@ -153,6 +155,24 @@ class AlertPersistenceAdapterTest :
                     every { query.fetch() } returns emptyList()
 
                     adapter.findAllByUserIdOrderByCreatedAtDesc(userId).shouldBeEmpty()
+                }
+            }
+        }
+
+        Given("findPageByUserId로 알림 페이지를 조회할 때") {
+            When("커서와 조회 한도를 전달하면") {
+                Then("정렬된 QueryDSL 조회에 커서 조건과 LIMIT을 적용한다") {
+                    val query = mockAlertQuery()
+                    val cursor = AlertCursor(createdAt, 10L)
+                    every { query.fetch() } returns listOf(alertEntity(9L), alertEntity(8L))
+
+                    val result = adapter.findPageByUserId(userId, 3, cursor)
+
+                    result.map { it.alertId } shouldBe listOf(9L, 8L)
+                    verify(exactly = 1) { query.limit(3L) }
+                    verify(exactly = 1) {
+                        query.orderBy(alertJpaEntity.createdAt.desc(), alertJpaEntity.alertId.desc())
+                    }
                 }
             }
         }

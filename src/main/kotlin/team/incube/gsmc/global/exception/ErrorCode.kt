@@ -63,6 +63,8 @@ enum class ErrorCode(
 
     // 알림
     ALERT_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다.", "NOT_FOUND"),
+    INVALID_ALERT_PAGE_SIZE(HttpStatus.BAD_REQUEST, "알림 페이지 크기는 1 이상 100 이하이어야 합니다.", "BAD_REQUEST"),
+    INVALID_ALERT_CURSOR(HttpStatus.BAD_REQUEST, "알림 커서가 올바르지 않습니다.", "BAD_REQUEST"),
 
     // 개발자
     INVALID_SCHOOL_INFO(HttpStatus.BAD_REQUEST, "학적 정보(학년·반·번호)가 올바르지 않습니다.", "BAD_REQUEST"),
