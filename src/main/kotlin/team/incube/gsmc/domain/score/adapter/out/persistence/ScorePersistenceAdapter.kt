@@ -11,6 +11,7 @@ import team.incube.gsmc.domain.file.adapter.out.persistence.entity.QFileJpaEntit
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.toDomain
 import team.incube.gsmc.domain.project.adapter.out.persistence.entity.ProjectJpaEntity
 import team.incube.gsmc.domain.score.Score
+import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreJpaEntity.scoreJpaEntity
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreUniqueSlotJpaEntity.scoreUniqueSlotJpaEntity
@@ -91,6 +92,11 @@ class ScorePersistenceAdapter(
         return entities.map { entity ->
             entity.toDomain(filesByScoreId[entity.scoreId]?.firstOrNull()?.toDomain())
         }
+    }
+
+    override fun findCalculationRowsByUserIdIn(userIds: List<Long>): List<ScoreCalculationRow> {
+        if (userIds.isEmpty()) return emptyList()
+        return queryFactory.fetchScoreCalculationRows(scoreJpaEntity.user.userId.`in`(userIds))
     }
 
     override fun findUnapprovedByUserIdAndCategoryType(
