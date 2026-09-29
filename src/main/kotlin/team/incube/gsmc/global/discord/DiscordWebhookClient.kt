@@ -1,5 +1,6 @@
 package team.incube.gsmc.global.discord
 
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -9,7 +10,7 @@ import team.themoment.sdk.logging.logger.logger
 
 @Component
 class DiscordWebhookClient(
-    private val restClient: RestClient,
+    @param:Qualifier("discordRestClient") private val restClient: RestClient,
 ) {
     fun sendAsync(
         webhookUrl: String,

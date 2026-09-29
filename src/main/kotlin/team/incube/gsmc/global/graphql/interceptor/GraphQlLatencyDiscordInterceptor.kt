@@ -8,34 +8,40 @@ import org.springframework.security.core.Authentication
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Mono
-import team.incube.gsmc.domain.auth.port.out.UserPersistencePort
 import team.incube.gsmc.global.auth.CustomUserDetails
 import team.incube.gsmc.global.discord.DiscordEmbed
 import team.incube.gsmc.global.discord.DiscordWebhookClient
 import team.themoment.sdk.logging.logger.logger
+import java.time.Clock
 import java.time.Instant
 
 @Component
 class GraphQlLatencyDiscordInterceptor(
     private val discordWebhookClient: DiscordWebhookClient,
-    private val userPersistencePort: UserPersistencePort,
     @param:Value($$"${discord.webhook.graphql-latency-url}") private val webhookUrl: String,
     @param:Value($$"${spring.application.name}") private val applicationName: String,
     @param:Value($$"${spring.profiles.active:local}") private val activeProfile: String,
+    private val clock: Clock = Clock.systemUTC(),
 ) : WebGraphQlInterceptor {
     override fun intercept(
         request: WebGraphQlRequest,
         chain: WebGraphQlInterceptor.Chain,
     ): Mono<WebGraphQlResponse> {
-        val start = System.currentTimeMillis()
+        val start = clock.millis()
         // GraphQL 실행은 다른 스레드로 넘어갈 수 있어 doOnNext 안에서 SecurityContextHolder를 읽으면
         // ThreadLocal이 비어 요청자 정보를 잃을 수 있다. 원 요청 스레드에서 동기적으로 미리 캡처한다.
         val authentication = SecurityContextHolder.getContext().authentication
         return chain
             .next(request)
             .doOnNext { response ->
-                runCatching { report(request, response, System.currentTimeMillis() - start, authentication) }
-                    .onFailure { logger().warn("GraphQL 응답속도 Discord 알림 실패: {}", it.message) }
+                val elapsedMs = clock.millis() - start
+                if (
+                    webhookUrl.isNotBlank() &&
+                    (response.errors.isNotEmpty() || elapsedMs >= SLOW_REQUEST_THRESHOLD_MS)
+                ) {
+                    runCatching { report(request, response, elapsedMs, authentication) }
+                        .onFailure { logger().warn("GraphQL 응답속도 Discord 알림 실패: {}", it.message) }
+                }
             }
     }
 
@@ -46,12 +52,12 @@ class GraphQlLatencyDiscordInterceptor(
         authentication: Authentication?,
     ) {
         val hasErrors = response.errors.isNotEmpty()
-        val isSlow = elapsedMs >= 700
+        val isSlow = elapsedMs >= SLOW_REQUEST_THRESHOLD_MS
         val color =
             when {
                 hasErrors -> DiscordEmbed.COLOR_RED
                 elapsedMs < 300 -> DiscordEmbed.COLOR_GREEN
-                elapsedMs < 700 -> DiscordEmbed.COLOR_YELLOW
+                elapsedMs < SLOW_REQUEST_THRESHOLD_MS -> DiscordEmbed.COLOR_YELLOW
                 elapsedMs < 1000 -> DiscordEmbed.COLOR_ORANGE
                 else -> DiscordEmbed.COLOR_RED
             }
@@ -128,10 +134,7 @@ class GraphQlLatencyDiscordInterceptor(
     private fun requesterInfo(authentication: Authentication?): String {
         val principal = authentication?.principal
         if (principal !is CustomUserDetails) return "익명"
-        val userName =
-            runCatching { userPersistencePort.findByUserId(principal.userId)?.userName }
-                .getOrNull() ?: principal.userId.toString()
-        return "$userName (${principal.userRole})"
+        return "${principal.userId} (${principal.userRole})"
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -159,6 +162,7 @@ class GraphQlLatencyDiscordInterceptor(
     private fun truncate(text: String): String = if (text.length > 900) text.take(900) + "..." else text
 
     companion object {
+        private const val SLOW_REQUEST_THRESHOLD_MS = 700L
         private val SENSITIVE_KEY_PATTERN = Regex("password|token|secret", RegexOption.IGNORE_CASE)
     }
 }

@@ -16,25 +16,27 @@ import org.springframework.graphql.server.WebGraphQlResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import reactor.core.publisher.Mono
-import team.incube.gsmc.domain.auth.port.out.UserPersistencePort
-import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.auth.CustomUserDetails
 import team.incube.gsmc.global.discord.DiscordEmbed
 import team.incube.gsmc.global.discord.DiscordWebhookClient
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 
 class GraphQlLatencyDiscordInterceptorTest :
     BehaviorSpec({
         fun interceptor(
             discordWebhookClient: DiscordWebhookClient,
-            userPersistencePort: UserPersistencePort,
+            webhookUrl: String = "https://discord.example/webhook",
+            clock: Clock = Clock.systemUTC(),
         ): GraphQlLatencyDiscordInterceptor =
             GraphQlLatencyDiscordInterceptor(
                 discordWebhookClient,
-                userPersistencePort,
-                "https://discord.example/webhook",
+                webhookUrl,
                 "GSMC-server-v4",
                 "test",
+                clock,
             )
 
         fun request(
@@ -56,20 +58,51 @@ class GraphQlLatencyDiscordInterceptorTest :
         fun chainReturning(res: WebGraphQlResponse): WebGraphQlInterceptor.Chain =
             WebGraphQlInterceptor.Chain { _ -> Mono.just(res) }
 
-        Given("intercept") {
-            When("에러 없이 응답이 오면") {
-                Then("GraphQL 요청 정보가 담긴 embed가 DiscordWebhookClient로 전달된다") {
-                    val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
-                    val userPersistencePort = mockk<UserPersistencePort>(relaxed = true)
-                    val embedSlot = slot<DiscordEmbed>()
+        fun errorResponse(message: String = "실패"): WebGraphQlResponse {
+            val error = mockk<ResponseError>()
+            every { error.message } returns message
+            return response(listOf(error))
+        }
 
-                    interceptor(discordWebhookClient, userPersistencePort)
+        Given("intercept") {
+            When("빠르고 정상적인 응답이면") {
+                Then("Discord 전송과 Embed 생성을 수행하지 않는다") {
+                    val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
+
+                    interceptor(discordWebhookClient, clock = SequenceClock(0, 699))
                         .intercept(request(), chainReturning(response()))
                         .block()
 
-                    verify { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
-                    embedSlot.captured.title shouldBe "🟢 [test] GSMC-server-v4 — GraphQL 요청"
-                    embedSlot.captured.color shouldBe DiscordEmbed.COLOR_GREEN
+                    verify(exactly = 0) { discordWebhookClient.sendAsync(any(), any()) }
+                }
+            }
+
+            When("빠른 응답에 GraphQL 오류가 포함되면") {
+                Then("Discord에 한 번 보고한다") {
+                    val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
+                    val embedSlot = slot<DiscordEmbed>()
+
+                    interceptor(discordWebhookClient, clock = SequenceClock(0, 10))
+                        .intercept(request(), chainReturning(errorResponse()))
+                        .block()
+
+                    verify(exactly = 1) { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
+                    embedSlot.captured.color shouldBe DiscordEmbed.COLOR_RED
+                    embedSlot.captured.title shouldContain "GraphQL 에러"
+                }
+            }
+
+            When("정상 응답 시간이 정확히 700ms이면") {
+                Then("느린 요청으로 한 번 보고한다") {
+                    val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
+                    val embedSlot = slot<DiscordEmbed>()
+
+                    interceptor(discordWebhookClient, clock = SequenceClock(0, 700))
+                        .intercept(request(), chainReturning(response()))
+                        .block()
+
+                    verify(exactly = 1) { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
+                    embedSlot.captured.title shouldContain "느린 응답"
                     embedSlot.captured.timestamp.shouldNotBeNull()
                     embedSlot.captured.fields
                         .first { it.name == "서비스" }
@@ -80,70 +113,72 @@ class GraphQlLatencyDiscordInterceptorTest :
                 }
             }
 
-            When("GraphQL 에러가 응답에 포함되면") {
-                Then("응답속도와 무관하게 빨간색과 에러 타이틀로 표시된다") {
+            When("느리면서 GraphQL 오류가 있는 응답이면") {
+                Then("중복하지 않고 한 번만 보고한다") {
                     val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
-                    val userPersistencePort = mockk<UserPersistencePort>(relaxed = true)
-                    val error = mockk<ResponseError>()
-                    every { error.message } returns "실패"
-                    val embedSlot = slot<DiscordEmbed>()
 
-                    interceptor(discordWebhookClient, userPersistencePort)
-                        .intercept(request(), chainReturning(response(listOf(error))))
+                    interceptor(discordWebhookClient, clock = SequenceClock(0, 700))
+                        .intercept(request(), chainReturning(errorResponse()))
                         .block()
 
+                    verify(exactly = 1) { discordWebhookClient.sendAsync(any(), any()) }
+                }
+            }
+
+            When("인증된 사용자의 보고 대상 요청이면") {
+                Then("DB 조회 없이 ID와 역할로 요청자를 표시한다") {
+                    val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
+                    val embedSlot = slot<DiscordEmbed>()
+                    val authentication =
+                        UsernamePasswordAuthenticationToken(CustomUserDetails(1L, UserRole.STUDENT), null, emptyList())
+                    SecurityContextHolder.getContext().authentication = authentication
+
+                    try {
+                        interceptor(discordWebhookClient, clock = SequenceClock(0, 700))
+                            .intercept(request(), chainReturning(response()))
+                            .block()
+                    } finally {
+                        SecurityContextHolder.clearContext()
+                    }
+
                     verify { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
-                    embedSlot.captured.color shouldBe DiscordEmbed.COLOR_RED
-                    embedSlot.captured.title shouldBe "🚨 [test] GSMC-server-v4 — GraphQL 에러"
-                    embedSlot.captured.description shouldBe "`실패`"
                     embedSlot.captured.fields
-                        .first { it.name == "에러" }
-                        .value shouldContain "실패"
+                        .first { it.name == "요청자" }
+                        .value shouldBe "1 (STUDENT)"
                 }
             }
 
-            When("응답 시간이 700ms 이상이면") {
-                Then("느린 응답 타이틀로 표시된다") {
+            When("익명 요청에 GraphQL 오류가 있으면") {
+                Then("예외 없이 익명으로 보고한다") {
                     val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
-                    val userPersistencePort = mockk<UserPersistencePort>(relaxed = true)
                     val embedSlot = slot<DiscordEmbed>()
-                    val slowChain =
-                        WebGraphQlInterceptor.Chain { _ ->
-                            Thread.sleep(700)
-                            Mono.just(response())
-                        }
 
-                    interceptor(discordWebhookClient, userPersistencePort)
-                        .intercept(request(), slowChain)
+                    interceptor(discordWebhookClient, clock = SequenceClock(0, 10))
+                        .intercept(request(), chainReturning(errorResponse()))
                         .block()
 
                     verify { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
-                    embedSlot.captured.title shouldContain "느린 응답"
+                    embedSlot.captured.fields
+                        .first { it.name == "요청자" }
+                        .value shouldBe "익명"
                 }
             }
 
-            When("변수에 password 키가 포함되면") {
-                Then("값이 마스킹되어 전달된다") {
+            When("웹훅 URL이 비어 있으면") {
+                Then("보고 구성과 네트워크 전송을 수행하지 않는다") {
                     val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
-                    val userPersistencePort = mockk<UserPersistencePort>(relaxed = true)
-                    val embedSlot = slot<DiscordEmbed>()
-                    val req = request(variables = mapOf("password" to "hunter2", "categoryType" to "TOEIC"))
 
-                    interceptor(discordWebhookClient, userPersistencePort)
-                        .intercept(req, chainReturning(response()))
+                    interceptor(discordWebhookClient, webhookUrl = "", clock = SequenceClock(0, 700))
+                        .intercept(request(), chainReturning(errorResponse()))
                         .block()
 
-                    verify { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
-                    val variablesField = embedSlot.captured.fields.first { it.name == "변수" }
-                    variablesField.value shouldContain "***"
-                    variablesField.value shouldNotContain "hunter2"
+                    verify(exactly = 0) { discordWebhookClient.sendAsync(any(), any()) }
                 }
             }
 
-            When("변수가 input 객체로 중첩되어 password 키를 포함하면") {
-                Then("중첩된 값까지 재귀적으로 마스킹되어 전달된다") {
+            When("중첩 변수에 password가 포함되면") {
+                Then("민감한 값은 마스킹되어 보고한다") {
                     val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
-                    val userPersistencePort = mockk<UserPersistencePort>(relaxed = true)
                     val embedSlot = slot<DiscordEmbed>()
                     val req =
                         request(
@@ -154,8 +189,8 @@ class GraphQlLatencyDiscordInterceptorTest :
                                 ),
                         )
 
-                    interceptor(discordWebhookClient, userPersistencePort)
-                        .intercept(req, chainReturning(response()))
+                    interceptor(discordWebhookClient, clock = SequenceClock(0, 10))
+                        .intercept(req, chainReturning(errorResponse()))
                         .block()
 
                     verify { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
@@ -166,14 +201,13 @@ class GraphQlLatencyDiscordInterceptorTest :
             }
 
             When("쿼리 원문이 900자를 넘으면") {
-                Then("900자로 잘리고 말줄임표가 붙은 코드블록으로 전달된다") {
+                Then("900자로 잘리고 말줄임표가 붙은 코드블록으로 보고한다") {
                     val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
-                    val userPersistencePort = mockk<UserPersistencePort>(relaxed = true)
                     val longQuery = "a".repeat(1000)
                     val embedSlot = slot<DiscordEmbed>()
 
-                    interceptor(discordWebhookClient, userPersistencePort)
-                        .intercept(request(document = longQuery), chainReturning(response()))
+                    interceptor(discordWebhookClient, clock = SequenceClock(0, 10))
+                        .intercept(request(document = longQuery), chainReturning(errorResponse()))
                         .block()
 
                     verify { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
@@ -182,37 +216,31 @@ class GraphQlLatencyDiscordInterceptorTest :
                 }
             }
 
-            When("인증된 사용자의 요청이면") {
-                Then("요청자 필드에 ID 대신 이름이 표시된다") {
-                    val discordWebhookClient = mockk<DiscordWebhookClient>(relaxed = true)
-                    val userPersistencePort = mockk<UserPersistencePort>(relaxed = true)
-                    every { userPersistencePort.findByUserId(1L) } returns
-                        User(
-                            userId = 1L,
-                            userName = "홍길동",
-                            userEmail = "test@gsm.hs.kr",
-                            userGrade = 2,
-                            userClassNumber = 1,
-                            userNumber = 10,
-                            userRole = UserRole.STUDENT,
-                        )
-                    val embedSlot = slot<DiscordEmbed>()
-                    val authentication =
-                        UsernamePasswordAuthenticationToken(CustomUserDetails(1L, UserRole.STUDENT), null, emptyList())
-                    SecurityContextHolder.getContext().authentication = authentication
+            When("Discord 전송 구성에서 예외가 발생하면") {
+                Then("GraphQL 응답을 실패시키지 않는다") {
+                    val discordWebhookClient = mockk<DiscordWebhookClient>()
+                    every { discordWebhookClient.sendAsync(any(), any()) } throws RuntimeException("network error")
 
-                    try {
-                        interceptor(discordWebhookClient, userPersistencePort)
-                            .intercept(request(), chainReturning(response()))
+                    runCatching {
+                        interceptor(discordWebhookClient, clock = SequenceClock(0, 10))
+                            .intercept(request(), chainReturning(errorResponse()))
                             .block()
-                    } finally {
-                        SecurityContextHolder.clearContext()
-                    }
-
-                    verify { discordWebhookClient.sendAsync(any(), capture(embedSlot)) }
-                    val requesterField = embedSlot.captured.fields.first { it.name == "요청자" }
-                    requesterField.value shouldBe "홍길동 (STUDENT)"
+                    }.isSuccess shouldBe true
                 }
             }
         }
     })
+
+private class SequenceClock(
+    private vararg val values: Long,
+) : Clock() {
+    private var index = 0
+
+    override fun getZone(): ZoneId = ZoneId.of("UTC")
+
+    override fun withZone(zone: ZoneId): Clock = this
+
+    override fun instant(): Instant = Instant.ofEpochMilli(millis())
+
+    override fun millis(): Long = values[index++]
+}
