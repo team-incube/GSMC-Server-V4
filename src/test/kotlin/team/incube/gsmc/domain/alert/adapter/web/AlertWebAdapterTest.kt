@@ -7,7 +7,10 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import team.incube.gsmc.domain.alert.Alert
+import team.incube.gsmc.domain.alert.AlertCursor
+import team.incube.gsmc.domain.alert.AlertPage
 import team.incube.gsmc.domain.alert.AlertType
+import team.incube.gsmc.domain.alert.port.`in`.FetchMyAlertConnectionUseCase
 import team.incube.gsmc.domain.alert.port.`in`.FetchMyAlertsUseCase
 import team.incube.gsmc.domain.alert.port.`in`.ModifyMyAlertIsReadUseCase
 import team.incube.gsmc.domain.alert.port.`in`.RemoveMyAlertUseCase
@@ -16,10 +19,16 @@ import java.time.LocalDateTime
 class AlertWebAdapterTest :
     BehaviorSpec({
         val fetchMyAlertsUseCase = mockk<FetchMyAlertsUseCase>()
+        val fetchMyAlertConnectionUseCase = mockk<FetchMyAlertConnectionUseCase>()
         val modifyMyAlertIsReadUseCase = mockk<ModifyMyAlertIsReadUseCase>()
         val removeMyAlertUseCase = mockk<RemoveMyAlertUseCase>()
         val webAdapter =
-            AlertWebAdapter(fetchMyAlertsUseCase, modifyMyAlertIsReadUseCase, removeMyAlertUseCase)
+            AlertWebAdapter(
+                fetchMyAlertsUseCase,
+                fetchMyAlertConnectionUseCase,
+                modifyMyAlertIsReadUseCase,
+                removeMyAlertUseCase,
+            )
 
         beforeEach { clearAllMocks() }
 
@@ -41,6 +50,38 @@ class AlertWebAdapterTest :
                     every { fetchMyAlertsUseCase.execute() } returns alerts
 
                     webAdapter.myAlerts() shouldBe alerts
+                }
+            }
+        }
+
+        Given("myAlertConnection 쿼리를 호출할 때") {
+            When("페이지 조건을 전달하면") {
+                Then("커서 페이지를 GraphQL 응답 형태로 변환한다") {
+                    val alert =
+                        Alert(
+                            alertId = 1L,
+                            userId = 10L,
+                            scoreId = null,
+                            alertType = AlertType.APPROVED,
+                            content = "승인되었습니다.",
+                            isRead = false,
+                            createdAt = LocalDateTime.of(2026, 1, 1, 0, 0, 0),
+                        )
+                    every { fetchMyAlertConnectionUseCase.execute(2, null) } returns
+                        AlertPage(
+                            alerts = listOf(alert),
+                            hasNextPage = false,
+                            endCursor = AlertCursor(alert.createdAt, alert.alertId),
+                        )
+
+                    val result = webAdapter.myAlertConnection(2, null)
+
+                    result.edges.single().node shouldBe alert
+                    result.edges.single().cursor shouldBe
+                        AlertCursor(alert.createdAt, alert.alertId)
+                            .encode()
+                    result.pageInfo.hasNextPage shouldBe false
+                    result.pageInfo.endCursor shouldBe result.edges.single().cursor
                 }
             }
         }

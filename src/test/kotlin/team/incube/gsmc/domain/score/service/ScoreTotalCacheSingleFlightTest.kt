@@ -46,9 +46,6 @@ class ScoreTotalCacheSingleFlightTest :
                 val started = CountDownLatch(1)
                 val release = CountDownLatch(1)
                 val start = CountDownLatch(1)
-                // start 래치에서 깨어난 직후에도 스레드 상태가 잠시 WAITING으로 남아, 상태만 보고는
-                // 후발 요청이 대표 요청을 기다리는 중인지 알 수 없다. load 호출 직전에 ready를 내려,
-                // 그 뒤의 WAITING은 load 안에서의 대기만 가리키게 한다.
                 val ready = CountDownLatch(8)
                 val results = Collections.synchronizedList(mutableListOf<Map<Long, Int>>())
                 val failures = Collections.synchronizedList(mutableListOf<Throwable>())

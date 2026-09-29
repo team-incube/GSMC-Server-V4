@@ -3,6 +3,7 @@ package team.incube.gsmc.domain.alert.adapter.out.persistence
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager
 import team.incube.gsmc.domain.alert.Alert
+import team.incube.gsmc.domain.alert.AlertCursor
 import team.incube.gsmc.domain.alert.adapter.out.persistence.entity.QAlertJpaEntity.alertJpaEntity
 import team.incube.gsmc.domain.alert.adapter.out.persistence.entity.toDomain
 import team.incube.gsmc.domain.alert.adapter.out.persistence.entity.toEntity
@@ -49,6 +50,39 @@ class AlertPersistenceAdapter(
             .orderBy(alertJpaEntity.createdAt.desc(), alertJpaEntity.alertId.desc())
             .fetch()
             .map { it.toDomain() }
+
+    override fun findPageByUserId(
+        userId: Long,
+        limit: Int,
+        cursor: AlertCursor?,
+    ): List<Alert> {
+        val predicates =
+            mutableListOf<com.querydsl.core.types.Predicate>(
+                alertJpaEntity.user.userId.eq(userId),
+            )
+        cursor?.let {
+            predicates +=
+                alertJpaEntity.createdAt
+                    .lt(it.createdAt)
+                    .or(
+                        alertJpaEntity.createdAt
+                            .eq(it.createdAt)
+                            .and(alertJpaEntity.alertId.lt(it.alertId)),
+                    )
+        }
+
+        return queryFactory
+            .selectFrom(alertJpaEntity)
+            .join(alertJpaEntity.user)
+            .fetchJoin()
+            .leftJoin(alertJpaEntity.score)
+            .fetchJoin()
+            .where(*predicates.toTypedArray())
+            .orderBy(alertJpaEntity.createdAt.desc(), alertJpaEntity.alertId.desc())
+            .limit(limit.toLong())
+            .fetch()
+            .map { it.toDomain() }
+    }
 
     override fun save(alert: Alert): Alert {
         val user = entityManager.getReference(UserJpaEntity::class.java, alert.userId)

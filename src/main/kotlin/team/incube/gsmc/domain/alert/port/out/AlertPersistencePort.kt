@@ -1,6 +1,7 @@
 package team.incube.gsmc.domain.alert.port.out
 
 import team.incube.gsmc.domain.alert.Alert
+import team.incube.gsmc.domain.alert.AlertCursor
 
 /**
  * 알림 영속성을 추상화하는 아웃바운드 포트 인터페이스입니다.
@@ -21,6 +22,20 @@ interface AlertPersistencePort {
      * @return 최신순으로 정렬된 해당 사용자의 알림 목록
      */
     fun findAllByUserIdOrderByCreatedAtDesc(userId: Long): List<Alert>
+
+    /**
+     * 특정 사용자의 알림 페이지를 커서 기준으로 조회한다.
+     *
+     * @param userId 조회할 사용자 ID
+     * @param limit 데이터베이스에서 조회할 최대 행 수
+     * @param cursor 이전 페이지 마지막 항목의 정렬 위치, 첫 페이지이면 null
+     * @return createdAt DESC, alertId DESC 순서의 알림 목록
+     */
+    fun findPageByUserId(
+        userId: Long,
+        limit: Int,
+        cursor: AlertCursor?,
+    ): List<Alert>
 
     /**
      * 알림을 저장한다. [alert]의 alertId가 기존 알림의 ID와 같으면 값을 갈아끼우고(update),

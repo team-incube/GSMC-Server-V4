@@ -18,7 +18,35 @@ input PatchAlertIsReadInput {
 }
 
 extend type Query {
+    # 기존 클라이언트 호환성을 위해 유지하는 전체 알림 목록입니다.
     myAlerts: [Alert!]!
+    # 현재 사용자의 알림을 최신순으로 조회하는 커서 기반 페이지입니다.
+    # 정렬은 createdAt DESC, alertId DESC이며 first의 기본값은 20, 최댓값은 100입니다.
+    myAlertConnection(first: Int = 20, after: String): AlertConnection!
+}
+
+# 알림 페이지의 항목과 다음 페이지 조회용 커서입니다.
+type AlertEdge {
+    # 페이지에 포함된 알림입니다.
+    node: Alert!
+    # 해당 알림의 createdAt과 alertId를 인코딩한 불투명 커서입니다.
+    cursor: String!
+}
+
+# 알림 페이지의 다음 조회 가능 여부와 마지막 커서입니다.
+type AlertPageInfo {
+    # after에 endCursor를 전달할 다음 페이지가 존재하는지 나타냅니다.
+    hasNextPage: Boolean!
+    # 현재 페이지 마지막 알림의 커서이며, 빈 페이지이면 null입니다.
+    endCursor: String
+}
+
+# 커서 기반 알림 페이지 응답입니다.
+type AlertConnection {
+    # 현재 페이지의 알림 항목입니다.
+    edges: [AlertEdge!]!
+    # 페이지 탐색 정보입니다.
+    pageInfo: AlertPageInfo!
 }
 
 extend type Mutation {
