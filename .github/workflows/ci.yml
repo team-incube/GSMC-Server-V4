@@ -38,6 +38,12 @@ jobs:
 
           echo "✅ 제목 검증 통과"
 
+          # Dependabot PR은 본문 템플릿을 따를 수 없으므로 본문 검증 생략
+          if [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ]; then
+            echo "⏭️ Dependabot PR — 본문 검증 생략"
+            exit 0
+          fi
+
           echo "=== PR 본문 검증 ==="
 
           # 필수 섹션 체크
@@ -101,7 +107,7 @@ jobs:
               TYPE_LABEL="🐞 Type: Bug/Function"
             elif echo "$BRANCH" | grep -qP '^docs/'; then
               TYPE_LABEL="📜 Type: Feature/Document"
-            elif echo "$BRANCH" | grep -qP '^cicd/'; then
+            elif echo "$BRANCH" | grep -qP '^(cicd|dependabot)/'; then
               TYPE_LABEL="⚙ Setting"
             else
               TYPE_LABEL="📩 Type: Feature/Function"
