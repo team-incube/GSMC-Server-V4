@@ -19,6 +19,18 @@ interface ScorePersistencePort {
     fun findById(scoreId: Long): Score?
 
     /**
+     * ID로 점수 요청을 조회하며, 조회한 행에 비관적 쓰기 락(`SELECT ... FOR UPDATE`)을 건다.
+     *
+     * 승인/거절처럼 "조회한 상태를 기준으로 판단해 갈아끼우는" 트랜잭션에서 동시 요청 간 lost update를
+     * 막는 데 사용한다. 락 대상은 `score_tb` 행 하나로 한정되며, 연관된 category/user/evidence까지
+     * 락이 번지지 않는다.
+     *
+     * @param scoreId 조회할 점수 요청 ID
+     * @return 해당 점수 요청, 없으면 null
+     */
+    fun findByIdForUpdate(scoreId: Long): Score?
+
+    /**
      * 특정 사용자의 모든 점수 요청을 조회한다.
      *
      * @param userId 조회할 사용자 ID

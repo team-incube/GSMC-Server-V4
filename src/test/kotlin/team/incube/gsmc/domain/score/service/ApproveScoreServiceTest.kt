@@ -82,7 +82,7 @@ class ApproveScoreServiceTest :
             When("PENDING 상태의 점수를 승인하면") {
                 Then("상태를 APPROVED로 갈아끼워 저장하고 APPROVED 알림을 생성한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(1L) } returns score(ScoreStatus.PENDING)
+                    every { scorePersistencePort.findByIdForUpdate(1L) } returns score(ScoreStatus.PENDING)
                     every { scorePersistencePort.save(any()) } answers { firstArg() }
                     every { alertPersistencePort.save(any()) } answers { firstArg<Alert>().copy(alertId = 100L) }
                     every { alertEventPublisherPort.publish(any()) } just runs
@@ -115,15 +115,16 @@ class ApproveScoreServiceTest :
             }
 
             When("이미 APPROVED인 점수를 다시 승인하면") {
-                Then("상태는 다시 저장하지만 알림은 중복 생성하지 않는다") {
+                Then("락만 잡고 early return하며 save 이후 로직을 전부 스킵한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(1L) } returns score(ScoreStatus.APPROVED)
-                    every { scorePersistencePort.save(any()) } answers { firstArg() }
+                    every { scorePersistencePort.findByIdForUpdate(1L) } returns score(ScoreStatus.APPROVED)
 
                     val result = service.execute(1L)
 
                     result shouldBe true
-                    verify(exactly = 1) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { removeSupersededFileUseCase.execute(any()) }
+                    verify(exactly = 0) { scorePersistencePort.deleteById(any()) }
                     verify(exactly = 0) { alertPersistencePort.save(any()) }
                     verify(exactly = 0) { alertEventPublisherPort.publish(any()) }
                     verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
@@ -133,7 +134,7 @@ class ApproveScoreServiceTest :
             When("존재하지 않는 점수를 승인하면") {
                 Then("SCORE_NOT_FOUND 예외가 발생한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(999L) } returns null
+                    every { scorePersistencePort.findByIdForUpdate(999L) } returns null
 
                     val exception = shouldThrow<GsmcException> { service.execute(999L) }
 
@@ -152,7 +153,7 @@ class ApproveScoreServiceTest :
                     val exception = shouldThrow<GsmcException> { service.execute(1L) }
 
                     exception.errorCode shouldBe ErrorCode.FORBIDDEN
-                    verify(exactly = 0) { scorePersistencePort.findById(any()) }
+                    verify(exactly = 0) { scorePersistencePort.findByIdForUpdate(any()) }
                 }
             }
         }
@@ -185,7 +186,7 @@ class ApproveScoreServiceTest :
                     val oldFile =
                         File(fileId = 7L, userId = 10L, fileKey = "k", fileOriginalName = "o", fileStoredName = "s")
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(2L) } returns toeicScore(2L, ScoreStatus.PENDING)
+                    every { scorePersistencePort.findByIdForUpdate(2L) } returns toeicScore(2L, ScoreStatus.PENDING)
                     every {
                         scorePersistencePort.findApprovedByUserIdAndCategoryType(10L, CategoryType.TOEIC)
                     } returns toeicScore(1L, ScoreStatus.APPROVED, oldFile)
@@ -207,7 +208,7 @@ class ApproveScoreServiceTest :
             When("기존 승인 점수가 없으면") {
                 Then("정리 없이 바로 승인한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(2L) } returns toeicScore(2L, ScoreStatus.PENDING)
+                    every { scorePersistencePort.findByIdForUpdate(2L) } returns toeicScore(2L, ScoreStatus.PENDING)
                     every {
                         scorePersistencePort.findApprovedByUserIdAndCategoryType(10L, CategoryType.TOEIC)
                     } returns null
@@ -223,15 +224,15 @@ class ApproveScoreServiceTest :
             }
 
             When("이미 승인된 점수를 다시 승인하면") {
-                Then("자기 자신을 정리하지 않는다") {
+                Then("자기 자신을 정리하지 않고 early return한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
-                    every { scorePersistencePort.findById(1L) } returns toeicScore(1L, ScoreStatus.APPROVED)
-                    every { scorePersistencePort.save(any()) } answers { firstArg() }
+                    every { scorePersistencePort.findByIdForUpdate(1L) } returns toeicScore(1L, ScoreStatus.APPROVED)
 
                     service.execute(1L) shouldBe true
 
                     verify(exactly = 0) { scorePersistencePort.findApprovedByUserIdAndCategoryType(any(), any()) }
                     verify(exactly = 0) { scorePersistencePort.deleteById(any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
                 }
             }
         }
