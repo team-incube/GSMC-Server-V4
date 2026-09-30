@@ -10,6 +10,7 @@ type Score {
     rejectionReason: String
     dgProjectId: ID
     updatedAt: DateTime!
+    submittedCategoryType: CategoryType
 }
 
 type ScoreCategoryGroup {

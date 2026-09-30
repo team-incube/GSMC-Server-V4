@@ -1,6 +1,7 @@
 package team.incube.gsmc.domain.score
 
 import team.incube.gsmc.domain.category.Category
+import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.evidence.Evidence
 import team.incube.gsmc.domain.file.File
 import java.time.LocalDateTime
@@ -26,6 +27,9 @@ import java.time.LocalDateTime
  * 카테고리에서만 값이 있고, 그 외 카테고리는 항상 null
  * @param createdAt 최초 등록 일시
  * @param updatedAt 최종 수정 일시
+ * @param submittedCategoryType 제출 시점의 원본 카테고리 유형 — JLPT/JPT처럼 TOEIC과 저장 행을
+ * 공유하는 카테고리에서, 실제로 제출된 시험 종류를 감사(audit) 목적으로 보존한다. `category.categoryType`과
+ * 같은 경우(TOEIC을 직접 제출한 경우 등)는 중복이라 항상 null로 둔다.
  * @see ScoreStatus
  */
 data class Score(
@@ -42,4 +46,5 @@ data class Score(
     val createdAt: LocalDateTime,
     override val updatedAt: LocalDateTime,
     val projectId: Long? = null,
+    val submittedCategoryType: CategoryType? = null,
 ) : ScoreCalculationSource
