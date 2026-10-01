@@ -94,6 +94,22 @@ class AcademicGradeSheetSupportTest :
             }
         }
 
+        Given("isInCurrentSchoolYear") {
+            val now = LocalDateTime.of(2026, 10, 1, 12, 0)
+
+            When("이번 학년도 3월 1일 이후면") {
+                Then("true다") {
+                    support.isInCurrentSchoolYear(LocalDateTime.of(2026, 3, 1, 0, 0), now) shouldBe true
+                }
+            }
+
+            When("이번 학년도 시작 전이면") {
+                Then("false다") {
+                    support.isInCurrentSchoolYear(LocalDateTime.of(2026, 2, 28, 23, 59), now) shouldBe false
+                }
+            }
+        }
+
         Given("ensureEditable") {
             val now = LocalDateTime.of(2026, 10, 1, 12, 0)
 

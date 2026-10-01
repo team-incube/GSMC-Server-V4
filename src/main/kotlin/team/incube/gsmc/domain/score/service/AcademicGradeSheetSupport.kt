@@ -73,10 +73,16 @@ class AcademicGradeSheetSupport(
         if (findUnapproved(userId) != null) return
         val approved =
             scorePersistencePort.findApprovedByUserIdAndCategoryType(userId, CategoryType.ACADEMIC_GRADE) ?: return
-        if (!approved.updatedAt.isBefore(schoolYearStart(now.toLocalDate()))) {
+        if (isInCurrentSchoolYear(approved.updatedAt, now)) {
             throw GsmcException(ErrorCode.ACADEMIC_GRADE_LOCKED)
         }
     }
+
+    /** [at]이 [now] 기준 이번 학년도(3월 1일 시작)에 속하는지 */
+    fun isInCurrentSchoolYear(
+        at: LocalDateTime,
+        now: LocalDateTime = LocalDateTime.now(),
+    ): Boolean = !at.isBefore(schoolYearStart(now.toLocalDate()))
 
     /** 승인되지 않은(심사 중이거나 반려된) 교과성적 점수 */
     fun findUnapproved(userId: Long): Score? =

@@ -22,7 +22,10 @@ class FetchAcademicGradeDetailServiceTest :
         val support = mockk<AcademicGradeSheetSupport>()
         val service = FetchAcademicGradeDetailService(support)
 
-        beforeEach { clearAllMocks() }
+        beforeEach {
+            clearAllMocks()
+            every { support.isInCurrentSchoolYear(any(), any()) } returns true
+        }
 
         Given("점수의 교과성적 상세를 조회할 때") {
             When("교과성적 점수면") {
@@ -45,6 +48,15 @@ class FetchAcademicGradeDetailServiceTest :
                         )
 
                     service.execute(other) shouldBe null
+                    verify(exactly = 0) { support.loadStudent(any()) }
+                }
+            }
+
+            When("지난 학년도 점수면") {
+                Then("진급 후 다른 입력표가 붙지 않도록 학생을 조회하지 않고 null을 돌려준다") {
+                    every { support.isInCurrentSchoolYear(any(), any()) } returns false
+
+                    service.execute(score(ScoreStatus.APPROVED)) shouldBe null
                     verify(exactly = 0) { support.loadStudent(any()) }
                 }
             }

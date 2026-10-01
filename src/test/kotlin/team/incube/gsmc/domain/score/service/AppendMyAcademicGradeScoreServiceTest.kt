@@ -54,6 +54,7 @@ class AppendMyAcademicGradeScoreServiceTest :
             every { sheetSupport.loadStudent(USER_ID) } returns studentInfo
             every { sheetSupport.loadSheet(studentInfo) } returns sheet
             every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { sheetSupport.ensureEditable(USER_ID, any()) } just runs
         }
 
         Given("교과성적을 신청할 때") {
@@ -72,6 +73,18 @@ class AppendMyAcademicGradeScoreServiceTest :
                     result.scoreValue shouldBe 7
                     result.rejectionReason shouldBe null
                     verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(USER_ID) }
+                }
+            }
+
+            When("이번 학년도에 이미 승인된 교과성적이 있으면") {
+                Then("ACADEMIC_GRADE_LOCKED 예외가 발생하고 새 점수를 만들지 않는다") {
+                    every {
+                        sheetSupport.ensureEditable(USER_ID, any())
+                    } throws GsmcException(ErrorCode.ACADEMIC_GRADE_LOCKED)
+
+                    shouldThrow<GsmcException> { service.execute() }.errorCode shouldBe ErrorCode.ACADEMIC_GRADE_LOCKED
+                    verify(exactly = 0) { appendScoreSupport.findOrCreateScore(any(), any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
                 }
             }
 
