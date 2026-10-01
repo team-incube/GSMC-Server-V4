@@ -135,6 +135,115 @@ class AppendMyScoreWithFileServiceTest :
             }
         }
 
+        Given("JLPT/JPT처럼 TOEIC과 카테고리 행을 공유하는 시험을 제출할 때") {
+            val toeicCategory =
+                Category(
+                    categoryId = 3,
+                    weight = 1,
+                    categoryEnglishName = "TOEIC",
+                    categoryKoreanName = "TOEIC",
+                    categoryMaximumValue = 10,
+                    isAccumulated = false,
+                    evidenceType = EvidenceType.FILE,
+                    categoryType = CategoryType.TOEIC,
+                    calculationType = ScoreCalculationType.SCORE_BASED,
+                    conversionDivisor = 100,
+                )
+
+            When("JLPT로 제출하면") {
+                Then("category는 TOEIC이지만 submittedCategoryType에 JLPT가 감사 추적용으로 남는다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.JLPT, EvidenceType.FILE) } returns
+                        toeicCategory
+                    every { filePersistencePort.findById(30L) } returns file(30L)
+                    every { appendScoreSupport.parseScoreValue("800", toeicCategory) } returns 8
+                    every {
+                        appendScoreSupport.findOrCreateScore(userId, toeicCategory)
+                    } returns freshScore(toeicCategory)
+                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 200L) }
+                    every { filePersistencePort.linkToScore(30L, 200L) } just runs
+
+                    val result = service.execute(CategoryType.JLPT, "800", 30L)
+
+                    result.category.categoryType shouldBe CategoryType.TOEIC
+                    result.submittedCategoryType shouldBe CategoryType.JLPT
+                }
+            }
+
+            When("JPT로 제출하면") {
+                Then("category는 TOEIC이지만 submittedCategoryType에 JPT가 감사 추적용으로 남는다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.JPT, EvidenceType.FILE) } returns
+                        toeicCategory
+                    every { filePersistencePort.findById(31L) } returns file(31L)
+                    every { appendScoreSupport.parseScoreValue("900", toeicCategory) } returns 9
+                    every {
+                        appendScoreSupport.findOrCreateScore(userId, toeicCategory)
+                    } returns freshScore(toeicCategory)
+                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 201L) }
+                    every { filePersistencePort.linkToScore(31L, 201L) } just runs
+
+                    val result = service.execute(CategoryType.JPT, "900", 31L)
+
+                    result.category.categoryType shouldBe CategoryType.TOEIC
+                    result.submittedCategoryType shouldBe CategoryType.JPT
+                }
+            }
+
+            When("TOEIC을 직접 제출하면") {
+                Then("submittedCategoryType은 중복이라 null로 남는다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.TOEIC, EvidenceType.FILE) } returns
+                        toeicCategory
+                    every { filePersistencePort.findById(32L) } returns file(32L)
+                    every { appendScoreSupport.parseScoreValue("950", toeicCategory) } returns 10
+                    every {
+                        appendScoreSupport.findOrCreateScore(userId, toeicCategory)
+                    } returns freshScore(toeicCategory)
+                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 202L) }
+                    every { filePersistencePort.linkToScore(32L, 202L) } just runs
+
+                    val result = service.execute(CategoryType.TOEIC, "950", 32L)
+
+                    result.submittedCategoryType shouldBe null
+                }
+            }
+        }
+
+        Given("봉사활동처럼 자체 카테고리 행을 갖는 시간 기반 활동을 파일과 함께 제출할 때") {
+            When("증빙 파일과 시간을 첨부하면") {
+                Then("scoreValue에 시간이 그대로 저장되고 submittedCategoryType은 null이다") {
+                    val volunteerCategory =
+                        Category(
+                            categoryId = 4,
+                            weight = 1,
+                            categoryEnglishName = "Volunteer",
+                            categoryKoreanName = "봉사활동",
+                            categoryMaximumValue = 10,
+                            isAccumulated = true,
+                            evidenceType = EvidenceType.FILE,
+                            categoryType = CategoryType.VOLUNTEER,
+                            calculationType = ScoreCalculationType.SCORE_BASED,
+                        )
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.VOLUNTEER, EvidenceType.FILE) } returns
+                        volunteerCategory
+                    every { filePersistencePort.findById(40L) } returns file(40L)
+                    every { appendScoreSupport.parseScoreValue("3", volunteerCategory) } returns 3
+                    every {
+                        appendScoreSupport.findOrCreateScore(userId, volunteerCategory)
+                    } returns freshScore(volunteerCategory)
+                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 203L) }
+                    every { filePersistencePort.linkToScore(40L, 203L) } just runs
+
+                    val result = service.execute(CategoryType.VOLUNTEER, "3", 40L)
+
+                    result.scoreValue shouldBe 3
+                    result.submittedCategoryType shouldBe null
+                }
+            }
+        }
+
         Given("COUNT_BASED 카테고리에 새로 제출할 때") {
             When("텍스트 값과 파일을 첨부하면") {
                 Then("activityName에 저장된다") {

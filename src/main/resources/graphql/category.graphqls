@@ -15,6 +15,7 @@ enum CategoryType {
     TOPCIT
     TOEIC
     JLPT
+    JPT
     TOEIC_ACADEMY
     READ_A_THON
     VOLUNTEER

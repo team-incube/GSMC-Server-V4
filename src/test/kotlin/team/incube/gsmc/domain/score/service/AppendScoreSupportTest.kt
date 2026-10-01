@@ -214,6 +214,20 @@ class AppendScoreSupportTest :
                     exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
                 }
             }
+
+            When("conversionDivisor가 1보다 큰 카테고리에 소수 원점수가 주어지면") {
+                Then("정수 제한 없이 환산 규칙대로 변환한다") {
+                    val cat =
+                        category(
+                            EvidenceType.FILE,
+                            ScoreCalculationType.SCORE_BASED,
+                            categoryType = CategoryType.TOPCIT,
+                            categoryMaximumValue = 10,
+                            conversionDivisor = 100,
+                        )
+                    support.parseScoreValue("850.4", cat) shouldBe 9
+                }
+            }
         }
 
         Given("findOrCreateScore") {

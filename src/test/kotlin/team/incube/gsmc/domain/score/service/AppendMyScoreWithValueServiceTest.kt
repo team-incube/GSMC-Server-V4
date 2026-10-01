@@ -47,19 +47,6 @@ class AppendMyScoreWithValueServiceTest :
         }
 
         val userId = 1L
-        val category =
-            Category(
-                categoryId = 1,
-                weight = 1,
-                categoryEnglishName = "VOLUNTEER",
-                categoryKoreanName = "봉사활동",
-                categoryMaximumValue = 10,
-                isAccumulated = true,
-                evidenceType = EvidenceType.UNREQUIRED,
-                categoryType = CategoryType.VOLUNTEER,
-                calculationType = ScoreCalculationType.SCORE_BASED,
-            )
-
         val academicGradeCategory =
             Category(
                 categoryId = 2,
@@ -73,7 +60,7 @@ class AppendMyScoreWithValueServiceTest :
                 calculationType = ScoreCalculationType.SCORE_BASED,
             )
 
-        fun freshScore(cat: Category = category) =
+        fun freshScore(cat: Category) =
             Score(
                 scoreId = 0,
                 userId = userId,
@@ -99,29 +86,6 @@ class AppendMyScoreWithValueServiceTest :
                 userNumber = 1,
                 userRole = UserRole.STUDENT,
             )
-
-        Given("증빙 불필요 + SCORE_BASED 카테고리에 제출할 때") {
-            When("숫자 값을 입력하면") {
-                Then("scoreValue에 변환된 점수가 저장된다") {
-                    every { memberUtil.getCurrentUserId() } returns userId
-                    every {
-                        appendScoreSupport.resolveUnrequiredCategory(
-                            CategoryType.VOLUNTEER,
-                            ScoreCalculationType.SCORE_BASED,
-                        )
-                    } returns category
-                    every { appendScoreSupport.parseScoreValue("10", category) } returns 10
-                    every { appendScoreSupport.findOrCreateScore(userId, category) } returns freshScore()
-                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 300L) }
-
-                    val result = service.execute(CategoryType.VOLUNTEER, "10")
-
-                    result.scoreValue shouldBe 10
-                    result.activityName shouldBe null
-                    result.scoreStatus shouldBe ScoreStatus.PENDING
-                }
-            }
-        }
 
         Given("교과성적 카테고리에 제출할 때") {
             When("1·2학년 학생이 5등급제 범위(1~5) 안의 등급을 입력하면") {

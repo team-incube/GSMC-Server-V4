@@ -59,9 +59,6 @@ class AppendScoreSupport(
     }
 
     /**
-     * 문자열 [value]를 [category]의 환산 규칙에 따라 인정점수로 파싱·변환한다. 파싱 가능 여부와 별개로
-     * 값의 유효성(유한성·하한·카테고리별 범위)은 [team.incube.gsmc.domain.score.converter.ScoreValueConverter.toScoreValue]가 검증한다.
-     *
      * @throws GsmcException 파싱할 수 없거나 허용 범위를 벗어나면 [ErrorCode.INVALID_SCORE_VALUE]
      */
     fun parseScoreValue(
@@ -131,11 +128,16 @@ class AppendScoreSupport(
     }
 
     /**
-     * [categoryType]으로 카테고리를 조회한다. JLPT는 TOEIC과 `category_tb` 행을 공유하므로
+     * [categoryType]으로 카테고리를 조회한다. JLPT/JPT는 TOEIC과 `category_tb` 행을 공유하므로
      * TOEIC으로 캐노니컬 매핑한 뒤 조회한다 ([team.incube.gsmc.domain.category.CategoryType] 참고).
      */
     private fun findCategoryOrThrow(categoryType: CategoryType): Category {
-        val canonicalType = if (categoryType == CategoryType.JLPT) CategoryType.TOEIC else categoryType
+        val canonicalType =
+            if (categoryType == CategoryType.JLPT || categoryType == CategoryType.JPT) {
+                CategoryType.TOEIC
+            } else {
+                categoryType
+            }
         return categoryPersistencePort.findByCategoryType(canonicalType)
             ?: throw GsmcException(ErrorCode.CATEGORY_NOT_FOUND)
     }

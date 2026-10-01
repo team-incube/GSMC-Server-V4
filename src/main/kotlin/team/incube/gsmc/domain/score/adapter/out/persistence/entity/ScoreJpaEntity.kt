@@ -16,6 +16,7 @@ import jakarta.persistence.Table
 import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.jpa.domain.support.AuditingEntityListener
+import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.adapter.out.persistence.entity.CategoryJpaEntity
 import team.incube.gsmc.domain.evidence.adapter.out.persistence.entity.EvidenceJpaEntity
 import team.incube.gsmc.domain.project.adapter.out.persistence.entity.ProjectJpaEntity
@@ -76,6 +77,10 @@ class ScoreJpaEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = true)
     val project: ProjectJpaEntity? = null,
+    /** 제출 시점의 원본 카테고리 유형 — JLPT/JPT처럼 TOEIC과 저장 행을 공유하는 카테고리의 감사 추적용, 그 외는 null */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "submitted_category_type", nullable = true, length = 30)
+    val submittedCategoryType: CategoryType? = null,
 ) {
     /** 최초 등록 일시 */
     @CreatedDate
