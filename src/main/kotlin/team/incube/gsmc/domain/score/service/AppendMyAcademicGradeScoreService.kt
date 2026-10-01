@@ -5,40 +5,34 @@ import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
-import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreWithValueUseCase
+import team.incube.gsmc.domain.score.port.`in`.AppendMyAcademicGradeScoreUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
-import team.incube.gsmc.global.exception.ErrorCode
-import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
 
 /**
- * 값 기반 점수 추가 유스케이스 구현 클래스입니다.
- * [AppendMyScoreWithValueUseCase]를 구현하며, 증빙이 필요 없고 집계 방식이 SCORE_BASED인
- * 카테고리에 대해 숫자 값을 입력해 점수를 신청한다. 교과성적([CategoryType.ACADEMIC_GRADE])은 평균을 직접 입력받지 않고
- * 과목별 입력표로만 신청하므로([AppendMyAcademicGradeScoreService]) 여기서는 거부한다. PENDING 상태로 새로 생성되므로
- * 해당 학생의 반/학년 백분위 캐시([ScoreTotalCacheInvalidator])를 무효화한다.
+ * 교과성적 신청 유스케이스 구현 클래스입니다.
+ * [AppendMyAcademicGradeScoreUseCase]를 구현하며, 완성된 입력표의 `(1학기 평균 + 2학기 평균) / 2`를
+ * 인정점수로 환산해 PENDING으로 신청한다. 반려됐거나 심사 중인 기존 점수가 있으면 그 행을 덮어쓰고,
+ * 승인된 점수만 있으면 새 행을 만든다([AppendScoreSupport.findOrCreateScore]). 해당 학생의 반/학년
+ * 백분위 캐시([ScoreTotalCacheInvalidator])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
-class AppendMyScoreWithValueService(
+class AppendMyAcademicGradeScoreService(
     private val appendScoreSupport: AppendScoreSupport,
+    private val academicGradeSheetSupport: AcademicGradeSheetSupport,
     private val scorePersistencePort: ScorePersistencePort,
     private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
     private val memberUtil: MemberUtil,
-) : AppendMyScoreWithValueUseCase {
+) : AppendMyAcademicGradeScoreUseCase {
     @Transactional
-    override fun execute(
-        categoryType: CategoryType,
-        value: String?,
-    ): Score {
-        if (categoryType == CategoryType.ACADEMIC_GRADE) {
-            throw GsmcException(ErrorCode.INVALID_CATEGORY_TYPE)
-        }
+    override fun execute(): Score {
         val userId = memberUtil.getCurrentUserId()
-        val category = appendScoreSupport.resolveUnrequiredCategory(categoryType, ScoreCalculationType.SCORE_BASED)
-
-        val scoreValue = appendScoreSupport.parseScoreValue(value, category)
+        val category =
+            appendScoreSupport.resolveUnrequiredCategory(CategoryType.ACADEMIC_GRADE, ScoreCalculationType.SCORE_BASED)
+        val sheet = academicGradeSheetSupport.loadSheet(academicGradeSheetSupport.loadStudent(userId))
+        val scoreValue = academicGradeSheetSupport.toScoreValue(sheet, category)
 
         val target = appendScoreSupport.findOrCreateScore(userId, category)
         val saved =

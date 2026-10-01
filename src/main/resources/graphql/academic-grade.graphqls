@@ -1,0 +1,64 @@
+"교과성적 입력표의 학과. 반 번호로 판정한다 (1·2반 SOFTWARE, 3반 SMART_IOT, 4반 AI)"
+enum Department {
+    SOFTWARE
+    SMART_IOT
+    AI
+}
+
+"현재 학년 1·2학기 교과성적 입력표"
+type AcademicGradeSheet {
+    grade: Int!
+    department: Department!
+    semesters: [AcademicSemesterSheet!]!
+    "반올림 전 최종 평균 = (1학기 평균 + 2학기 평균) / 2. 입력이 완성되지 않았으면 null"
+    rawAverage: Float
+    "두 학기 모두 입력이 완성됐는지"
+    complete: Boolean!
+}
+
+type AcademicSemesterSheet {
+    semester: Int!
+    subjects: [AcademicSubjectRow!]!
+    "입력한 과목 등급의 단순 평균. 입력이 없으면 null"
+    average: Float
+    "필수 과목이 모두 입력되고 택1 그룹마다 1개가 입력됐는지"
+    complete: Boolean!
+}
+
+type AcademicSubjectRow {
+    subjectName: String!
+    "택1 선택 그룹 이름. 같은 그룹 과목 중 정확히 1개를 입력해야 한다. 필수 과목은 null"
+    electiveGroup: String
+    "선택자만 수강하는 과목. 입력했을 때만 평균에 포함된다"
+    optional: Boolean!
+    "입력한 등급(1~5). 3학년은 성취도 A~E를 1~5로 환산한 값. 미입력이면 null"
+    subjectGrade: Int
+    "3학년의 성취도(A~E). 그 외 학년이거나 미입력이면 null"
+    achievement: String
+}
+
+input SaveAcademicGradeSheetInput {
+    "현재 학년 입력값 전체. 빠진 과목은 미입력으로 저장된다"
+    entries: [AcademicGradeEntryInput!]!
+}
+
+input AcademicGradeEntryInput {
+    semester: Int!
+    subjectName: String!
+    "1·2학년은 석차등급 \"1\"~\"5\", 3학년은 성취도 \"A\"~\"E\""
+    value: String!
+}
+
+extend type Score {
+    "교과성적 점수일 때 학생의 현재 학년 과목별 입력표. 그 외 카테고리는 null"
+    academicGradeDetail: AcademicGradeSheet
+}
+
+extend type Query {
+    myAcademicGradeSheet: AcademicGradeSheet!
+}
+
+extend type Mutation {
+    saveMyAcademicGradeSheet(input: SaveAcademicGradeSheetInput!): AcademicGradeSheet!
+    submitMyAcademicGrade: Score!
+}
