@@ -45,8 +45,8 @@ input SaveAcademicGradeSheetInput {
 input AcademicGradeEntryInput {
     semester: Int!
     subjectName: String!
-    "1·2학년은 석차등급 \"1\"~\"5\", 3학년은 성취도 \"A\"~\"E\""
-    value: String!
+    "1·2학년은 석차등급 \"1\"~\"5\", 3학년은 성취도 \"A\"~\"E\". null이나 빈 문자열이면 미입력으로 처리해 저장하지 않는다"
+    value: String
 }
 
 extend type Score {

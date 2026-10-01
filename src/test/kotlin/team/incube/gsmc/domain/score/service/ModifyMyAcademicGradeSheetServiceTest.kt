@@ -76,6 +76,20 @@ class ModifyMyAcademicGradeSheetServiceTest :
                 }
             }
 
+            When("값이 null이거나 빈 문자열인 칸이 섞여 있으면") {
+                Then("그 칸은 미입력으로 보고 저장하지 않는다") {
+                    service.execute(
+                        listOf(
+                            AcademicGradeEntryCommand(1, "공통국어1", "2"),
+                            AcademicGradeEntryCommand(1, "공통수학1", null),
+                            AcademicGradeEntryCommand(1, "공통영어1", " "),
+                        ),
+                    )
+
+                    savedEntries.captured.map { it.subjectName } shouldBe listOf("공통국어1")
+                }
+            }
+
             When("3학년이 성취도로 입력하면") {
                 Then("1~5로 환산해 저장한다") {
                     givenStudent(3, Department.AI)

@@ -12,5 +12,5 @@ data class SaveAcademicGradeSheetInput(
 data class AcademicGradeEntryInput(
     val semester: Int,
     val subjectName: String,
-    val value: String,
+    val value: String?,
 )

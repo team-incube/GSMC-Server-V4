@@ -19,7 +19,7 @@ import team.incube.gsmc.global.util.MemberUtil
  * 본인 교과성적 입력표 저장 유스케이스 구현 클래스입니다.
  * [ModifyMyAcademicGradeSheetUseCase]를 구현하며, 현재 학년 입력값을 통째로 교체한다.
  *
- * 과목은 학생의 학년·학기·학과 목록에 있어야 하고, 택1 선택 그룹은 학기마다 1개까지만 입력할 수 있다.
+ * 값이 null이거나 빈 문자열인 칸은 미입력으로 보고 저장하지 않는다. 과목은 학생의 학년·학기·학과 목록에 있어야 하고, 택1 선택 그룹은 학기마다 1개까지만 입력할 수 있다.
  * 이번 학년도에 승인된 교과성적이 있으면 잠겨 있어 저장할 수 없다([AcademicGradeSheetSupport.ensureEditable]).
  * 심사 중인 교과성적이 있으면 그 점수를 새 평균으로 다시 계산하므로, 이때는 입력표가 완성된 상태여야 한다.
  */
@@ -54,8 +54,9 @@ class ModifyMyAcademicGradeSheetService(
     private fun toEntries(
         userId: Long,
         student: AcademicGradeSheetSupport.Student,
-        commands: List<AcademicGradeEntryCommand>,
+        allCommands: List<AcademicGradeEntryCommand>,
     ): List<AcademicGradeEntry> {
+        val commands = allCommands.filterNot { it.value.isNullOrBlank() }
         if (commands.distinctBy { it.semester to it.subjectName }.size != commands.size) {
             throw GsmcException(ErrorCode.INVALID_ACADEMIC_SUBJECT)
         }
@@ -75,7 +76,7 @@ class ModifyMyAcademicGradeSheetService(
                         grade = student.grade,
                         semester = command.semester,
                         subjectName = subject.name,
-                        subjectGrade = AcademicGradeValue.parse(student.grade, command.value),
+                        subjectGrade = AcademicGradeValue.parse(student.grade, requireNotNull(command.value)),
                     )
             }
         val duplicatedElective =
