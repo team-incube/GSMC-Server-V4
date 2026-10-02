@@ -106,15 +106,15 @@ class AcademicGradeScoreValueConverterTest :
                 }
             }
 
-            When("3학년 학생이 1~9 범위 등급을 제출하면") {
+            When("3학년 학생이 1~5 범위 등급(성취도 환산값)을 제출하면") {
                 Then("예외가 발생하지 않는다") {
-                    converter.validate(9.0, 3)
+                    converter.validate(5.0, 3)
                 }
             }
 
-            When("3학년 학생이 9등급제 범위를 벗어난 등급을 제출하면") {
+            When("3학년 학생이 5단계를 벗어난 등급을 제출하면") {
                 Then("INVALID_SCORE_VALUE 예외가 발생한다") {
-                    val exception = shouldThrow<GsmcException> { converter.validate(10.0, 3) }
+                    val exception = shouldThrow<GsmcException> { converter.validate(6.0, 3) }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
                 }

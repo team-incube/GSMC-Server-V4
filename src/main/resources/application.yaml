@@ -1,6 +1,9 @@
 spring:
   application:
     name: GSMC-server-v4
+  config:
+    # 교과성적 과목 목록. 기본은 JAR에 포함된 파일이고, 운영에서 바꾸려면 외부 파일 경로(file:...)를 지정한다.
+    import: ${ACADEMIC_CURRICULUM_PATH:classpath:academic-curriculum.yml}
   graphql:
     graphiql:
       enabled: true
