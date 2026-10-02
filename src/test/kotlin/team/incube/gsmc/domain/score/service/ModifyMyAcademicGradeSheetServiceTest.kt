@@ -21,6 +21,7 @@ import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.USER_ID
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.academicGradeCategory
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.completeCommands
+import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.curriculum
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.score
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.student
 import team.incube.gsmc.global.exception.ErrorCode
@@ -58,6 +59,7 @@ class ModifyMyAcademicGradeSheetServiceTest :
             every { memberUtil.getCurrentUserId() } returns USER_ID
             every { support.ensureEditable(USER_ID, any()) } just runs
             every { support.findPending(USER_ID) } returns null
+            every { support.curriculum() } returns curriculum
             every { academicGradeEntryPersistencePort.replaceAll(USER_ID, any(), capture(savedEntries)) } answers
                 { thirdArg() }
             every { scoreTotalCacheInvalidator.invalidate(any()) } just runs

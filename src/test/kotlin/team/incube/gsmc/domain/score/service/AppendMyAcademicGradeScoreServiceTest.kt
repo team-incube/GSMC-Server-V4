@@ -18,6 +18,7 @@ import team.incube.gsmc.domain.score.academic.Department
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.USER_ID
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.academicGradeCategory
+import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.curriculum
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.score
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.student
 import team.incube.gsmc.global.exception.ErrorCode
@@ -40,7 +41,7 @@ class AppendMyAcademicGradeScoreServiceTest :
                 memberUtil = memberUtil,
             )
         val studentInfo = AcademicGradeSheetSupport.Student(student(), 1, Department.SOFTWARE)
-        val sheet = AcademicGradeSheet.of(1, Department.SOFTWARE, emptyList())
+        val sheet = AcademicGradeSheet.of(curriculum, 1, Department.SOFTWARE, emptyList())
 
         beforeEach {
             clearAllMocks()

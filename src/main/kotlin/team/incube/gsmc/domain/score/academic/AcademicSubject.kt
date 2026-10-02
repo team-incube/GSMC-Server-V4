@@ -1,7 +1,7 @@
 package team.incube.gsmc.domain.score.academic
 
 /**
- * 교과성적 입력 대상 과목
+ * 교과성적 입력 대상 과목 ([AcademicCurriculum] 참고)
  *
  * @param name 교수학습 및 평가운영 계획 원문 표기 그대로의 과목명
  * @param departments 이 과목을 수강하는 학과

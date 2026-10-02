@@ -11,12 +11,14 @@ import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.academic.AcademicGradeSheet
 import team.incube.gsmc.domain.score.academic.Department
+import team.incube.gsmc.domain.score.port.out.AcademicCurriculumPort
 import team.incube.gsmc.domain.score.port.out.AcademicGradeEntryPersistencePort
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.USER_ID
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.academicGradeCategory
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.completeEntries
+import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.curriculum
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.score
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.student
 import team.incube.gsmc.global.exception.ErrorCode
@@ -28,10 +30,19 @@ class AcademicGradeSheetSupportTest :
         val memberPersistencePort = mockk<MemberPersistencePort>()
         val academicGradeEntryPersistencePort = mockk<AcademicGradeEntryPersistencePort>()
         val scorePersistencePort = mockk<ScorePersistencePort>()
+        val academicCurriculumPort = mockk<AcademicCurriculumPort>()
         val support =
-            AcademicGradeSheetSupport(memberPersistencePort, academicGradeEntryPersistencePort, scorePersistencePort)
+            AcademicGradeSheetSupport(
+                memberPersistencePort,
+                academicGradeEntryPersistencePort,
+                scorePersistencePort,
+                academicCurriculumPort,
+            )
 
-        beforeEach { clearAllMocks() }
+        beforeEach {
+            clearAllMocks()
+            every { academicCurriculumPort.get() } returns curriculum
+        }
 
         Given("loadStudent") {
             When("3반 2학년 학생이면") {
@@ -77,7 +88,13 @@ class AcademicGradeSheetSupportTest :
         Given("toScoreValue") {
             When("입력표가 완성되면") {
                 Then("10 - 반올림(평균)으로 환산한다") {
-                    val sheet = AcademicGradeSheet.of(1, Department.SOFTWARE, completeEntries(subjectGrade = 3))
+                    val sheet =
+                        AcademicGradeSheet.of(
+                            curriculum,
+                            1,
+                            Department.SOFTWARE,
+                            completeEntries(subjectGrade = 3),
+                        )
 
                     support.toScoreValue(sheet, academicGradeCategory) shouldBe 7
                 }
@@ -85,7 +102,7 @@ class AcademicGradeSheetSupportTest :
 
             When("입력표가 미완성이면") {
                 Then("ACADEMIC_GRADE_INCOMPLETE 예외가 발생한다") {
-                    val sheet = AcademicGradeSheet.of(1, Department.SOFTWARE, emptyList())
+                    val sheet = AcademicGradeSheet.of(curriculum, 1, Department.SOFTWARE, emptyList())
 
                     shouldThrow<GsmcException> {
                         support.toScoreValue(sheet, academicGradeCategory)

@@ -37,10 +37,11 @@ class ModifyMyAcademicGradeSheetService(
         val student = academicGradeSheetSupport.loadStudent(userId)
         academicGradeSheetSupport.ensureEditable(userId)
 
-        val newEntries = toEntries(userId, student, entries)
+        val curriculum = academicGradeSheetSupport.curriculum()
+        val newEntries = toEntries(curriculum, userId, student, entries)
         academicGradeEntryPersistencePort.replaceAll(userId, student.grade, newEntries)
 
-        val sheet = AcademicGradeSheet.of(student.grade, student.department, newEntries)
+        val sheet = AcademicGradeSheet.of(curriculum, student.grade, student.department, newEntries)
         academicGradeSheetSupport.findPending(userId)?.let { pending ->
             val scoreValue = academicGradeSheetSupport.toScoreValue(sheet, pending.category)
             if (pending.scoreValue != scoreValue) {
@@ -52,11 +53,13 @@ class ModifyMyAcademicGradeSheetService(
     }
 
     private fun toEntries(
+        curriculum: AcademicCurriculum,
         userId: Long,
         student: AcademicGradeSheetSupport.Student,
         allCommands: List<AcademicGradeEntryCommand>,
     ): List<AcademicGradeEntry> {
         val commands = allCommands.filterNot { it.value.isNullOrBlank() }
+        val usesAchievement = curriculum.usesAchievement(student.grade)
         if (commands.distinctBy { it.semester to it.subjectName }.size != commands.size) {
             throw GsmcException(ErrorCode.INVALID_ACADEMIC_SUBJECT)
         }
@@ -66,7 +69,7 @@ class ModifyMyAcademicGradeSheetService(
                     throw GsmcException(ErrorCode.INVALID_ACADEMIC_SUBJECT)
                 }
                 val subject =
-                    AcademicCurriculum
+                    curriculum
                         .subjectsOf(student.grade, command.semester, student.department)
                         .find { it.name == command.subjectName }
                         ?: throw GsmcException(ErrorCode.INVALID_ACADEMIC_SUBJECT)
@@ -76,7 +79,7 @@ class ModifyMyAcademicGradeSheetService(
                         grade = student.grade,
                         semester = command.semester,
                         subjectName = subject.name,
-                        subjectGrade = AcademicGradeValue.parse(student.grade, requireNotNull(command.value)),
+                        subjectGrade = AcademicGradeValue.parse(usesAchievement, requireNotNull(command.value)),
                     )
             }
         val duplicatedElective =

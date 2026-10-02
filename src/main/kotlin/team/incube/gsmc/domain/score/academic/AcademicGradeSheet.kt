@@ -27,24 +27,32 @@ data class AcademicGradeSheet(
     companion object {
         /** 커리큘럼 과목 목록에 입력값([entries])을 채워 표를 만든다. 목록에 없는 과목의 입력은 무시한다 */
         fun of(
+            curriculum: AcademicCurriculum,
             grade: Int,
             department: Department,
             entries: List<AcademicGradeEntry>,
         ): AcademicGradeSheet {
+            val usesAchievement = curriculum.usesAchievement(grade)
             val entryByKey = entries.associateBy { it.semester to it.subjectName }
             val semesters =
                 AcademicCurriculum.SEMESTERS.map { semester ->
                     AcademicSemesterSheet(
                         semester = semester,
                         rows =
-                            AcademicCurriculum.subjectsOf(grade, semester, department).map { subject ->
+                            curriculum.subjectsOf(grade, semester, department).map { subject ->
                                 val subjectGrade = entryByKey[semester to subject.name]?.subjectGrade
                                 AcademicSubjectRow(
                                     subjectName = subject.name,
                                     electiveGroup = subject.electiveGroup,
                                     optional = subject.optional,
                                     subjectGrade = subjectGrade,
-                                    achievement = subjectGrade?.let { AcademicGradeValue.achievementOf(grade, it) },
+                                    achievement =
+                                        subjectGrade?.let {
+                                            AcademicGradeValue.achievementOf(
+                                                usesAchievement,
+                                                it,
+                                            )
+                                        },
                                 )
                             },
                     )

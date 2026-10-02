@@ -9,18 +9,18 @@ import team.incube.gsmc.global.exception.GsmcException
 class AcademicGradeValueTest :
     BehaviorSpec({
         Given("parse") {
-            When("1·2학년이 1~5 숫자를 입력하면") {
+            When("석차등급 학년(1·2학년)이 1~5 숫자를 입력하면") {
                 Then("그대로 등급이다") {
-                    AcademicGradeValue.parse(1, "1") shouldBe 1
-                    AcademicGradeValue.parse(2, " 5 ") shouldBe 5
+                    AcademicGradeValue.parse(false, "1") shouldBe 1
+                    AcademicGradeValue.parse(false, " 5 ") shouldBe 5
                 }
             }
 
-            When("3학년이 성취도를 입력하면") {
+            When("성취도 학년(3학년)이 성취도를 입력하면") {
                 Then("A=1 … E=5로 환산한다. 소문자도 받는다") {
-                    AcademicGradeValue.parse(3, "A") shouldBe 1
-                    AcademicGradeValue.parse(3, "c") shouldBe 3
-                    AcademicGradeValue.parse(3, "E") shouldBe 5
+                    AcademicGradeValue.parse(true, "A") shouldBe 1
+                    AcademicGradeValue.parse(true, "c") shouldBe 3
+                    AcademicGradeValue.parse(true, "E") shouldBe 5
                 }
             }
 
@@ -34,7 +34,7 @@ class AcademicGradeValueTest :
             ).forEach { (condition, grade, value) ->
                 When(condition) {
                     Then("INVALID_SCORE_VALUE 예외가 발생한다") {
-                        val exception = shouldThrow<GsmcException> { AcademicGradeValue.parse(grade, value) }
+                        val exception = shouldThrow<GsmcException> { AcademicGradeValue.parse(grade == 3, value) }
 
                         exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
                     }
@@ -45,13 +45,13 @@ class AcademicGradeValueTest :
         Given("achievementOf") {
             When("3학년이면") {
                 Then("성취도 문자로 되돌린다") {
-                    AcademicGradeValue.achievementOf(3, 2) shouldBe "B"
+                    AcademicGradeValue.achievementOf(true, 2) shouldBe "B"
                 }
             }
 
             When("1·2학년이면") {
                 Then("null이다") {
-                    AcademicGradeValue.achievementOf(1, 2) shouldBe null
+                    AcademicGradeValue.achievementOf(false, 2) shouldBe null
                 }
             }
         }

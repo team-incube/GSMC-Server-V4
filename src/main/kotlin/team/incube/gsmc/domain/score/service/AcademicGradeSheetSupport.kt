@@ -5,9 +5,11 @@ import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
+import team.incube.gsmc.domain.score.academic.AcademicCurriculum
 import team.incube.gsmc.domain.score.academic.AcademicGradeSheet
 import team.incube.gsmc.domain.score.academic.Department
 import team.incube.gsmc.domain.score.converter.ScoreValueConverterRegistry
+import team.incube.gsmc.domain.score.port.out.AcademicCurriculumPort
 import team.incube.gsmc.domain.score.port.out.AcademicGradeEntryPersistencePort
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
@@ -18,7 +20,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
- * 교과성적 입력표 관련 서비스들이 공유하는 학생 조회, 표 조립, 인정점수 환산, 수정 잠금 판단을 모아둔
+ * 교과성적 입력표 관련 서비스들이 공유하는 과목 목록 조회, 학생 조회, 표 조립, 인정점수 환산, 수정 잠금 판단을 모아둔
  * 헬퍼입니다. 포트가 아닌 순수 협력 객체로, 여러 서비스에 그대로 주입된다.
  */
 @Component
@@ -26,7 +28,11 @@ class AcademicGradeSheetSupport(
     private val memberPersistencePort: MemberPersistencePort,
     private val academicGradeEntryPersistencePort: AcademicGradeEntryPersistencePort,
     private val scorePersistencePort: ScorePersistencePort,
+    private val academicCurriculumPort: AcademicCurriculumPort,
 ) {
+    /** 현재 적용 중인 과목 목록 */
+    fun curriculum(): AcademicCurriculum = academicCurriculumPort.get()
+
     /**
      * @throws GsmcException 사용자가 없으면 [ErrorCode.USER_NOT_FOUND], 학년이 없으면 [ErrorCode.INVALID_GRADE],
      * 반 번호가 없거나 범위를 벗어나면 [ErrorCode.INVALID_CLASS_NUMBER]
@@ -40,6 +46,7 @@ class AcademicGradeSheetSupport(
     /** 학생의 현재 학년 입력표를 조립한다 */
     fun loadSheet(student: Student): AcademicGradeSheet =
         AcademicGradeSheet.of(
+            curriculum = curriculum(),
             grade = student.grade,
             department = student.department,
             entries = academicGradeEntryPersistencePort.findAllByUserIdAndGrade(student.user.userId, student.grade),

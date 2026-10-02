@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 class AcademicGradeSheetTest :
     BehaviorSpec({
         val userId = 1L
+        val curriculum = TestCurriculum.curriculum
 
         fun entry(
             grade: Int,
@@ -27,7 +28,7 @@ class AcademicGradeSheetTest :
             semester: Int,
             department: Department,
             subjectGrade: Int,
-        ) = AcademicCurriculum
+        ) = curriculum
             .subjectsOf(grade, semester, department)
             .filter { it.electiveGroup == null && !it.optional }
             .map { entry(grade, semester, it.name, subjectGrade) }
@@ -41,7 +42,7 @@ class AcademicGradeSheetTest :
                         required(1, 2, Department.SMART_IOT, 1).mapIndexed { index, e ->
                             if (index == 0) e.copy(subjectGrade = 5) else e
                         }
-                    val sheet = AcademicGradeSheet.of(1, Department.SMART_IOT, first + second)
+                    val sheet = AcademicGradeSheet.of(curriculum, 1, Department.SMART_IOT, first + second)
 
                     val firstAverage = 1.0
                     val secondAverage = (5.0 + (second.size - 1) * 1.0) / second.size
@@ -53,7 +54,12 @@ class AcademicGradeSheetTest :
             When("한 학기라도 미완성이면") {
                 Then("null이다") {
                     val sheet =
-                        AcademicGradeSheet.of(1, Department.SOFTWARE, required(1, 1, Department.SOFTWARE, 2))
+                        AcademicGradeSheet.of(
+                            curriculum,
+                            1,
+                            Department.SOFTWARE,
+                            required(1, 1, Department.SOFTWARE, 2),
+                        )
 
                     sheet.isComplete() shouldBe false
                     sheet.rawAverage() shouldBe null
@@ -67,7 +73,7 @@ class AcademicGradeSheetTest :
                     val entries =
                         required(1, 1, Department.SOFTWARE, 2) + required(1, 2, Department.SOFTWARE, 2) +
                             entry(1, 1, "전기전자일반", 5)
-                    val sheet = AcademicGradeSheet.of(1, Department.SOFTWARE, entries)
+                    val sheet = AcademicGradeSheet.of(curriculum, 1, Department.SOFTWARE, entries)
 
                     sheet.rawAverage() shouldBe 2.0
                 }
@@ -79,14 +85,14 @@ class AcademicGradeSheetTest :
 
             When("그룹에서 아무것도 입력하지 않으면") {
                 Then("미완성이다") {
-                    AcademicGradeSheet.of(2, Department.SOFTWARE, base).isComplete() shouldBe false
+                    AcademicGradeSheet.of(curriculum, 2, Department.SOFTWARE, base).isComplete() shouldBe false
                 }
             }
 
             When("그룹에서 1개를 입력하면") {
                 Then("완성이고 그 과목이 평균에 들어간다") {
                     val sheet =
-                        AcademicGradeSheet.of(2, Department.SOFTWARE, base + entry(2, 2, "인공지능 일반", 1))
+                        AcademicGradeSheet.of(curriculum, 2, Department.SOFTWARE, base + entry(2, 2, "인공지능 일반", 1))
 
                     sheet.isComplete() shouldBe true
                     val requiredCount = required(2, 2, Department.SOFTWARE, 3).size
@@ -99,6 +105,7 @@ class AcademicGradeSheetTest :
                 Then("미완성이다") {
                     val sheet =
                         AcademicGradeSheet.of(
+                            curriculum,
                             2,
                             Department.SOFTWARE,
                             base + entry(2, 2, "인공지능 일반", 1) + entry(2, 2, "웹프로그래밍", 1),
@@ -116,13 +123,13 @@ class AcademicGradeSheetTest :
 
             When("선택자 과목(웹 프로그래밍 실무)을 입력하지 않아도") {
                 Then("완성이다") {
-                    AcademicGradeSheet.of(3, Department.AI, base).isComplete() shouldBe true
+                    AcademicGradeSheet.of(curriculum, 3, Department.AI, base).isComplete() shouldBe true
                 }
             }
 
             When("선택자 과목을 입력하면") {
                 Then("평균에 들어가고 성취도 문자도 함께 보인다") {
-                    val sheet = AcademicGradeSheet.of(3, Department.AI, base + entry(3, 1, "웹 프로그래밍 실무", 5))
+                    val sheet = AcademicGradeSheet.of(curriculum, 3, Department.AI, base + entry(3, 1, "웹 프로그래밍 실무", 5))
 
                     sheet.semesters[0].average()!! shouldBe
                         ((sheet.semesters[0].rows.count { it.subjectGrade != null } - 1) * 2.0 + 5.0) /

@@ -12,6 +12,7 @@ import team.incube.gsmc.domain.score.academic.AcademicGradeSheet
 import team.incube.gsmc.domain.score.academic.Department
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.USER_ID
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.academicGradeCategory
+import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.curriculum
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.score
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.student
 import team.incube.gsmc.global.exception.ErrorCode
@@ -31,7 +32,7 @@ class FetchAcademicGradeDetailServiceTest :
             When("교과성적 점수면") {
                 Then("제출한 학생의 입력표를 돌려준다") {
                     val studentInfo = AcademicGradeSheetSupport.Student(student(), 1, Department.SOFTWARE)
-                    val sheet = AcademicGradeSheet.of(1, Department.SOFTWARE, emptyList())
+                    val sheet = AcademicGradeSheet.of(curriculum, 1, Department.SOFTWARE, emptyList())
                     every { support.loadStudent(USER_ID) } returns studentInfo
                     every { support.loadSheet(studentInfo) } returns sheet
 
