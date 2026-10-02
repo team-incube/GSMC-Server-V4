@@ -3,7 +3,8 @@ spring:
     name: GSMC-server-v4
   graphql:
     graphiql:
-      enabled: true
+      # API 문서 UI(GraphiQL·Swagger)는 운영에 노출되지 않도록 기본은 끄고, 로컬 등 필요한 환경에서만 API_DOCS_ENABLED=true로 켠다.
+      enabled: ${API_DOCS_ENABLED:false}
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -49,6 +50,12 @@ sse:
   heartbeat-interval: 30000
   emitter-timeout: 1800000
   max-connections-per-user: 5
+
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
 
 sdk:
   logging:
