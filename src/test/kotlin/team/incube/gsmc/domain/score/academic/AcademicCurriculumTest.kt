@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 
@@ -82,10 +83,15 @@ class AcademicCurriculumTest :
 
         Given("설정 파일 academic-curriculum.yml") {
             When("바인딩하면") {
-                Then("6개 학기와 성취도 학년(3)이 읽힌다") {
-                    TestCurriculum.properties.curriculum.map { it.grade to it.semester } shouldBe
-                        listOf(1 to 1, 1 to 2, 2 to 1, 2 to 2, 3 to 1, 3 to 2)
-                    TestCurriculum.properties.achievementGrades shouldBe setOf(3)
+                Then("1~3학년 1·2학기 과목과 성취도 학년(3)이 읽힌다") {
+                    for (grade in 1..3) {
+                        for (semester in AcademicCurriculum.SEMESTERS) {
+                            Department.entries
+                                .flatMap { curriculum.subjectsOf(grade, semester, it) }
+                                .shouldNotBeEmpty()
+                        }
+                    }
+                    curriculum.usesAchievement(3) shouldBe true
                 }
             }
         }

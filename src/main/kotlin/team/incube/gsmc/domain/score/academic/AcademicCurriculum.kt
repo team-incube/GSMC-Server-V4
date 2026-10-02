@@ -10,7 +10,7 @@ package team.incube.gsmc.domain.score.academic
  * @param semesters 학년·학기별 과목 목록
  * @param achievementGrades 석차등급 대신 성취도(A~E)로 입력하는 학년
  * @throws IllegalArgumentException 학기가 1·2가 아니거나, 한 학기에 같은 과목명이 두 번 있거나,
- * 수강 학과가 비어 있거나, 한 과목이 택1 그룹이면서 선택자 과목이면
+ * 수강 학과가 비어 있거나, 택1 그룹 이름이 비어 있거나, 한 과목이 택1 그룹이면서 선택자 과목이면
  */
 class AcademicCurriculum(
     semesters: List<AcademicCurriculumSemester>,
@@ -31,6 +31,7 @@ class AcademicCurriculum(
             semester.subjects.forEach { subject ->
                 require(subject.name.isNotBlank()) { "$label: 과목명이 비어 있습니다." }
                 require(subject.departments.isNotEmpty()) { "$label ${subject.name}: 수강 학과가 비어 있습니다." }
+                require(subject.electiveGroup?.isBlank() != true) { "$label ${subject.name}: 택1 그룹 이름이 비어 있습니다." }
                 require(!(subject.optional && subject.electiveGroup != null)) {
                     "$label ${subject.name}: 택1 그룹 과목은 선택자 과목(optional)일 수 없습니다."
                 }
