@@ -20,6 +20,7 @@ import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
 import team.incube.gsmc.domain.auth.port.out.OAuthPort
 import team.incube.gsmc.domain.auth.port.out.OAuthStatePersistencePort
 import team.incube.gsmc.domain.auth.port.out.RefreshTokenPersistencePort
+import team.incube.gsmc.domain.auth.port.out.UserEventPublisherPort
 import team.incube.gsmc.domain.auth.port.out.UserPersistencePort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
@@ -33,6 +34,7 @@ class LoginServiceTest :
         val userPersistencePort = mockk<UserPersistencePort>()
         val refreshTokenPersistencePort = mockk<RefreshTokenPersistencePort>()
         val authTokenPort = mockk<AuthTokenPort>()
+        val userEventPublisherPort = mockk<UserEventPublisherPort>(relaxUnitFun = true)
         val transactionManager = mockk<PlatformTransactionManager>()
         val loginService =
             LoginService(
@@ -41,6 +43,7 @@ class LoginServiceTest :
                 userPersistencePort = userPersistencePort,
                 refreshTokenPersistencePort = refreshTokenPersistencePort,
                 authTokenPort = authTokenPort,
+                userEventPublisherPort = userEventPublisherPort,
                 transactionManager = transactionManager,
             )
 
