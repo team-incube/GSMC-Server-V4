@@ -314,4 +314,19 @@ class ScoreTotalCacheInvalidatorTest :
                 }
             }
         }
+
+        Given("트랜잭션 안에서 invalidateCohort가 호출될 때") {
+            beforeEach { TransactionSynchronizationManager.initSynchronization() }
+            afterEach { TransactionSynchronizationManager.clearSynchronization() }
+
+            When("아직 커밋되지 않았으면") {
+                Then("무효화를 예약하지 않는다") {
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidateCohort(2, 3)
+
+                    verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+        }
     })
