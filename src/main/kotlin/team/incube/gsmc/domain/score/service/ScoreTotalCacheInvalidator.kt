@@ -2,6 +2,8 @@ package team.incube.gsmc.domain.score.service
 
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.stereotype.Component
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
 import team.themoment.sdk.logging.logger.logger
@@ -54,6 +56,25 @@ class ScoreTotalCacheInvalidator(
             debounceGradeEviction(userGrade)
             member.userClassNumber?.let { debounceClassEviction(userGrade, it) }
         }.onFailure { logger().warn("반/학년 백분위 캐시 무효화 실패 (userId={})", userId, it) }
+    }
+
+    /**
+     * 트랜잭션 안이면 커밋 성공 후에 [action]을 실행하고, 롤백되면 실행하지 않는다.
+     * 트랜잭션 밖에서 호출되면 즉시 실행한다.
+     */
+    private fun runAfterCommit(action: () -> Unit) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action()
+            return
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() {
+                    runCatching(action)
+                        .onFailure { logger().warn("커밋 후 백분위 캐시 무효화 예약 실패", it) }
+                }
+            },
+        )
     }
 
     private fun debounceGradeEviction(userGrade: Int) {
