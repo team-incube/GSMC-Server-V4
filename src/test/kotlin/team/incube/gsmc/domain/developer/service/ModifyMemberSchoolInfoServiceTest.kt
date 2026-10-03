@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
+import team.incube.gsmc.domain.developer.port.out.MemberEventPublisherPort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -18,7 +19,8 @@ class ModifyMemberSchoolInfoServiceTest :
     BehaviorSpec({
         val developerPersistencePort = mockk<DeveloperPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
-        val service = ModifyMemberSchoolInfoService(developerPersistencePort, memberUtil)
+        val memberEventPublisherPort = mockk<MemberEventPublisherPort>(relaxUnitFun = true)
+        val service = ModifyMemberSchoolInfoService(developerPersistencePort, memberUtil, memberEventPublisherPort)
 
         beforeEach { clearAllMocks() }
 
