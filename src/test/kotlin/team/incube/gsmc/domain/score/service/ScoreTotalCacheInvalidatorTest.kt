@@ -10,6 +10,7 @@ import io.mockk.slot
 import io.mockk.verify
 import org.springframework.core.task.TaskRejectedException
 import org.springframework.scheduling.TaskScheduler
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
 import team.incube.gsmc.domain.user.User
@@ -183,6 +184,22 @@ class ScoreTotalCacheInvalidatorTest :
                     invalidator.invalidate(1L)
 
                     verify(exactly = 4) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+        }
+
+        Given("트랜잭션 안에서 invalidate가 호출될 때") {
+            beforeEach { TransactionSynchronizationManager.initSynchronization() }
+            afterEach { TransactionSynchronizationManager.clearSynchronization() }
+
+            When("아직 커밋되지 않았으면") {
+                Then("무효화를 예약하지 않는다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidate(1L)
+
+                    verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
                 }
             }
         }
