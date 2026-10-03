@@ -339,5 +339,18 @@ class ScoreTotalCacheInvalidatorTest :
                     verify(exactly = 2) { taskScheduler.schedule(any(), any<Instant>()) }
                 }
             }
+
+            When("롤백되면") {
+                Then("무효화를 예약하지 않는다") {
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidateCohort(2, 3)
+                    TransactionSynchronizationManager.getSynchronizations().forEach {
+                        it.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
+                    }
+
+                    verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
         }
     })
