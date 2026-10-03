@@ -229,5 +229,18 @@ class ScoreTotalCacheInvalidatorTest :
                     verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
                 }
             }
+
+            When("커밋 후 예약 중 예외가 발생해도") {
+                Then("예외를 밖으로 던지지 않는다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } throws TaskRejectedException("shutdown")
+
+                    invalidator.invalidate(1L)
+
+                    shouldNotThrowAny {
+                        TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+                    }
+                }
+            }
         }
     })
