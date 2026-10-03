@@ -328,5 +328,16 @@ class ScoreTotalCacheInvalidatorTest :
                     verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
                 }
             }
+
+            When("커밋되면") {
+                Then("커밋 후에 반/학년 무효화를 각각 한 번씩 예약한다") {
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidateCohort(2, 3)
+                    TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+
+                    verify(exactly = 2) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
         }
     })
