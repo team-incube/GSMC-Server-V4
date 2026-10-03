@@ -304,5 +304,14 @@ class ScoreTotalCacheInvalidatorTest :
                     verify(exactly = 2) { taskScheduler.schedule(any(), any<Instant>()) }
                 }
             }
+
+            When("TaskScheduler가 스케줄을 거부하면") {
+                Then("예외를 밖으로 던지지 않는다") {
+                    every { taskScheduler.schedule(any(), any<Instant>()) } throws
+                        TaskRejectedException("scheduler is shutting down")
+
+                    shouldNotThrowAny { invalidator.invalidateCohort(2, 3) }
+                }
+            }
         }
     })
