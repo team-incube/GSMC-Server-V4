@@ -243,4 +243,36 @@ class ScoreTotalCacheInvalidatorTest :
                 }
             }
         }
+
+        Given("학년/반을 직접 지정해 invalidateCohort를 호출할 때") {
+            When("반을 함께 넘기면") {
+                Then("회원을 조회하지 않고 해당 반/학년 캐시를 무효화한다") {
+                    every { scoreTotalCachePort.evictGradeTotals(2) } returns Unit
+                    every { scoreTotalCachePort.evictClassTotals(2, 3) } returns Unit
+                    val tasks = captureScheduledTasks()
+
+                    invalidator.invalidateCohort(2, 3)
+                    tasks.forEach { it.run() }
+
+                    tasks.size shouldBe 2
+                    verify(exactly = 1) { scoreTotalCachePort.evictGradeTotals(2) }
+                    verify(exactly = 1) { scoreTotalCachePort.evictClassTotals(2, 3) }
+                    verify(exactly = 0) { memberPersistencePort.findByUserId(any()) }
+                }
+            }
+
+            When("반 없이 학년만 넘기면") {
+                Then("학년 캐시만 무효화한다") {
+                    every { scoreTotalCachePort.evictGradeTotals(2) } returns Unit
+                    val tasks = captureScheduledTasks()
+
+                    invalidator.invalidateCohort(2, null)
+                    tasks.forEach { it.run() }
+
+                    tasks.size shouldBe 1
+                    verify(exactly = 1) { scoreTotalCachePort.evictGradeTotals(2) }
+                    verify(exactly = 0) { scoreTotalCachePort.evictClassTotals(any(), any()) }
+                }
+            }
+        }
     })
