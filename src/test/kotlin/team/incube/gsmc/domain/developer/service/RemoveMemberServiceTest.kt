@@ -93,6 +93,7 @@ class RemoveMemberServiceTest :
                     every { developerPersistencePort.hasRelatedData(1L) } returns false
                     every { developerPersistencePort.delete(any()) } returns Unit
                     every { memberEventPublisherPort.publishRemoved(1L) } just Runs
+                    every { memberEventPublisherPort.publishCohortChanged(any()) } just Runs
 
                     val result = service.execute(1L)
 
