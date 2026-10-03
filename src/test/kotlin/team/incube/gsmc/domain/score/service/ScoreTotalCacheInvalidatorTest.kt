@@ -292,5 +292,17 @@ class ScoreTotalCacheInvalidatorTest :
                     verify(exactly = 1) { scoreTotalCachePort.evictClassTotals(2, 4) }
                 }
             }
+
+            When("같은 반에 대해 invalidate와 함께 호출되면") {
+                Then("디바운스 창을 공유해 중복 예약하지 않는다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidate(1L)
+                    invalidator.invalidateCohort(2, 3)
+
+                    verify(exactly = 2) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
         }
     })
