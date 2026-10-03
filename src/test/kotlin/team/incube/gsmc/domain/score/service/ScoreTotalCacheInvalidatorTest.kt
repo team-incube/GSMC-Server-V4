@@ -202,5 +202,17 @@ class ScoreTotalCacheInvalidatorTest :
                     verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
                 }
             }
+
+            When("커밋되면") {
+                Then("커밋 후에 반/학년 무효화를 각각 한 번씩 예약한다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidate(1L)
+                    TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+
+                    verify(exactly = 2) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
         }
     })
