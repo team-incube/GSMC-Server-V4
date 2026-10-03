@@ -12,6 +12,7 @@ import io.mockk.verify
 import team.incube.gsmc.domain.auth.port.out.RefreshTokenPersistencePort
 import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
+import team.incube.gsmc.domain.developer.port.out.MemberEventPublisherPort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -24,12 +25,14 @@ class ModifyMemberRoleServiceTest :
         val memberUtil = mockk<MemberUtil>()
         val refreshTokenPersistencePort = mockk<RefreshTokenPersistencePort>()
         val tokenInvalidationPort = mockk<TokenInvalidationPort>()
+        val memberEventPublisherPort = mockk<MemberEventPublisherPort>(relaxUnitFun = true)
         val service =
             ModifyMemberRoleService(
                 developerPersistencePort,
                 memberUtil,
                 refreshTokenPersistencePort,
                 tokenInvalidationPort,
+                memberEventPublisherPort,
             )
 
         beforeEach { clearAllMocks() }
