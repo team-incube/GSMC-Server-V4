@@ -52,9 +52,12 @@ class ScoreTotalCacheInvalidator(
         runCatching {
             val member = memberPersistencePort.findByUserId(userId) ?: return@runCatching
             val userGrade = member.userGrade ?: return@runCatching
+            val userClassNumber = member.userClassNumber
 
-            debounceGradeEviction(userGrade)
-            member.userClassNumber?.let { debounceClassEviction(userGrade, it) }
+            runAfterCommit {
+                debounceGradeEviction(userGrade)
+                userClassNumber?.let { debounceClassEviction(userGrade, it) }
+            }
         }.onFailure { logger().warn("반/학년 백분위 캐시 무효화 실패 (userId={})", userId, it) }
     }
 
