@@ -32,6 +32,7 @@ enum class ErrorCode(
     INVALID_CATEGORY_TYPE(HttpStatus.BAD_REQUEST, "해당 요청에 사용할 수 없는 카테고리입니다.", "BAD_REQUEST"),
     INVALID_SCORE_VALUE(HttpStatus.BAD_REQUEST, "점수 값이 올바르지 않습니다.", "BAD_REQUEST"),
     SCORE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 신청한 카테고리입니다.", "CONFLICT"),
+    EVIDENCE_DRAFT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 작성 중인 증빙 초안이 있습니다.", "CONFLICT"),
     FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "파일을 찾을 수 없습니다.", "NOT_FOUND"),
     INVALID_REJECTION_REASON(HttpStatus.BAD_REQUEST, "거절 사유는 1자 이상 500자 이하여야 합니다.", "BAD_REQUEST"),
     INVALID_FILE_SIZE(HttpStatus.BAD_REQUEST, "파일 크기는 20MB를 초과할 수 없습니다.", "BAD_REQUEST"),
