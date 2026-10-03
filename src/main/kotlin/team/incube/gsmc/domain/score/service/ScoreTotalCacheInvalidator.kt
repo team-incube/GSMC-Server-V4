@@ -80,6 +80,24 @@ class ScoreTotalCacheInvalidator(
         )
     }
 
+    /**
+     * 지정한 학년(과 반)의 백분위 캐시를 무효화한다. 회원 조회 없이 호출자가 넘긴 범위를 그대로 사용하므로,
+     * 반 이동처럼 변경 전 집단을 DB에서 더 이상 알 수 없는 경우에 쓴다. 반이 없으면 학년 캐시만 무효화한다.
+     */
+    fun invalidateCohort(
+        userGrade: Int,
+        userClassNumber: Int?,
+    ) {
+        runCatching {
+            runAfterCommit {
+                debounceGradeEviction(userGrade)
+                userClassNumber?.let { debounceClassEviction(userGrade, it) }
+            }
+        }.onFailure {
+            logger().warn("반/학년 백분위 캐시 무효화 실패 (userGrade={}, userClassNumber={})", userGrade, userClassNumber, it)
+        }
+    }
+
     private fun debounceGradeEviction(userGrade: Int) {
         pendingGradeEvictions.computeIfAbsent(userGrade) {
             taskScheduler.schedule(
