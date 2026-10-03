@@ -274,5 +274,23 @@ class ScoreTotalCacheInvalidatorTest :
                     verify(exactly = 0) { scoreTotalCachePort.evictClassTotals(any(), any()) }
                 }
             }
+
+            When("반 이동처럼 같은 학년의 이전 반과 새 반을 연달아 넘기면") {
+                Then("학년은 한 번, 두 반은 각각 한 번씩 예약한다") {
+                    every { scoreTotalCachePort.evictGradeTotals(2) } returns Unit
+                    every { scoreTotalCachePort.evictClassTotals(2, 3) } returns Unit
+                    every { scoreTotalCachePort.evictClassTotals(2, 4) } returns Unit
+                    val tasks = captureScheduledTasks()
+
+                    invalidator.invalidateCohort(2, 3)
+                    invalidator.invalidateCohort(2, 4)
+                    tasks.forEach { it.run() }
+
+                    tasks.size shouldBe 3
+                    verify(exactly = 1) { scoreTotalCachePort.evictGradeTotals(2) }
+                    verify(exactly = 1) { scoreTotalCachePort.evictClassTotals(2, 3) }
+                    verify(exactly = 1) { scoreTotalCachePort.evictClassTotals(2, 4) }
+                }
+            }
         }
     })
