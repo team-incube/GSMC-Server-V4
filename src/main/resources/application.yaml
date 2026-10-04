@@ -3,7 +3,10 @@ spring:
     name: GSMC-server-v4
   graphql:
     graphiql:
-      enabled: true
+      enabled: ${GRAPHIQL_ENABLED:false}
+    schema:
+      introspection:
+        enabled: ${GRAPHQL_INTROSPECTION_ENABLED:false}
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
