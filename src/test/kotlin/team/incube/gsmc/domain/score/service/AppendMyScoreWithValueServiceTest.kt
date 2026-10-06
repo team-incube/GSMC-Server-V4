@@ -15,10 +15,7 @@ import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
-import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
-import team.incube.gsmc.domain.user.User
-import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
@@ -26,16 +23,15 @@ import java.time.LocalDateTime
 
 class AppendMyScoreWithValueServiceTest :
     BehaviorSpec({
+        val userId = 1L
         val appendScoreSupport = mockk<AppendScoreSupport>()
         val scorePersistencePort = mockk<ScorePersistencePort>()
-        val memberPersistencePort = mockk<MemberPersistencePort>()
         val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
         val memberUtil = mockk<MemberUtil>()
         val service =
             AppendMyScoreWithValueService(
                 appendScoreSupport = appendScoreSupport,
                 scorePersistencePort = scorePersistencePort,
-                memberPersistencePort = memberPersistencePort,
                 scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
                 memberUtil = memberUtil,
             )
@@ -43,20 +39,19 @@ class AppendMyScoreWithValueServiceTest :
         beforeEach {
             clearAllMocks()
             every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
-            every { appendScoreSupport.parseRawScoreValue(any()) } answers { firstArg<String>().toDouble() }
+            every { memberUtil.getCurrentUserId() } returns userId
         }
 
-        val userId = 1L
-        val academicGradeCategory =
+        val ncsCategory =
             Category(
-                categoryId = 2,
+                categoryId = 3,
                 weight = 1,
-                categoryEnglishName = "ACADEMIC_GRADE",
-                categoryKoreanName = "교과성적",
-                categoryMaximumValue = 9,
+                categoryEnglishName = "NCS",
+                categoryKoreanName = "NCS",
+                categoryMaximumValue = 5,
                 isAccumulated = false,
                 evidenceType = EvidenceType.UNREQUIRED,
-                categoryType = CategoryType.ACADEMIC_GRADE,
+                categoryType = CategoryType.NCS,
                 calculationType = ScoreCalculationType.SCORE_BASED,
             )
 
@@ -67,141 +62,46 @@ class AppendMyScoreWithValueServiceTest :
                 category = cat,
                 evidence = null,
                 file = null,
-                scoreStatus = ScoreStatus.PENDING,
+                scoreStatus = ScoreStatus.REJECTED,
                 activityName = null,
                 scoreValue = null,
-                rejectionReason = null,
+                rejectionReason = "사유",
                 dgProjectId = null,
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now(),
             )
 
-        fun student(grade: Int) =
-            User(
-                userId = userId,
-                userName = "학생",
-                userEmail = "student@gsm.hs.kr",
-                userGrade = grade,
-                userClassNumber = 1,
-                userNumber = 1,
-                userRole = UserRole.STUDENT,
-            )
+        Given("교과성적 카테고리에 평균을 직접 입력하면") {
+            When("어떤 값이든") {
+                Then("과목별 입력표로만 신청할 수 있으므로 INVALID_CATEGORY_TYPE 예외가 발생하고 저장하지 않는다") {
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(CategoryType.ACADEMIC_GRADE, "3")
+                        }
 
-        Given("교과성적 카테고리에 제출할 때") {
-            When("1·2학년 학생이 5등급제 범위(1~5) 안의 등급을 입력하면") {
-                Then("정상적으로 처리된다") {
-                    every { memberUtil.getCurrentUserId() } returns userId
+                    exception.errorCode shouldBe ErrorCode.INVALID_CATEGORY_TYPE
+                    verify(exactly = 0) { appendScoreSupport.resolveUnrequiredCategory(any(), any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                }
+            }
+        }
+
+        Given("값 기반 카테고리에 값을 입력하면") {
+            When("유효한 값이면") {
+                Then("PENDING으로 저장하고 반려 사유를 지운 뒤 캐시를 무효화한다") {
                     every {
-                        appendScoreSupport.resolveUnrequiredCategory(
-                            CategoryType.ACADEMIC_GRADE,
-                            ScoreCalculationType.SCORE_BASED,
-                        )
-                    } returns academicGradeCategory
-                    every { memberPersistencePort.findByUserId(userId) } returns student(grade = 2)
-                    every { appendScoreSupport.parseScoreValue("3", academicGradeCategory) } returns 7
-                    every {
-                        appendScoreSupport.findOrCreateScore(userId, academicGradeCategory)
-                    } returns freshScore(academicGradeCategory)
+                        appendScoreSupport.resolveUnrequiredCategory(CategoryType.NCS, ScoreCalculationType.SCORE_BASED)
+                    } returns ncsCategory
+                    every { appendScoreSupport.parseScoreValue("2", ncsCategory) } returns 4
+                    every { appendScoreSupport.findOrCreateScore(userId, ncsCategory) } returns freshScore(ncsCategory)
                     every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 301L) }
 
-                    val result = service.execute(CategoryType.ACADEMIC_GRADE, "3")
+                    val result = service.execute(CategoryType.NCS, "2")
 
-                    result.scoreValue shouldBe 7
-                }
-            }
-
-            listOf(
-                "학생 정보가 없으면" to null,
-                "학생의 학년 정보가 비어 있으면" to student(grade = 1).copy(userGrade = null),
-            ).forEach { (condition, member) ->
-                When(condition) {
-                    Then("USER_NOT_FOUND 예외가 발생하고 저장하지 않는다") {
-                        every { memberUtil.getCurrentUserId() } returns userId
-                        every {
-                            appendScoreSupport.resolveUnrequiredCategory(
-                                CategoryType.ACADEMIC_GRADE,
-                                ScoreCalculationType.SCORE_BASED,
-                            )
-                        } returns academicGradeCategory
-                        every { appendScoreSupport.parseScoreValue("3", academicGradeCategory) } returns 7
-                        every { memberPersistencePort.findByUserId(userId) } returns member
-
-                        val exception =
-                            shouldThrow<GsmcException> {
-                                service.execute(CategoryType.ACADEMIC_GRADE, "3")
-                            }
-
-                        exception.errorCode shouldBe ErrorCode.USER_NOT_FOUND
-                        verify(exactly = 0) { scorePersistencePort.save(any()) }
-                    }
-                }
-            }
-
-            When("등급에 NaN을 입력하면") {
-                Then("공통 검증에서 INVALID_SCORE_VALUE로 거부되어 학년 조회·저장을 하지 않는다") {
-                    every { memberUtil.getCurrentUserId() } returns userId
-                    every {
-                        appendScoreSupport.resolveUnrequiredCategory(
-                            CategoryType.ACADEMIC_GRADE,
-                            ScoreCalculationType.SCORE_BASED,
-                        )
-                    } returns academicGradeCategory
-                    every {
-                        appendScoreSupport.parseScoreValue("NaN", academicGradeCategory)
-                    } throws GsmcException(ErrorCode.INVALID_SCORE_VALUE)
-
-                    val exception =
-                        shouldThrow<GsmcException> {
-                            service.execute(CategoryType.ACADEMIC_GRADE, "NaN")
-                        }
-
-                    exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
-                    verify(exactly = 0) { memberPersistencePort.findByUserId(any()) }
-                    verify(exactly = 0) { scorePersistencePort.save(any()) }
-                }
-            }
-
-            When("1·2학년 학생이 5등급제 범위를 벗어난 등급(예: 7)을 입력하면") {
-                Then("INVALID_SCORE_VALUE 예외가 발생한다") {
-                    every { memberUtil.getCurrentUserId() } returns userId
-                    every {
-                        appendScoreSupport.resolveUnrequiredCategory(
-                            CategoryType.ACADEMIC_GRADE,
-                            ScoreCalculationType.SCORE_BASED,
-                        )
-                    } returns academicGradeCategory
-                    every { memberPersistencePort.findByUserId(userId) } returns student(grade = 2)
-                    every { appendScoreSupport.parseScoreValue("7", academicGradeCategory) } returns 3
-
-                    val exception =
-                        shouldThrow<GsmcException> {
-                            service.execute(CategoryType.ACADEMIC_GRADE, "7")
-                        }
-
-                    exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
-                    verify(exactly = 0) { scorePersistencePort.save(any()) }
-                }
-            }
-
-            When("3학년 학생이 9등급제 범위(1~9) 안의 등급(예: 7)을 입력하면") {
-                Then("정상적으로 처리된다") {
-                    every { memberUtil.getCurrentUserId() } returns userId
-                    every {
-                        appendScoreSupport.resolveUnrequiredCategory(
-                            CategoryType.ACADEMIC_GRADE,
-                            ScoreCalculationType.SCORE_BASED,
-                        )
-                    } returns academicGradeCategory
-                    every { memberPersistencePort.findByUserId(userId) } returns student(grade = 3)
-                    every { appendScoreSupport.parseScoreValue("7", academicGradeCategory) } returns 3
-                    every {
-                        appendScoreSupport.findOrCreateScore(userId, academicGradeCategory)
-                    } returns freshScore(academicGradeCategory)
-                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 302L) }
-
-                    val result = service.execute(CategoryType.ACADEMIC_GRADE, "7")
-
-                    result.scoreValue shouldBe 3
+                    result.scoreValue shouldBe 4
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    result.rejectionReason shouldBe null
+                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(userId) }
                 }
             }
         }
