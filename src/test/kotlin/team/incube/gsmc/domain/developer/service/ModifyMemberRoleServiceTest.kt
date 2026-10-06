@@ -12,6 +12,8 @@ import io.mockk.verify
 import team.incube.gsmc.domain.auth.port.out.RefreshTokenPersistencePort
 import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
+import team.incube.gsmc.domain.developer.port.out.MemberEventPublisherPort
+import team.incube.gsmc.domain.user.StudentCohort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -24,12 +26,14 @@ class ModifyMemberRoleServiceTest :
         val memberUtil = mockk<MemberUtil>()
         val refreshTokenPersistencePort = mockk<RefreshTokenPersistencePort>()
         val tokenInvalidationPort = mockk<TokenInvalidationPort>()
+        val memberEventPublisherPort = mockk<MemberEventPublisherPort>(relaxUnitFun = true)
         val service =
             ModifyMemberRoleService(
                 developerPersistencePort,
                 memberUtil,
                 refreshTokenPersistencePort,
                 tokenInvalidationPort,
+                memberEventPublisherPort,
             )
 
         beforeEach { clearAllMocks() }
@@ -93,6 +97,46 @@ class ModifyMemberRoleServiceTest :
                     }
                     verify(exactly = 1) { refreshTokenPersistencePort.delete(any()) }
                     verify(exactly = 1) { tokenInvalidationPort.invalidate(any()) }
+                }
+            }
+
+            When("학생을 교사로 변경하면") {
+                Then("학생이 빠지는 기존 집단을 발행한다") {
+                    every { refreshTokenPersistencePort.delete(any()) } just Runs
+                    every { tokenInvalidationPort.invalidate(any()) } just Runs
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.ROOT
+                    every { developerPersistencePort.findByEmail("student@gsm.hs.kr") } returns student()
+                    every { developerPersistencePort.save(any()) } answers { firstArg() }
+
+                    service.execute("student@gsm.hs.kr", UserRole.TEACHER)
+
+                    verify(exactly = 1) { memberEventPublisherPort.publishCohortChanged(setOf(StudentCohort(1, 2))) }
+                }
+            }
+
+            When("학적이 있는 교사를 학생으로 변경하면") {
+                Then("학생이 새로 들어가는 집단을 발행한다") {
+                    every { refreshTokenPersistencePort.delete(any()) } just Runs
+                    every { tokenInvalidationPort.invalidate(any()) } just Runs
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.ROOT
+                    every { developerPersistencePort.findByEmail("teacher@gsm.hs.kr") } returns
+                        student(email = "teacher@gsm.hs.kr").copy(userRole = UserRole.TEACHER)
+                    every { developerPersistencePort.save(any()) } answers { firstArg() }
+
+                    service.execute("teacher@gsm.hs.kr", UserRole.STUDENT)
+
+                    verify(exactly = 1) { memberEventPublisherPort.publishCohortChanged(setOf(StudentCohort(1, 2))) }
+                }
+            }
+
+            When("존재하지 않는 회원이라 변경에 실패하면") {
+                Then("집단 변경을 발행하지 않는다") {
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.ROOT
+                    every { developerPersistencePort.findByEmail("none@gsm.hs.kr") } returns null
+
+                    shouldThrow<GsmcException> { service.execute("none@gsm.hs.kr", UserRole.TEACHER) }
+
+                    verify(exactly = 0) { memberEventPublisherPort.publishCohortChanged(any()) }
                 }
             }
         }

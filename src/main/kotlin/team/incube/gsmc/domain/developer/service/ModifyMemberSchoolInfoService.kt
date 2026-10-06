@@ -3,6 +3,8 @@ package team.incube.gsmc.domain.developer.service
 import org.springframework.transaction.annotation.Transactional
 import team.incube.gsmc.domain.developer.port.`in`.ModifyMemberSchoolInfoUseCase
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
+import team.incube.gsmc.domain.developer.port.out.MemberEventPublisherPort
+import team.incube.gsmc.domain.user.StudentCohort
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
@@ -17,11 +19,14 @@ import team.incube.gsmc.global.util.MemberUtil
  * 입력해야 하며, 그 외 권한은 모두 비우거나 모두 입력해야 합니다. 학년·반·번호 중복은 DB 유니크
  * 제약(`uk_user_grade_class_number`)에 맡기지 않고 사전 조회로 직접 검증해 [GsmcException]으로
  * 응답합니다.
+ * 반·학년 이동 시 변경 후 회원 정보만으로는 이전 집단을 알 수 없으므로, 저장 전 회원과 저장할 회원의
+ * 집단을 모두 [MemberEventPublisherPort]로 발행해 양쪽 백분위 캐시가 무효화되게 합니다.
  */
 @Port(direction = PortDirection.INBOUND)
 class ModifyMemberSchoolInfoService(
     private val developerPersistencePort: DeveloperPersistencePort,
     private val memberUtil: MemberUtil,
+    private val memberEventPublisherPort: MemberEventPublisherPort,
 ) : ModifyMemberSchoolInfoUseCase {
     @Transactional
     override fun execute(
@@ -45,12 +50,15 @@ class ModifyMemberSchoolInfoService(
             }
         }
 
-        developerPersistencePort.save(
+        val updated =
             member.copy(
                 userGrade = grade,
                 userClassNumber = classNumber,
                 userNumber = number,
-            ),
+            )
+        developerPersistencePort.save(updated)
+        memberEventPublisherPort.publishCohortChanged(
+            setOfNotNull(StudentCohort.of(member), StudentCohort.of(updated)),
         )
 
         return true

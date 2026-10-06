@@ -10,6 +10,7 @@ enum class ErrorCode(
 ) {
     // 공통
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.", "INTERNAL_SERVER_ERROR"),
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 경로를 찾을 수 없습니다.", "NOT_FOUND"),
 
     // 인증
     INVALID_OAUTH_STATE(HttpStatus.BAD_REQUEST, "유효하지 않은 OAuth state입니다.", "BAD_REQUEST"),
@@ -35,6 +36,7 @@ enum class ErrorCode(
     INVALID_ACADEMIC_SUBJECT(HttpStatus.BAD_REQUEST, "해당 학년·학기·학과에서 입력할 수 없는 과목입니다.", "BAD_REQUEST"),
     ACADEMIC_GRADE_INCOMPLETE(HttpStatus.BAD_REQUEST, "교과성적 입력이 완료되지 않았습니다.", "BAD_REQUEST"),
     ACADEMIC_GRADE_LOCKED(HttpStatus.CONFLICT, "승인된 교과성적은 수정할 수 없습니다.", "CONFLICT"),
+    EVIDENCE_DRAFT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 작성 중인 증빙 초안이 있습니다.", "CONFLICT"),
     FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "파일을 찾을 수 없습니다.", "NOT_FOUND"),
     INVALID_REJECTION_REASON(HttpStatus.BAD_REQUEST, "거절 사유는 1자 이상 500자 이하여야 합니다.", "BAD_REQUEST"),
     INVALID_FILE_SIZE(HttpStatus.BAD_REQUEST, "파일 크기는 20MB를 초과할 수 없습니다.", "BAD_REQUEST"),

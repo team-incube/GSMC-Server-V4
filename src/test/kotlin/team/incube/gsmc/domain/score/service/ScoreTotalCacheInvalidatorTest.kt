@@ -10,6 +10,8 @@ import io.mockk.slot
 import io.mockk.verify
 import org.springframework.core.task.TaskRejectedException
 import org.springframework.scheduling.TaskScheduler
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
 import team.incube.gsmc.domain.user.User
@@ -183,6 +185,171 @@ class ScoreTotalCacheInvalidatorTest :
                     invalidator.invalidate(1L)
 
                     verify(exactly = 4) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+        }
+
+        Given("트랜잭션 안에서 invalidate가 호출될 때") {
+            beforeEach { TransactionSynchronizationManager.initSynchronization() }
+            afterEach { TransactionSynchronizationManager.clearSynchronization() }
+
+            When("아직 커밋되지 않았으면") {
+                Then("무효화를 예약하지 않는다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidate(1L)
+
+                    verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+
+            When("커밋되면") {
+                Then("커밋 후에 반/학년 무효화를 각각 한 번씩 예약한다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidate(1L)
+                    TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+
+                    verify(exactly = 2) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+
+            When("롤백되면") {
+                Then("무효화를 예약하지 않는다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidate(1L)
+                    TransactionSynchronizationManager.getSynchronizations().forEach {
+                        it.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
+                    }
+
+                    verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+
+            When("커밋 후 예약 중 예외가 발생해도") {
+                Then("예외를 밖으로 던지지 않는다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } throws TaskRejectedException("shutdown")
+
+                    invalidator.invalidate(1L)
+
+                    shouldNotThrowAny {
+                        TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+                    }
+                }
+            }
+        }
+
+        Given("학년/반을 직접 지정해 invalidateCohort를 호출할 때") {
+            When("반을 함께 넘기면") {
+                Then("회원을 조회하지 않고 해당 반/학년 캐시를 무효화한다") {
+                    every { scoreTotalCachePort.evictGradeTotals(2) } returns Unit
+                    every { scoreTotalCachePort.evictClassTotals(2, 3) } returns Unit
+                    val tasks = captureScheduledTasks()
+
+                    invalidator.invalidateCohort(2, 3)
+                    tasks.forEach { it.run() }
+
+                    tasks.size shouldBe 2
+                    verify(exactly = 1) { scoreTotalCachePort.evictGradeTotals(2) }
+                    verify(exactly = 1) { scoreTotalCachePort.evictClassTotals(2, 3) }
+                    verify(exactly = 0) { memberPersistencePort.findByUserId(any()) }
+                }
+            }
+
+            When("반 없이 학년만 넘기면") {
+                Then("학년 캐시만 무효화한다") {
+                    every { scoreTotalCachePort.evictGradeTotals(2) } returns Unit
+                    val tasks = captureScheduledTasks()
+
+                    invalidator.invalidateCohort(2, null)
+                    tasks.forEach { it.run() }
+
+                    tasks.size shouldBe 1
+                    verify(exactly = 1) { scoreTotalCachePort.evictGradeTotals(2) }
+                    verify(exactly = 0) { scoreTotalCachePort.evictClassTotals(any(), any()) }
+                }
+            }
+
+            When("반 이동처럼 같은 학년의 이전 반과 새 반을 연달아 넘기면") {
+                Then("학년은 한 번, 두 반은 각각 한 번씩 예약한다") {
+                    every { scoreTotalCachePort.evictGradeTotals(2) } returns Unit
+                    every { scoreTotalCachePort.evictClassTotals(2, 3) } returns Unit
+                    every { scoreTotalCachePort.evictClassTotals(2, 4) } returns Unit
+                    val tasks = captureScheduledTasks()
+
+                    invalidator.invalidateCohort(2, 3)
+                    invalidator.invalidateCohort(2, 4)
+                    tasks.forEach { it.run() }
+
+                    tasks.size shouldBe 3
+                    verify(exactly = 1) { scoreTotalCachePort.evictGradeTotals(2) }
+                    verify(exactly = 1) { scoreTotalCachePort.evictClassTotals(2, 3) }
+                    verify(exactly = 1) { scoreTotalCachePort.evictClassTotals(2, 4) }
+                }
+            }
+
+            When("같은 반에 대해 invalidate와 함께 호출되면") {
+                Then("디바운스 창을 공유해 중복 예약하지 않는다") {
+                    every { memberPersistencePort.findByUserId(1L) } returns studentOf(1L, 2, 3)
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidate(1L)
+                    invalidator.invalidateCohort(2, 3)
+
+                    verify(exactly = 2) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+
+            When("TaskScheduler가 스케줄을 거부하면") {
+                Then("예외를 밖으로 던지지 않는다") {
+                    every { taskScheduler.schedule(any(), any<Instant>()) } throws
+                        TaskRejectedException("scheduler is shutting down")
+
+                    shouldNotThrowAny { invalidator.invalidateCohort(2, 3) }
+                }
+            }
+        }
+
+        Given("트랜잭션 안에서 invalidateCohort가 호출될 때") {
+            beforeEach { TransactionSynchronizationManager.initSynchronization() }
+            afterEach { TransactionSynchronizationManager.clearSynchronization() }
+
+            When("아직 커밋되지 않았으면") {
+                Then("무효화를 예약하지 않는다") {
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidateCohort(2, 3)
+
+                    verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+
+            When("커밋되면") {
+                Then("커밋 후에 반/학년 무효화를 각각 한 번씩 예약한다") {
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidateCohort(2, 3)
+                    TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+
+                    verify(exactly = 2) { taskScheduler.schedule(any(), any<Instant>()) }
+                }
+            }
+
+            When("롤백되면") {
+                Then("무효화를 예약하지 않는다") {
+                    every { taskScheduler.schedule(any(), any<Instant>()) } returns mockk<ScheduledFuture<*>>()
+
+                    invalidator.invalidateCohort(2, 3)
+                    TransactionSynchronizationManager.getSynchronizations().forEach {
+                        it.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
+                    }
+
+                    verify(exactly = 0) { taskScheduler.schedule(any(), any<Instant>()) }
                 }
             }
         }
