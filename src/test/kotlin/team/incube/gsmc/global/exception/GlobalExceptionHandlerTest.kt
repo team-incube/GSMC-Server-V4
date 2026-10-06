@@ -2,6 +2,7 @@ package team.incube.gsmc.global.exception
 
 import io.kotest.core.spec.style.BehaviorSpec
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.HttpMethod
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -9,6 +10,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.servlet.resource.NoResourceFoundException
 
 /**
  * [GlobalExceptionHandler]를 Spring 컨텍스트 없이 standalone MockMvc로 검증한다.
@@ -21,6 +23,9 @@ private class TestExceptionController {
 
     @GetMapping("/test/data-integrity-violation")
     fun dataIntegrityViolation(): Nothing = throw DataIntegrityViolationException("Duplicate entry")
+
+    @GetMapping("/test/no-resource")
+    fun noResource(): Nothing = throw NoResourceFoundException(HttpMethod.GET, "/graphiql", "graphiql")
 
     @GetMapping("/test/generic-exception")
     fun genericException(): Nothing = throw RuntimeException("boom")
@@ -54,6 +59,18 @@ class GlobalExceptionHandlerTest :
                         .andExpect(status().isBadRequest)
                         .andExpect(jsonPath("$.status").value(ErrorCode.INVALID_OAUTH_STATE.status.value()))
                         .andExpect(jsonPath("$.message").value(ErrorCode.INVALID_OAUTH_STATE.message))
+                }
+            }
+        }
+
+        Given("NoResourceFoundException이 발생했을 때") {
+            When("매핑되지 않은 경로(꺼진 GraphiQL 등)로 요청하면") {
+                Then("500이 아니라 404 상태와 RESOURCE_NOT_FOUND 메시지를 응답한다") {
+                    mockMvc
+                        .perform(get("/test/no-resource"))
+                        .andExpect(status().isNotFound)
+                        .andExpect(jsonPath("$.status").value(ErrorCode.RESOURCE_NOT_FOUND.status.value()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.RESOURCE_NOT_FOUND.message))
                 }
             }
         }
