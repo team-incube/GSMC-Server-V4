@@ -38,6 +38,7 @@ dependencies {
     implementation(Libs.APACHE_POI)
     implementation(Libs.SPRING_BOOT_SECURITY)
     implementation(Libs.SPRING_BOOT_WEB)
+    implementation(Libs.SPRING_BOOT_ACTUATOR)
     implementation(Libs.JACKSON_KOTLIN)
     implementation(Libs.KOTLIN_REFLECT)
     implementation(Libs.QUERYDSL_JPA)

@@ -52,6 +52,8 @@ class SecurityConfig(
                 "/api/auth/authorization-url",
                 "/api/auth/signin",
                 "/api/auth/token/refresh",
+                "/actuator/health/liveness",
+                "/actuator/health/readiness",
                 "/swagger-ui.html",
                 "/swagger-ui/**",
                 "/v3/api-docs/**",
