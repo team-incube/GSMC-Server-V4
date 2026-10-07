@@ -51,6 +51,40 @@ interface FileJpaRepository : JpaRepository<FileJpaEntity, Long> {
         scoreStatus: ScoreStatus,
     ): Boolean
 
+    /** 다른 점수에 연결된 파일이나 score 연결이 남은 파일을 Evidence로 이동시키지 않습니다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE file_tb
+            SET evidence_id = :evidenceId
+            WHERE file_id = :fileId
+              AND score_id IS NULL
+              AND (evidence_id IS NULL OR evidence_id = :evidenceId)
+        """,
+        nativeQuery = true,
+    )
+    fun linkToEvidenceIfAvailable(
+        @Param("fileId") fileId: Long,
+        @Param("evidenceId") evidenceId: Long,
+    ): Int
+
+    /** 다른 Evidence에 연결된 파일이나 evidence 연결이 남은 파일을 Score로 이동시키지 않습니다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE file_tb
+            SET score_id = :scoreId
+            WHERE file_id = :fileId
+              AND evidence_id IS NULL
+              AND (score_id IS NULL OR score_id = :scoreId)
+        """,
+        nativeQuery = true,
+    )
+    fun linkToScoreIfAvailable(
+        @Param("fileId") fileId: Long,
+        @Param("scoreId") scoreId: Long,
+    ): Int
+
     @Modifying
     @Query("update FileJpaEntity f set f.evidence = null where f.evidence.evidenceId = :evidenceId")
     fun unlinkAllFromEvidence(

@@ -369,6 +369,31 @@ class SubmitProjectParticipationServiceTest :
         }
 
         Given("외부 API 검증 후 트랜잭션 내부 DB 처리에서 실패할 때") {
+            When("새 Evidence에 연결할 파일이 다른 대상에 이미 연결되어 있으면") {
+                Then("생성 중인 Evidence와 점수는 롤백하고 FILE_ALREADY_LINKED를 반환한다") {
+                    commonMocksForStudent()
+                    every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns dgProject()
+                    every { categoryPersistencePort.findByCategoryType(CategoryType.PROJECT_PARTICIPATION) } returns
+                        category
+                    every { filePersistencePort.findAllByIdIn(listOf(10L)) } returns listOf(file(10L))
+                    every { scorePersistencePort.findByUserIdAndDgProjectId(userId, dgProjectId) } returns null
+                    every { evidencePersistencePort.save(any()) } answers {
+                        firstArg<Evidence>().copy(evidenceId = 500L)
+                    }
+                    every { filePersistencePort.linkToEvidence(10L, 500L) } throws
+                        GsmcException(ErrorCode.FILE_ALREADY_LINKED)
+
+                    shouldThrow<GsmcException> {
+                        service.execute(dgProjectId, "내용", listOf(10L))
+                    }.errorCode shouldBe ErrorCode.FILE_ALREADY_LINKED
+
+                    transactionManager.commitCount shouldBe 0
+                    transactionManager.rollbackCount shouldBe 1
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                }
+            }
+
             When("점수 저장이 실패하면") {
                 Then("트랜잭션을 롤백하고 캐시 무효화를 실행하지 않는다") {
                     commonMocksForStudent()
