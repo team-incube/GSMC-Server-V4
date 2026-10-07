@@ -63,7 +63,7 @@ class FilePersistenceAdapter(
         evidenceId: Long,
     ) {
         if (fileJpaRepository.linkToEvidenceIfAvailable(fileId, evidenceId) == 0) {
-            throw GsmcException(ErrorCode.FILE_ALREADY_LINKED)
+            throwLinkFailure(fileId)
         }
     }
 
@@ -81,7 +81,7 @@ class FilePersistenceAdapter(
         scoreId: Long,
     ) {
         if (fileJpaRepository.linkToScoreIfAvailable(fileId, scoreId) == 0) {
-            throw GsmcException(ErrorCode.FILE_ALREADY_LINKED)
+            throwLinkFailure(fileId)
         }
     }
 
@@ -91,6 +91,16 @@ class FilePersistenceAdapter(
 
     override fun isLinkedToApprovedScore(fileId: Long): Boolean =
         fileJpaRepository.existsByFileIdAndScoreScoreStatus(fileId, ScoreStatus.APPROVED)
+
+    private fun throwLinkFailure(fileId: Long): Nothing {
+        val errorCode =
+            if (fileJpaRepository.existsById(fileId)) {
+                ErrorCode.FILE_ALREADY_LINKED
+            } else {
+                ErrorCode.FILE_NOT_FOUND
+            }
+        throw GsmcException(errorCode)
+    }
 
     private fun FileJpaEntity.copy(
         score: ScoreJpaEntity? = this.score,

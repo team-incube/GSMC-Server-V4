@@ -194,9 +194,19 @@ class FilePersistenceAdapterTest :
             When("다른 점수 또는 근거 자료에 연결되어 조건부 UPDATE가 실패하면") {
                 Then("기존 연결을 변경하지 않고 FILE_ALREADY_LINKED 예외를 던진다") {
                     every { fileJpaRepository.linkToEvidenceIfAvailable(10L, 5L) } returns 0
+                    every { fileJpaRepository.existsById(10L) } returns true
 
                     shouldThrow<GsmcException> { adapter.linkToEvidence(10L, 5L) }.errorCode shouldBe
                         ErrorCode.FILE_ALREADY_LINKED
+                }
+            }
+            When("대상 파일이 존재하지 않아 조건부 UPDATE가 실패하면") {
+                Then("FILE_NOT_FOUND 예외를 던진다") {
+                    every { fileJpaRepository.linkToEvidenceIfAvailable(999L, 5L) } returns 0
+                    every { fileJpaRepository.existsById(999L) } returns false
+
+                    shouldThrow<GsmcException> { adapter.linkToEvidence(999L, 5L) }.errorCode shouldBe
+                        ErrorCode.FILE_NOT_FOUND
                 }
             }
         }
@@ -238,9 +248,19 @@ class FilePersistenceAdapterTest :
             When("다른 점수 또는 근거 자료에 연결되어 조건부 UPDATE가 실패하면") {
                 Then("기존 연결을 변경하지 않고 FILE_ALREADY_LINKED 예외를 던진다") {
                     every { fileJpaRepository.linkToScoreIfAvailable(10L, 7L) } returns 0
+                    every { fileJpaRepository.existsById(10L) } returns true
 
                     shouldThrow<GsmcException> { adapter.linkToScore(10L, 7L) }.errorCode shouldBe
                         ErrorCode.FILE_ALREADY_LINKED
+                }
+            }
+            When("대상 파일이 존재하지 않아 조건부 UPDATE가 실패하면") {
+                Then("FILE_NOT_FOUND 예외를 던진다") {
+                    every { fileJpaRepository.linkToScoreIfAvailable(999L, 7L) } returns 0
+                    every { fileJpaRepository.existsById(999L) } returns false
+
+                    shouldThrow<GsmcException> { adapter.linkToScore(999L, 7L) }.errorCode shouldBe
+                        ErrorCode.FILE_NOT_FOUND
                 }
             }
         }
