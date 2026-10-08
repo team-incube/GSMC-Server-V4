@@ -238,6 +238,15 @@ class ScorePersistenceAdapter(
         scoreJpaRepository.unlinkEvidence(evidenceId)
     }
 
+    /**
+     * 증빙에 연결된 점수 행을 비관적 쓰기 락으로 잠근 뒤 승인 여부를 확인한다("잠그고 확인").
+     * 트랜잭션 안에서 호출해야 하며, 락은 호출한 트랜잭션이 끝날 때까지 유지된다.
+     */
+    override fun isEvidenceLinkedToApprovedScore(evidenceId: Long): Boolean =
+        scoreJpaRepository
+            .findAllByEvidenceIdForUpdate(evidenceId)
+            .any { it.scoreStatus == ScoreStatus.APPROVED }
+
     override fun unlinkProject(projectId: Long) {
         scoreJpaRepository.unlinkProject(projectId)
     }

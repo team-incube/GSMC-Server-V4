@@ -48,6 +48,7 @@ enum class ErrorCode(
     SHEET_PRESIGNED_URL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Sheet 다운로드 URL 생성에 실패했습니다.", "INTERNAL_SERVER_ERROR"),
     FILE_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "이미 업로드 확인이 완료된 파일입니다.", "CONFLICT"),
     FILE_LINKED_TO_APPROVED_SCORE(HttpStatus.CONFLICT, "승인된 점수 요청에 연결된 파일은 삭제할 수 없습니다.", "CONFLICT"),
+    EVIDENCE_LINKED_TO_APPROVED_SCORE(HttpStatus.CONFLICT, "승인된 점수 요청에 연결된 증빙자료는 수정하거나 삭제할 수 없습니다.", "CONFLICT"),
     EVIDENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "증빙자료를 찾을 수 없습니다.", "NOT_FOUND"),
     INVALID_EVIDENCE_INPUT(HttpStatus.BAD_REQUEST, "증빙자료 입력값이 올바르지 않습니다.", "BAD_REQUEST"),
     EVIDENCE_ALREADY_CONNECTED(HttpStatus.CONFLICT, "Score에 이미 증빙자료가 연결되어 있습니다.", "CONFLICT"),
