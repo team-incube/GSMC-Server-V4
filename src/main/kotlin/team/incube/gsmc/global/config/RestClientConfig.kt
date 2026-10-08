@@ -3,18 +3,32 @@ package team.incube.gsmc.global.config
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.task.TaskExecutor
 import org.springframework.http.client.ClientHttpRequestFactory
 import org.springframework.http.client.SimpleClientHttpRequestFactory
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.web.client.RestClient
-import java.time.Duration
+import team.incube.gsmc.global.erroralert.ErrorAlertProperties
 
 @Configuration
-class RestClientConfig {
+class RestClientConfig(
+    private val errorAlertProperties: ErrorAlertProperties,
+) {
     @Bean
     fun discordRequestFactory(): ClientHttpRequestFactory =
         SimpleClientHttpRequestFactory().apply {
-            setConnectTimeout(DISCORD_CONNECT_TIMEOUT)
-            setReadTimeout(DISCORD_READ_TIMEOUT)
+            setConnectTimeout(errorAlertProperties.connectTimeout)
+            setReadTimeout(errorAlertProperties.readTimeout)
+        }
+
+    @Bean("discordWebhookExecutor")
+    fun discordWebhookExecutor(): TaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 1
+            maxPoolSize = 1
+            queueCapacity = errorAlertProperties.queueCapacity
+            setThreadNamePrefix("discord-webhook-")
+            setWaitForTasksToCompleteOnShutdown(false)
         }
 
     @Bean
@@ -25,9 +39,4 @@ class RestClientConfig {
             .builder()
             .requestFactory(requestFactory)
             .build()
-
-    companion object {
-        private val DISCORD_CONNECT_TIMEOUT = Duration.ofSeconds(1)
-        private val DISCORD_READ_TIMEOUT = Duration.ofSeconds(2)
-    }
 }

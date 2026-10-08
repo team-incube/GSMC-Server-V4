@@ -1,5 +1,6 @@
 package team.incube.gsmc.domain.file.adapter.scheduler
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.mockk.clearAllMocks
 import io.mockk.every
@@ -9,12 +10,14 @@ import io.mockk.runs
 import io.mockk.verify
 import team.incube.gsmc.domain.file.port.`in`.ProcessFileStorageDeletionTaskUseCase
 import team.incube.gsmc.domain.file.port.`in`.ReportFileStorageDeletionBacklogUseCase
+import team.incube.gsmc.global.erroralert.ErrorAlertPublisher
 
 class FileStorageDeletionSchedulerTest :
     BehaviorSpec({
         val processUseCase = mockk<ProcessFileStorageDeletionTaskUseCase>()
         val reportUseCase = mockk<ReportFileStorageDeletionBacklogUseCase>()
-        val scheduler = FileStorageDeletionScheduler(processUseCase, reportUseCase)
+        val errorAlertPublisher = mockk<ErrorAlertPublisher>(relaxed = true)
+        val scheduler = FileStorageDeletionScheduler(processUseCase, reportUseCase, errorAlertPublisher)
 
         beforeEach {
             clearAllMocks()
@@ -38,6 +41,16 @@ class FileStorageDeletionSchedulerTest :
 
                     verify(exactly = 1) { reportUseCase.execute() }
                     verify(exactly = 0) { processUseCase.execute() }
+                }
+            }
+
+            When("처리되지 않은 실행 예외가 밖으로 전파되면") {
+                Then("오류 알림을 발행하면서 기존 예외 전파 동작을 유지한다") {
+                    every { processUseCase.execute() } throws RuntimeException("boom")
+
+                    shouldThrow<RuntimeException> { scheduler.processDueTasks() }
+
+                    verify(exactly = 1) { errorAlertPublisher.publish(any(), any()) }
                 }
             }
         }

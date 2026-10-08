@@ -14,6 +14,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
 import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.global.security.filter.JwtAuthenticationFilter
+import team.incube.gsmc.global.security.filter.RequestIdFilter
 import team.incube.gsmc.global.security.handler.JwtAccessDeniedHandler
 import team.incube.gsmc.global.security.handler.JwtAuthenticationEntryPoint
 
@@ -40,7 +41,7 @@ class SecurityConfig(
             .addFilterBefore(
                 JwtAuthenticationFilter(authTokenPort, tokenInvalidationPort),
                 UsernamePasswordAuthenticationFilter::class.java,
-            )
+            ).addFilterBefore(RequestIdFilter(), JwtAuthenticationFilter::class.java)
         return http.build()
     }
 
@@ -70,6 +71,7 @@ class SecurityConfig(
                 this.allowedOrigins = this@SecurityConfig.allowedOrigins
                 allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 allowedHeaders = listOf("*")
+                exposedHeaders = listOf(RequestIdFilter.REQUEST_ID_HEADER)
                 allowCredentials = true
                 maxAge = 3600L
             }

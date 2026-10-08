@@ -13,6 +13,7 @@ import team.incube.gsmc.domain.file.FileStorageDeletionTask
 import team.incube.gsmc.domain.file.FileStorageDeletionTaskStatus
 import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistencePort
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
+import team.incube.gsmc.global.erroralert.ErrorAlertPublisher
 import java.time.LocalDateTime
 
 /**
@@ -70,6 +71,7 @@ private class InMemoryFileStorageDeletionTaskPersistencePort : FileStorageDeleti
 
 class ProcessFileStorageDeletionTaskLeaseTest :
     BehaviorSpec({
+        val errorAlertPublisher = mockk<ErrorAlertPublisher>(relaxed = true)
         val start = LocalDateTime.of(2026, 9, 28, 12, 0)
 
         fun transactionManager() =
@@ -87,8 +89,21 @@ class ProcessFileStorageDeletionTaskLeaseTest :
                     val storage = mockk<FileStoragePort>()
                     val workerBTime = start.plusMinutes(6)
                     val workerB =
-                        ProcessFileStorageDeletionTaskService(port, storage, transactionManager(), { workerBTime })
-                    val workerA = ProcessFileStorageDeletionTaskService(port, storage, transactionManager(), { start })
+                        ProcessFileStorageDeletionTaskService(
+                            port,
+                            storage,
+                            transactionManager(),
+                            errorAlertPublisher,
+                            { workerBTime },
+                        )
+                    val workerA =
+                        ProcessFileStorageDeletionTaskService(
+                            port,
+                            storage,
+                            transactionManager(),
+                            errorAlertPublisher,
+                            { start },
+                        )
                     var calls = 0
                     every { storage.deleteObject("key-1") } answers {
                         calls++
@@ -113,8 +128,21 @@ class ProcessFileStorageDeletionTaskLeaseTest :
                     val storage = mockk<FileStoragePort>()
                     val workerBTime = start.plusMinutes(6)
                     val workerB =
-                        ProcessFileStorageDeletionTaskService(port, storage, transactionManager(), { workerBTime })
-                    val workerA = ProcessFileStorageDeletionTaskService(port, storage, transactionManager(), { start })
+                        ProcessFileStorageDeletionTaskService(
+                            port,
+                            storage,
+                            transactionManager(),
+                            errorAlertPublisher,
+                            { workerBTime },
+                        )
+                    val workerA =
+                        ProcessFileStorageDeletionTaskService(
+                            port,
+                            storage,
+                            transactionManager(),
+                            errorAlertPublisher,
+                            { start },
+                        )
                     var calls = 0
                     every { storage.deleteObject("key-1") } answers {
                         calls++
@@ -144,9 +172,17 @@ class ProcessFileStorageDeletionTaskLeaseTest :
                             port,
                             storage,
                             transactionManager(),
+                            errorAlertPublisher,
                             { start.plusMinutes(6) },
                         )
-                    val workerA = ProcessFileStorageDeletionTaskService(port, storage, transactionManager(), { start })
+                    val workerA =
+                        ProcessFileStorageDeletionTaskService(
+                            port,
+                            storage,
+                            transactionManager(),
+                            errorAlertPublisher,
+                            { start },
+                        )
                     var calls = 0
                     every { storage.deleteObject("key-1") } answers {
                         calls++
