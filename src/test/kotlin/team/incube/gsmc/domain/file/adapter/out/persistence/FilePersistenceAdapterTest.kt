@@ -1,5 +1,6 @@
 package team.incube.gsmc.domain.file.adapter.out.persistence
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -15,6 +16,8 @@ import team.incube.gsmc.domain.file.adapter.out.persistence.entity.FileJpaEntity
 import team.incube.gsmc.domain.file.adapter.out.persistence.repository.FileJpaRepository
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.ScoreJpaEntity
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
+import team.incube.gsmc.global.exception.ErrorCode
+import team.incube.gsmc.global.exception.GsmcException
 import java.util.Optional
 
 class FilePersistenceAdapterTest :
@@ -180,29 +183,30 @@ class FilePersistenceAdapterTest :
         }
 
         Given("linkToEvidence로 근거 자료를 연결할 때") {
-            When("대상 파일이 존재하면") {
-                Then("evidence 참조를 채운 새 엔티티로 저장한다") {
-                    val target = entity(10L)
-                    val evidenceRef = mockk<EvidenceJpaEntity>()
-                    every { fileJpaRepository.findById(10L) } returns Optional.of(target)
-                    every { entityManager.getReference(EvidenceJpaEntity::class.java, 5L) } returns evidenceRef
-                    val savedSlot = slot<FileJpaEntity>()
-                    every { fileJpaRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
-
+            When("연결되지 않았거나 같은 근거 자료에 이미 연결된 파일이면") {
+                Then("조건부 UPDATE로 연결한다") {
+                    every { fileJpaRepository.linkToEvidenceIfAvailable(10L, 5L) } returns 1
                     adapter.linkToEvidence(10L, 5L)
 
-                    savedSlot.captured.fileId shouldBe 10L
-                    savedSlot.captured.evidence shouldBe evidenceRef
+                    verify(exactly = 1) { fileJpaRepository.linkToEvidenceIfAvailable(10L, 5L) }
                 }
             }
-            When("대상 파일이 존재하지 않으면") {
-                Then("아무 것도 하지 않는다") {
-                    every { fileJpaRepository.findById(999L) } returns Optional.empty()
+            When("다른 점수 또는 근거 자료에 연결되어 조건부 UPDATE가 실패하면") {
+                Then("기존 연결을 변경하지 않고 FILE_ALREADY_LINKED 예외를 던진다") {
+                    every { fileJpaRepository.linkToEvidenceIfAvailable(10L, 5L) } returns 0
+                    every { fileJpaRepository.existsById(10L) } returns true
 
-                    adapter.linkToEvidence(999L, 5L)
+                    shouldThrow<GsmcException> { adapter.linkToEvidence(10L, 5L) }.errorCode shouldBe
+                        ErrorCode.FILE_ALREADY_LINKED
+                }
+            }
+            When("대상 파일이 존재하지 않아 조건부 UPDATE가 실패하면") {
+                Then("FILE_NOT_FOUND 예외를 던진다") {
+                    every { fileJpaRepository.linkToEvidenceIfAvailable(999L, 5L) } returns 0
+                    every { fileJpaRepository.existsById(999L) } returns false
 
-                    verify(exactly = 0) { fileJpaRepository.save(any()) }
-                    verify(exactly = 0) { entityManager.getReference(EvidenceJpaEntity::class.java, any()) }
+                    shouldThrow<GsmcException> { adapter.linkToEvidence(999L, 5L) }.errorCode shouldBe
+                        ErrorCode.FILE_NOT_FOUND
                 }
             }
         }
@@ -233,28 +237,30 @@ class FilePersistenceAdapterTest :
         }
 
         Given("linkToScore로 점수 요청을 연결할 때") {
-            When("대상 파일이 존재하면") {
-                Then("score 참조를 채운 새 엔티티로 저장한다") {
-                    val target = entity(10L)
-                    val scoreRef = mockk<ScoreJpaEntity>()
-                    every { fileJpaRepository.findById(10L) } returns Optional.of(target)
-                    every { entityManager.getReference(ScoreJpaEntity::class.java, 7L) } returns scoreRef
-                    val savedSlot = slot<FileJpaEntity>()
-                    every { fileJpaRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
-
+            When("연결되지 않았거나 같은 점수에 이미 연결된 파일이면") {
+                Then("조건부 UPDATE로 연결한다") {
+                    every { fileJpaRepository.linkToScoreIfAvailable(10L, 7L) } returns 1
                     adapter.linkToScore(10L, 7L)
 
-                    savedSlot.captured.score shouldBe scoreRef
+                    verify(exactly = 1) { fileJpaRepository.linkToScoreIfAvailable(10L, 7L) }
                 }
             }
-            When("대상 파일이 존재하지 않으면") {
-                Then("아무 것도 하지 않는다") {
-                    every { fileJpaRepository.findById(999L) } returns Optional.empty()
+            When("다른 점수 또는 근거 자료에 연결되어 조건부 UPDATE가 실패하면") {
+                Then("기존 연결을 변경하지 않고 FILE_ALREADY_LINKED 예외를 던진다") {
+                    every { fileJpaRepository.linkToScoreIfAvailable(10L, 7L) } returns 0
+                    every { fileJpaRepository.existsById(10L) } returns true
 
-                    adapter.linkToScore(999L, 7L)
+                    shouldThrow<GsmcException> { adapter.linkToScore(10L, 7L) }.errorCode shouldBe
+                        ErrorCode.FILE_ALREADY_LINKED
+                }
+            }
+            When("대상 파일이 존재하지 않아 조건부 UPDATE가 실패하면") {
+                Then("FILE_NOT_FOUND 예외를 던진다") {
+                    every { fileJpaRepository.linkToScoreIfAvailable(999L, 7L) } returns 0
+                    every { fileJpaRepository.existsById(999L) } returns false
 
-                    verify(exactly = 0) { fileJpaRepository.save(any()) }
-                    verify(exactly = 0) { entityManager.getReference(ScoreJpaEntity::class.java, any()) }
+                    shouldThrow<GsmcException> { adapter.linkToScore(999L, 7L) }.errorCode shouldBe
+                        ErrorCode.FILE_NOT_FOUND
                 }
             }
         }

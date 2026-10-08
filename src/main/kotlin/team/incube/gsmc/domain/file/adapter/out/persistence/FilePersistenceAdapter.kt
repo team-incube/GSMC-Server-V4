@@ -13,11 +13,14 @@ import team.incube.gsmc.domain.score.adapter.out.persistence.entity.ScoreJpaEnti
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
+import team.incube.gsmc.global.exception.ErrorCode
+import team.incube.gsmc.global.exception.GsmcException
 
 /**
  * 업로드 파일 영속성 처리를 담당하는 아웃바운드 어댑터 클래스입니다.
- * [FilePersistencePort]를 구현합니다. [FileJpaEntity]의 필드가 전부 불변(`val`)이라, score/evidence 연결
- * 변경은 기존 값을 그대로 옮긴 새 엔티티를 만들어 같은 ID로 저장(update)하는 방식으로 처리합니다.
+ * [FilePersistencePort]를 구현합니다. score/evidence 연결은 기존 연결 상태를 조건으로 포함한 벌크 UPDATE로
+ * 처리해 다른 대상의 연결을 덮어쓰지 않습니다. 연결 해제처럼 엔티티 상태를 바꾸는 작업은 불변 필드 특성상
+ * 기존 값을 유지한 새 엔티티를 같은 ID로 저장(update)합니다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class FilePersistenceAdapter(
@@ -59,9 +62,9 @@ class FilePersistenceAdapter(
         fileId: Long,
         evidenceId: Long,
     ) {
-        val entity = fileJpaRepository.findById(fileId).orElse(null) ?: return
-        val evidence = entityManager.getReference(EvidenceJpaEntity::class.java, evidenceId)
-        fileJpaRepository.save(entity.copy(evidence = evidence))
+        if (fileJpaRepository.linkToEvidenceIfAvailable(fileId, evidenceId) == 0) {
+            throwLinkFailure(fileId)
+        }
     }
 
     override fun unlinkFromEvidence(fileId: Long) {
@@ -77,9 +80,9 @@ class FilePersistenceAdapter(
         fileId: Long,
         scoreId: Long,
     ) {
-        val entity = fileJpaRepository.findById(fileId).orElse(null) ?: return
-        val score = entityManager.getReference(ScoreJpaEntity::class.java, scoreId)
-        fileJpaRepository.save(entity.copy(score = score))
+        if (fileJpaRepository.linkToScoreIfAvailable(fileId, scoreId) == 0) {
+            throwLinkFailure(fileId)
+        }
     }
 
     override fun unlinkFromScore(fileId: Long) {
@@ -88,6 +91,16 @@ class FilePersistenceAdapter(
 
     override fun isLinkedToApprovedScore(fileId: Long): Boolean =
         fileJpaRepository.existsByFileIdAndScoreScoreStatus(fileId, ScoreStatus.APPROVED)
+
+    private fun throwLinkFailure(fileId: Long): Nothing {
+        val errorCode =
+            if (fileJpaRepository.existsById(fileId)) {
+                ErrorCode.FILE_ALREADY_LINKED
+            } else {
+                ErrorCode.FILE_NOT_FOUND
+            }
+        throw GsmcException(errorCode)
+    }
 
     private fun FileJpaEntity.copy(
         score: ScoreJpaEntity? = this.score,

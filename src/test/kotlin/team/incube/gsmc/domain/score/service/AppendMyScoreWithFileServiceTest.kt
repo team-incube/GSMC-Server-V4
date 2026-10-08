@@ -298,6 +298,29 @@ class AppendMyScoreWithFileServiceTest :
             }
         }
 
+        Given("다른 점수 또는 근거 자료에 연결된 파일을 새 점수에 연결할 때") {
+            When("파일 연결의 조건부 갱신이 실패하면") {
+                Then("FILE_ALREADY_LINKED를 반환하고 캐시를 무효화하지 않는다") {
+                    val cat = category(ScoreCalculationType.SCORE_BASED)
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.CERTIFICATE, EvidenceType.FILE) } returns
+                        cat
+                    every { filePersistencePort.findById(10L) } returns file(10L)
+                    every { appendScoreSupport.parseScoreValue("850", cat) } returns 850
+                    every { appendScoreSupport.findOrCreateScore(userId, cat) } returns freshScore(cat)
+                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 100L) }
+                    every { filePersistencePort.linkToScore(10L, 100L) } throws
+                        GsmcException(ErrorCode.FILE_ALREADY_LINKED)
+
+                    shouldThrow<GsmcException> {
+                        service.execute(CategoryType.CERTIFICATE, "850", 10L)
+                    }.errorCode shouldBe ErrorCode.FILE_ALREADY_LINKED
+
+                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                }
+            }
+        }
+
         Given("REJECTED 상태의 기존 제출이 있고 다른 파일로 재제출할 때") {
             When("제출하면") {
                 Then("기존 파일 연결은 해제하고 새 파일을 연결한다") {
