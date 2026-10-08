@@ -38,7 +38,7 @@ class MemberPersistenceAdapter(
             .selectFrom(userJpaEntity)
             .where(*buildSearchConditions(query).toTypedArray())
             .orderBy(*buildOrderSpecifiers(query.sort))
-            .offset((query.page * query.limit).toLong())
+            .offset(query.page.toLong() * query.limit)
             .limit(query.limit.toLong())
             .fetch()
             .map { it.toDomain() }

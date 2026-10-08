@@ -60,7 +60,7 @@ class ProjectPersistenceAdapter(
             .selectFrom(projectJpaEntity)
             .where(titleSearchCondition(title))
             .orderBy(projectJpaEntity.projectId.desc())
-            .offset((page * size).toLong())
+            .offset(page.toLong() * size)
             .limit(size.toLong())
             .fetch()
             .map { it.toSummaryDomain() }

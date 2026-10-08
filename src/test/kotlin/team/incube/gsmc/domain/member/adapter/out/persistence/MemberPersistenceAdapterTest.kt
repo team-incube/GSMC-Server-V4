@@ -10,6 +10,7 @@ import io.kotest.matchers.shouldBe
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import team.incube.gsmc.domain.member.SearchMembersQuery
 import team.incube.gsmc.domain.member.SortDirection
 import team.incube.gsmc.domain.member.adapter.out.persistence.repository.MemberUserJpaRepository
@@ -122,6 +123,31 @@ class MemberPersistenceAdapterTest :
                     val result = adapter.findAllBySearchCondition(query(sort = SortDirection.DESC))
 
                     result.map { it.userId } shouldBe listOf(2L, 1L)
+                }
+            }
+        }
+
+        Given("큰 페이지 번호로 페이지 목록을 조회할 때") {
+            listOf(
+                Triple(21474837, 100, 2147483700L),
+                Triple(0, 100, 0L),
+                Triple(Int.MAX_VALUE, 100, 214748364700L),
+            ).forEach { (page, limit, expectedOffset) ->
+                When("page가 $page, limit이 ${limit}이면") {
+                    Then("offset에 오버플로 없이 ${expectedOffset}L을 전달한다") {
+                        val offsetSlot = slot<Long>()
+                        val findQuery = mockk<JPAQuery<UserJpaEntity>>()
+                        every { queryFactory.selectFrom(any<EntityPath<UserJpaEntity>>()) } returns findQuery
+                        every { findQuery.where(*varargAll { true }) } returns findQuery
+                        every { findQuery.orderBy(*varargAll { true }) } returns findQuery
+                        every { findQuery.offset(capture(offsetSlot)) } returns findQuery
+                        every { findQuery.limit(any()) } returns findQuery
+                        every { findQuery.fetch() } returns emptyList()
+
+                        adapter.findAllBySearchCondition(query().copy(page = page, limit = limit))
+
+                        offsetSlot.captured shouldBe expectedOffset
+                    }
                 }
             }
         }
