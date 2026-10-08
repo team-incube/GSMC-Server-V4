@@ -395,6 +395,28 @@ class ScorePersistenceAdapterTest :
             }
         }
 
+        Given("isEvidenceLinkedToApprovedScore로 확인할 때") {
+            When("증빙에 승인된 점수가 연결되어 있으면") {
+                Then("락 조회한 점수 중 승인 상태가 있어 true를 반환한다") {
+                    every { scoreJpaRepository.findAllByEvidenceIdForUpdate(5L) } returns
+                        listOf(scoreEntity(10L, ScoreStatus.PENDING), scoreEntity(11L, ScoreStatus.APPROVED))
+
+                    adapter.isEvidenceLinkedToApprovedScore(5L) shouldBe true
+                }
+            }
+
+            When("연결된 점수가 대기·반려뿐이거나 없으면") {
+                Then("false를 반환한다") {
+                    every { scoreJpaRepository.findAllByEvidenceIdForUpdate(5L) } returns
+                        listOf(scoreEntity(10L, ScoreStatus.PENDING), scoreEntity(11L, ScoreStatus.REJECTED))
+                    every { scoreJpaRepository.findAllByEvidenceIdForUpdate(6L) } returns emptyList()
+
+                    adapter.isEvidenceLinkedToApprovedScore(5L) shouldBe false
+                    adapter.isEvidenceLinkedToApprovedScore(6L) shouldBe false
+                }
+            }
+        }
+
         Given("findAllByUserId로 조회할 때") {
             When("사용자 ID 하나를 전달하면") {
                 Then("findAllByUserIdIn에 위임되어 해당 사용자의 점수 목록을 반환한다") {
