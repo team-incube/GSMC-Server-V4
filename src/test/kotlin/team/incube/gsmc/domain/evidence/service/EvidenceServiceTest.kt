@@ -51,7 +51,7 @@ class EvidenceServiceTest :
         val fetchService = FetchMyEvidencesService(evidencePersistencePort, support, memberUtil)
         val draftFetchService = FetchMyEvidenceDraftService(evidencePersistencePort, support, memberUtil)
         val singleFetchService = FetchEvidenceService(evidencePersistencePort, support, memberUtil)
-        val modifyService = ModifyEvidenceService(evidencePersistencePort, support, memberUtil)
+        val modifyService = ModifyEvidenceService(evidencePersistencePort, scorePersistencePort, support, memberUtil)
         val removeService =
             RemoveEvidenceService(evidencePersistencePort, scorePersistencePort, filePersistencePort, memberUtil)
         val draftAppendService = AppendEvidenceDraftService(evidencePersistencePort, support, memberUtil)
@@ -200,6 +200,7 @@ class EvidenceServiceTest :
                     val existingFile = file(20L, evidenceId = 5L)
                     every { memberUtil.getCurrentUserId() } returns userId
                     every { evidencePersistencePort.findById(5L) } returns evidence(5L, files = listOf(existingFile))
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(5L) } returns false
                     every { filePersistencePort.findAllByEvidenceId(5L) } returns listOf(existingFile)
                     every { filePersistencePort.findAllByIdIn(setOf(20L)) } returns listOf(existingFile)
                     every { evidencePersistencePort.save(any()) } answers { firstArg<Evidence>() }
@@ -220,6 +221,7 @@ class EvidenceServiceTest :
                     val newFile = file(21L)
                     every { memberUtil.getCurrentUserId() } returns userId
                     every { evidencePersistencePort.findById(5L) } returns evidence(5L)
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(5L) } returns false
                     every { filePersistencePort.findAllByEvidenceId(5L) } returns listOf(oldFile)
                     every { filePersistencePort.findAllByIdIn(setOf(21L)) } returns listOf(newFile)
                     every { evidencePersistencePort.save(any()) } answers { firstArg<Evidence>() }
@@ -239,6 +241,7 @@ class EvidenceServiceTest :
                 Then("Score와 File 연결만 해제하고 레코드는 보존한다") {
                     every { memberUtil.getCurrentUserId() } returns userId
                     every { evidencePersistencePort.findById(5L) } returns evidence(5L)
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(5L) } returns false
                     every { scorePersistencePort.unlinkEvidence(5L) } just runs
                     every { filePersistencePort.unlinkAllFromEvidence(5L) } just runs
                     every { evidencePersistencePort.deleteById(5L) } just runs
@@ -248,6 +251,87 @@ class EvidenceServiceTest :
                     verify(exactly = 1) { scorePersistencePort.unlinkEvidence(5L) }
                     verify(exactly = 1) { filePersistencePort.unlinkAllFromEvidence(5L) }
                     verify(exactly = 1) { evidencePersistencePort.deleteById(5L) }
+                }
+            }
+        }
+
+        Given("승인된 점수 요청에 연결된 Evidence가 있을 때") {
+            When("제목만 수정하면") {
+                Then("EVIDENCE_LINKED_TO_APPROVED_SCORE를 반환하고 저장·파일 동기화를 하지 않는다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { evidencePersistencePort.findById(5L) } returns evidence(5L)
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(5L) } returns true
+
+                    shouldThrow<GsmcException> { modifyService.execute(5L, "새 제목", null, null) }.errorCode shouldBe
+                        ErrorCode.EVIDENCE_LINKED_TO_APPROVED_SCORE
+
+                    verify(exactly = 0) { evidencePersistencePort.save(any()) }
+                    verify(exactly = 0) { filePersistencePort.linkToEvidence(any(), any()) }
+                    verify(exactly = 0) { filePersistencePort.unlinkFromEvidence(any()) }
+                }
+            }
+
+            When("삭제하면") {
+                Then("EVIDENCE_LINKED_TO_APPROVED_SCORE를 반환하고 연결 해제·삭제를 하지 않는다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { evidencePersistencePort.findById(5L) } returns evidence(5L)
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(5L) } returns true
+
+                    shouldThrow<GsmcException> { removeService.execute(5L) }.errorCode shouldBe
+                        ErrorCode.EVIDENCE_LINKED_TO_APPROVED_SCORE
+
+                    verify(exactly = 0) { scorePersistencePort.unlinkEvidence(any()) }
+                    verify(exactly = 0) { filePersistencePort.unlinkAllFromEvidence(any()) }
+                    verify(exactly = 0) { evidencePersistencePort.deleteById(any()) }
+                }
+            }
+        }
+
+        Given("승인되지 않은(대기·반려) 점수 요청에 연결된 Evidence가 있을 때") {
+            When("수정하면") {
+                Then("기존대로 저장한다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { evidencePersistencePort.findById(5L) } returns evidence(5L)
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(5L) } returns false
+                    every { filePersistencePort.findAllByEvidenceId(5L) } returns emptyList()
+                    every { filePersistencePort.findAllByIdIn(any()) } returns emptyList()
+                    every { evidencePersistencePort.save(any()) } answers { firstArg<Evidence>() }
+
+                    modifyService.execute(5L, "새 제목", null, null).evidenceTitle shouldBe "새 제목"
+
+                    verify(exactly = 1) { evidencePersistencePort.save(any()) }
+                }
+            }
+
+            When("삭제하면") {
+                Then("기존대로 삭제한다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { evidencePersistencePort.findById(5L) } returns evidence(5L)
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(5L) } returns false
+                    every { scorePersistencePort.unlinkEvidence(5L) } just runs
+                    every { filePersistencePort.unlinkAllFromEvidence(5L) } just runs
+                    every { evidencePersistencePort.deleteById(5L) } just runs
+
+                    removeService.execute(5L) shouldBe true
+
+                    verify(exactly = 1) { evidencePersistencePort.deleteById(5L) }
+                }
+            }
+        }
+
+        Given("타인 소유 Evidence가 승인된 점수에 연결되어 있을 때") {
+            When("수정 또는 삭제를 시도하면") {
+                Then("승인 여부를 조회하지 않고 EVIDENCE_NOT_FOUND를 반환한다") {
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { evidencePersistencePort.findById(99L) } returns evidence(99L, ownerId = 2L)
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(99L) } returns true
+
+                    shouldThrow<GsmcException> { modifyService.execute(99L, "새 제목", null, null) }.errorCode shouldBe
+                        ErrorCode.EVIDENCE_NOT_FOUND
+                    shouldThrow<GsmcException> { removeService.execute(99L) }.errorCode shouldBe
+                        ErrorCode.EVIDENCE_NOT_FOUND
+
+                    verify(exactly = 0) { scorePersistencePort.isEvidenceLinkedToApprovedScore(any()) }
                 }
             }
         }
