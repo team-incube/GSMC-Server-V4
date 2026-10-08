@@ -326,4 +326,29 @@ class ProjectPersistenceAdapterTest :
                 }
             }
         }
+
+        Given("큰 페이지 번호로 findAllByTitleContaining을 조회할 때") {
+            listOf(
+                Triple(21474837, 100, 2147483700L),
+                Triple(0, 100, 0L),
+                Triple(Int.MAX_VALUE, 100, 214748364700L),
+            ).forEach { (page, size, expectedOffset) ->
+                When("page가 $page, size가 ${size}이면") {
+                    Then("offset에 오버플로 없이 ${expectedOffset}L을 전달한다") {
+                        val offsetSlot = slot<Long>()
+                        val query = mockk<JPAQuery<ProjectJpaEntity>>()
+                        every { queryFactory.selectFrom(projectJpaEntity) } returns query
+                        every { query.where(any<Predicate>()) } returns query
+                        every { query.orderBy(any<OrderSpecifier<*>>()) } returns query
+                        every { query.offset(capture(offsetSlot)) } returns query
+                        every { query.limit(any()) } returns query
+                        every { query.fetch() } returns emptyList()
+
+                        adapter.findAllByTitleContaining("A", page, size)
+
+                        offsetSlot.captured shouldBe expectedOffset
+                    }
+                }
+            }
+        }
     })
