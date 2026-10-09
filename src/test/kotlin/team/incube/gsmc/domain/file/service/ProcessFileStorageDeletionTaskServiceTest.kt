@@ -18,6 +18,7 @@ import team.incube.gsmc.domain.file.FileStorageDeletionTask
 import team.incube.gsmc.domain.file.FileStorageDeletionTaskStatus
 import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistencePort
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
+import team.incube.gsmc.global.erroralert.ErrorAlertPublisher
 import java.time.LocalDateTime
 
 class ProcessFileStorageDeletionTaskServiceTest :
@@ -25,6 +26,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
         val taskPersistencePort = mockk<FileStorageDeletionTaskPersistencePort>()
         val fileStoragePort = mockk<FileStoragePort>()
         val transactionManager = mockk<PlatformTransactionManager>()
+        val errorAlertPublisher = mockk<ErrorAlertPublisher>(relaxed = true)
         val start = LocalDateTime.of(2026, 9, 28, 12, 0)
         var now = start
         val service =
@@ -32,6 +34,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
                 taskPersistencePort,
                 fileStoragePort,
                 transactionManager,
+                errorAlertPublisher,
                 currentTime = { now },
             )
 
@@ -109,6 +112,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
                     failureSlot.captured.attemptCount shouldBe 1
                     failureSlot.captured.nextAttemptAt shouldBe start.plusMinutes(1)
                     failureSlot.captured.lastError!! shouldContain "RuntimeException: s3 down"
+                    verify(exactly = 0) { errorAlertPublisher.publish(any(), any()) }
                     verify(exactly = 1) { taskPersistencePort.deleteAllByIdAndLeaseToken(listOf(1L), any()) }
                     verify(exactly = 0) { fileStoragePort.deleteObject("key-3") }
                 }
@@ -153,6 +157,7 @@ class ProcessFileStorageDeletionTaskServiceTest :
 
                     failureSlot.captured.status shouldBe FileStorageDeletionTaskStatus.FAILED
                     failureSlot.captured.attemptCount shouldBe FILE_STORAGE_DELETION_MAX_ATTEMPTS
+                    verify(exactly = 1) { errorAlertPublisher.publish(any(), any()) }
                 }
             }
 
@@ -252,7 +257,12 @@ class ProcessFileStorageDeletionTaskServiceTest :
             When("작업을 처리하면") {
                 Then("시스템 현재 시각을 기준으로 처리할 작업을 조회한다") {
                     val defaultClockService =
-                        ProcessFileStorageDeletionTaskService(taskPersistencePort, fileStoragePort, transactionManager)
+                        ProcessFileStorageDeletionTaskService(
+                            taskPersistencePort,
+                            fileStoragePort,
+                            transactionManager,
+                            errorAlertPublisher,
+                        )
                     val nowSlot = slot<LocalDateTime>()
                     every { taskPersistencePort.findAllDueForUpdate(capture(nowSlot), 50) } returns emptyList()
                     val before = LocalDateTime.now()

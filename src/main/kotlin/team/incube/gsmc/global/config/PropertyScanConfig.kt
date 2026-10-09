@@ -6,6 +6,7 @@ import team.incube.gsmc.domain.alert.adapter.sse.AlertSseProperties
 import team.incube.gsmc.domain.auth.adapter.out.oauth.OAuthProperties
 import team.incube.gsmc.domain.file.adapter.out.s3.S3Properties
 import team.incube.gsmc.domain.project.adapter.out.openapi.DataGsmOpenApiProperties
+import team.incube.gsmc.global.erroralert.ErrorAlertProperties
 import team.incube.gsmc.global.security.jwt.JwtProperties
 
 @Configuration
@@ -15,5 +16,6 @@ import team.incube.gsmc.global.security.jwt.JwtProperties
     DataGsmOpenApiProperties::class,
     S3Properties::class,
     AlertSseProperties::class,
+    ErrorAlertProperties::class,
 )
 class PropertyScanConfig

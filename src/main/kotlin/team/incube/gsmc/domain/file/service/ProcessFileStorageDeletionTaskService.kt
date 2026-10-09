@@ -9,6 +9,9 @@ import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistenceP
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
+import team.incube.gsmc.global.erroralert.ErrorAlertContext
+import team.incube.gsmc.global.erroralert.ErrorAlertPublisher
+import team.incube.gsmc.global.erroralert.ErrorAlertSource
 import team.themoment.sdk.logging.logger.logger
 import java.time.Duration
 import java.time.LocalDateTime
@@ -63,6 +66,7 @@ class ProcessFileStorageDeletionTaskService(
     private val fileStorageDeletionTaskPersistencePort: FileStorageDeletionTaskPersistencePort,
     private val fileStoragePort: FileStoragePort,
     transactionManager: PlatformTransactionManager,
+    private val errorAlertPublisher: ErrorAlertPublisher,
     private val currentTime: () -> LocalDateTime = LocalDateTime::now,
 ) : ProcessFileStorageDeletionTaskUseCase {
     private val transactionTemplate = TransactionTemplate(transactionManager)
@@ -165,6 +169,14 @@ class ProcessFileStorageDeletionTaskService(
                 task.taskId,
                 task.fileKey,
                 task.attemptCount,
+                e,
+            )
+            errorAlertPublisher.publish(
+                ErrorAlertContext(
+                    source = ErrorAlertSource.SCHEDULER,
+                    classification = "RETRY_EXHAUSTED",
+                    endpoint = "file-storage-deletion",
+                ),
                 e,
             )
         } else {

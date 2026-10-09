@@ -52,7 +52,7 @@ cors:
 
 logging:
   pattern:
-    level: "%5p [userId=%X{userId:-anonymous}]"
+    level: "%5p [requestId=%X{requestId:-none}] [userId=%X{userId:-anonymous}]"
 
 sse:
   heartbeat-interval: 30000
@@ -105,6 +105,15 @@ aws:
 discord:
   webhook:
     graphql-latency-url: ${DISCORD_GRAPHQL_LATENCY_WEBHOOK_URL:}
+  error-alert:
+    enabled: ${DISCORD_ERROR_ALERT_ENABLED:false}
+    webhook-url: ${DISCORD_ERROR_ALERT_WEBHOOK_URL:}
+    environment: ${APP_ENVIRONMENT:local}
+    connect-timeout: ${DISCORD_ERROR_ALERT_CONNECT_TIMEOUT:1s}
+    read-timeout: ${DISCORD_ERROR_ALERT_READ_TIMEOUT:2s}
+    suppression-window: ${DISCORD_ERROR_ALERT_SUPPRESSION_WINDOW:5m}
+    cache-max-size: ${DISCORD_ERROR_ALERT_CACHE_MAX_SIZE:1000}
+    queue-capacity: ${DISCORD_ERROR_ALERT_QUEUE_CAPACITY:100}
 
 management:
   endpoints:

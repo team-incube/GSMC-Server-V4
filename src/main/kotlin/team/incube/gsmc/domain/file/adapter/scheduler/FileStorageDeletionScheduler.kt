@@ -5,6 +5,9 @@ import team.incube.gsmc.domain.file.port.`in`.ProcessFileStorageDeletionTaskUseC
 import team.incube.gsmc.domain.file.port.`in`.ReportFileStorageDeletionBacklogUseCase
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
+import team.incube.gsmc.global.erroralert.ErrorAlertContext
+import team.incube.gsmc.global.erroralert.ErrorAlertPublisher
+import team.incube.gsmc.global.erroralert.ErrorAlertSource
 
 /**
  * 스토리지 객체 삭제 작업을 주기적으로 처리하고 적체 현황을 보고하는 인바운드 어댑터입니다.
@@ -15,14 +18,34 @@ import team.incube.gsmc.global.annotation.adapter.Adapter
 class FileStorageDeletionScheduler(
     private val processFileStorageDeletionTaskUseCase: ProcessFileStorageDeletionTaskUseCase,
     private val reportFileStorageDeletionBacklogUseCase: ReportFileStorageDeletionBacklogUseCase,
+    private val errorAlertPublisher: ErrorAlertPublisher,
 ) {
     @Scheduled(fixedDelay = 10_000, initialDelay = 10_000)
     fun processDueTasks() {
-        processFileStorageDeletionTaskUseCase.execute()
+        runWithAlert("file-storage-deletion-process") { processFileStorageDeletionTaskUseCase.execute() }
     }
 
     @Scheduled(fixedDelay = 600_000, initialDelay = 60_000)
     fun reportBacklog() {
-        reportFileStorageDeletionBacklogUseCase.execute()
+        runWithAlert("file-storage-deletion-backlog") { reportFileStorageDeletionBacklogUseCase.execute() }
+    }
+
+    private fun runWithAlert(
+        taskName: String,
+        task: () -> Unit,
+    ) {
+        try {
+            task()
+        } catch (e: Exception) {
+            errorAlertPublisher.publish(
+                ErrorAlertContext(
+                    source = ErrorAlertSource.SCHEDULER,
+                    classification = "UNHANDLED_SCHEDULER_ERROR",
+                    endpoint = taskName,
+                ),
+                e,
+            )
+            throw e
+        }
     }
 }
