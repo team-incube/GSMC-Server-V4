@@ -1,0 +1,42 @@
+# 환경 파일 (비밀값)
+.env
+.env.*
+!.env.example
+
+# VCS / CI
+.git
+.gitignore
+.github
+
+# IDE
+.idea
+.vscode
+*.iml
+out/
+
+# 로컬 빌드 산출물
+build/
+**/build/
+.gradle/
+**/.gradle/
+
+# 기타
+*.log
+logs/
+.DS_Store
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Kotlin 로컬 캐시
+.kotlin/
+
+# AI 도구 설정 / 문서
+.claude/
+.codex/
+.agents/
+.harness/
+.reviewbot/
+AGENTS.md
+CLAUDE.md
+docs/
