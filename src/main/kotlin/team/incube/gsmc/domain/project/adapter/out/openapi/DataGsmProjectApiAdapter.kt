@@ -15,6 +15,7 @@ import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+import team.themoment.sdk.logging.logger.logger
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -118,8 +119,17 @@ class DataGsmProjectApiAdapter(
                     requestProjectPage(queryParams)
                 } catch (exception: Exception) {
                     if (exception is HttpClientErrorException.NotFound) return null
-                    if (!canRetry(exception, attempt, deadline)) throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
+                    if (!canRetry(exception, attempt, deadline)) {
+                        logger().warn("DataGSM 호출 실패: attempt={}, params={}", attempt, queryParams, exception)
+                        throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
+                    }
 
+                    logger().info(
+                        "DataGSM 일시 실패, 재시도: attempt={}, params={}, cause={}",
+                        attempt,
+                        queryParams,
+                        exception.toString(),
+                    )
                     attempt++
                     waitBeforeRetry()
                     continue
