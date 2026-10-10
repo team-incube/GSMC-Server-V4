@@ -32,7 +32,13 @@ jobs:
           key: ${{ secrets.SERVER_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
+            set -eu
             cd ~/GSMC-server-V4
             git pull origin develop
-            sudo docker compose down
-            sudo docker compose up -d --build
+
+            # 실행 중인 서비스를 유지한 채 새 이미지를 먼저 빌드한다. 빌드가 실패하면 여기서 중단된다.
+            sudo docker compose build backend
+
+            # 빌드가 성공한 뒤에만 backend를 교체한다. Redis는 설정이 바뀌지 않았다면 그대로 유지된다.
+            sudo docker compose up -d redis
+            sudo docker compose up -d --no-build --no-deps backend
