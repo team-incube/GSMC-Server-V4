@@ -3,19 +3,20 @@ package team.incube.gsmc.domain.project.adapter.out.openapi
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import org.springframework.http.client.SimpleClientHttpRequestFactory
+import org.springframework.http.client.JdkClientHttpRequestFactory
+import java.net.http.HttpClient
 import java.time.Duration
 
-private fun SimpleClientHttpRequestFactory.timeout(fieldName: String): Int =
+private fun JdkClientHttpRequestFactory.field(fieldName: String): Any? =
     javaClass
         .getDeclaredField(fieldName)
         .apply { isAccessible = true }
-        .getInt(this)
+        .get(this)
 
 class DataGsmOpenApiConfigTest :
     BehaviorSpec({
         Given("DataGSM OpenAPI 전용 RestClient 설정이 있을 때") {
-            Then("지정한 connect/read timeout을 요청 팩토리에 반영한다") {
+            Then("커넥션을 재사용하는 JDK HttpClient에 지정한 connect/read timeout을 반영한다") {
                 val properties =
                     DataGsmOpenApiProperties(
                         baseUrl = "https://openapi.example.com",
@@ -25,9 +26,10 @@ class DataGsmOpenApiConfigTest :
                     )
                 val requestFactory = DataGsmOpenApiConfig(properties).dataGsmOpenApiRequestFactory()
 
-                val simpleRequestFactory = requestFactory.shouldBeInstanceOf<SimpleClientHttpRequestFactory>()
-                simpleRequestFactory.timeout("connectTimeout") shouldBe 1_500
-                simpleRequestFactory.timeout("readTimeout") shouldBe 2_750
+                val jdkRequestFactory = requestFactory.shouldBeInstanceOf<JdkClientHttpRequestFactory>()
+                val httpClient = jdkRequestFactory.field("httpClient").shouldBeInstanceOf<HttpClient>()
+                httpClient.connectTimeout().get() shouldBe Duration.ofMillis(1_500)
+                jdkRequestFactory.field("readTimeout") shouldBe Duration.ofMillis(2_750)
             }
         }
 
