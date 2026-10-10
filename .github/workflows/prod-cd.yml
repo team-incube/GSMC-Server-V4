@@ -67,3 +67,8 @@ jobs:
               fi
               exit 1
             fi
+
+            # 실제로 구동 중인 이미지와 배포 대상 커밋을 기록한다.
+            echo "배포 대상 커밋: ${{ github.sha }}"
+            echo "서버 체크아웃 커밋: $(git rev-parse HEAD)"
+            echo "실행 중인 이미지: $(sudo docker inspect --format '{{.Image}}' gsmc-server)"
