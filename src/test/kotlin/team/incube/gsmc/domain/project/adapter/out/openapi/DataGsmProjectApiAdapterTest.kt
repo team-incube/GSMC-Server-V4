@@ -250,6 +250,20 @@ class DataGsmProjectApiAdapterTest :
                 verify(exactly = 2) { restClient.get() }
             }
 
+            Then("재시도 대기 중 인터럽트되면 재요청 없이 연동 실패로 응답하고 인터럽트 상태를 유지한다") {
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } throws ResourceAccessException("connection refused")
+
+                Thread.currentThread().interrupt()
+                val exception = shouldThrow<GsmcException> { adapter.findProjectById(1L) }
+                val interrupted = Thread.interrupted()
+
+                exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
+                interrupted shouldBe true
+                verify(exactly = 1) { restClient.get() }
+            }
+
             Then("4xx 응답은 재시도하지 않는다") {
                 every {
                     responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())

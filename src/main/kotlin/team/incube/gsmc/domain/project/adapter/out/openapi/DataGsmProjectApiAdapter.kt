@@ -121,11 +121,21 @@ class DataGsmProjectApiAdapter(
                     if (!canRetry(exception, attempt, deadline)) throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
 
                     attempt++
-                    Thread.sleep(RETRY_BACKOFF)
+                    waitBeforeRetry()
                     continue
                 }
 
             return response?.data ?: throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
+        }
+    }
+
+    /** 재시도 대기 중 인터럽트되면 인터럽트 상태를 복구하고, 재요청 없이 연동 실패로 처리합니다. */
+    private fun waitBeforeRetry() {
+        try {
+            Thread.sleep(RETRY_BACKOFF)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
         }
     }
 
