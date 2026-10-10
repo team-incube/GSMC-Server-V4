@@ -1,5 +1,6 @@
 package team.incube.gsmc.domain.project.adapter.out.openapi
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.clearAllMocks
@@ -16,6 +17,8 @@ import team.incube.gsmc.domain.project.adapter.out.openapi.dto.DataGsmProjectDto
 import team.incube.gsmc.domain.project.adapter.out.openapi.dto.DataGsmProjectPageDto
 import team.incube.gsmc.domain.project.adapter.out.openapi.dto.DataGsmProjectParticipantDto
 import team.incube.gsmc.domain.project.port.out.DataGsmProjectCachePort
+import team.incube.gsmc.global.exception.ErrorCode
+import team.incube.gsmc.global.exception.GsmcException
 import java.net.URI
 import java.util.function.Function
 
@@ -157,6 +160,27 @@ class DataGsmProjectApiAdapterTest :
 
                 verify(exactly = 2) { restClient.get() }
                 verify(exactly = 1) { cachePort.saveAll(listOf(project, secondProject)) }
+            }
+        }
+
+        Given("외부 API가 최대 페이지 수를 넘는 totalPages를 반환할 때") {
+            Then("순회를 중단하고 일부 목록을 캐시하지 않는다") {
+                every { cachePort.findAll() } returns null
+                every { restClient.get() } returns uriSpec
+                every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
+                every { requestSpec.retrieve() } returns responseSpec
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } returns DataGsmApiResponseDto(data = DataGsmProjectPageDto(51, 5_100, listOf(projectDto)))
+
+                val exception =
+                    shouldThrow<GsmcException> {
+                        adapter.findActiveProjectsByParticipantEmail("student@gsm.hs.kr")
+                    }
+
+                exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
+                verify(exactly = 1) { restClient.get() }
+                verify(exactly = 0) { cachePort.saveAll(any()) }
             }
         }
 

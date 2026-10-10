@@ -19,6 +19,12 @@ private const val PAGE_SIZE = 100
 private const val ACTIVE_STATUS = "ACTIVE"
 
 /**
+ * 전체 목록 순회에서 허용하는 최대 페이지 수입니다(페이지당 [PAGE_SIZE]건, 최대 5,000건).
+ * 외부 API가 비정상적인 `totalPages`를 돌려줘도 순회가 끝없이 길어지지 않게 막습니다.
+ */
+private const val MAX_PAGES = 50
+
+/**
  * DataGSM 프로젝트 데이터 OpenAPI(`GET /v1/projects`) 연동을 담당하는 아웃바운드 어댑터 클래스입니다.
  * [DataGsmProjectApiPort]를 구현하며, `X-API-KEY` 헤더 인증을 사용하는 순수 REST 호출을 [RestClient]로 처리합니다.
  * 참여자 이메일 필터는 API가 직접 지원하지 않아 클라이언트 측에서 전체 ACTIVE 프로젝트를 조회한 뒤 걸러낸다.
@@ -53,6 +59,12 @@ class DataGsmProjectApiAdapter(
         }
     }
 
+    /**
+     * 외부 API에서 전체 ACTIVE 프로젝트를 페이지 순서대로 조회합니다.
+     *
+     * `totalPages`가 [MAX_PAGES]를 넘으면 일부만 조회한 목록이 24시간 캐시되지 않도록
+     * 순회를 중단하고 예외를 던집니다.
+     */
     private fun fetchAllActiveProjects(): List<DataGsmProject> {
         val result = mutableListOf<DataGsmProject>()
         var page = 0
@@ -60,6 +72,7 @@ class DataGsmProjectApiAdapter(
         while (true) {
             val pageDto =
                 fetchProjectPage(mapOf("status" to ACTIVE_STATUS, "page" to page, "size" to PAGE_SIZE)) ?: break
+            if (pageDto.totalPages > MAX_PAGES) throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
             result += pageDto.projects.map { it.toDomain() }
 
             page++
