@@ -13,6 +13,7 @@ import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+import java.time.Clock
 
 private const val PROJECTS_PATH = "/v1/projects"
 private const val PAGE_SIZE = 100
@@ -34,6 +35,8 @@ class DataGsmProjectApiAdapter(
     private val dataGsmOpenApiRestClient: RestClient,
     private val dataGsmProjectCachePort: DataGsmProjectCachePort,
     private val dataGsmProjectSingleFlight: DataGsmProjectSingleFlight,
+    private val dataGsmOpenApiProperties: DataGsmOpenApiProperties,
+    private val clock: Clock = Clock.systemUTC(),
 ) : DataGsmProjectApiPort {
     /** DataGSM에서 현재 사용자가 참여한 활성 프로젝트를 조회합니다. */
     override fun findActiveProjectsByParticipantEmail(email: String): List<DataGsmProject> =
@@ -62,14 +65,18 @@ class DataGsmProjectApiAdapter(
     /**
      * 외부 API에서 전체 ACTIVE 프로젝트를 페이지 순서대로 조회합니다.
      *
-     * `totalPages`가 [MAX_PAGES]를 넘으면 일부만 조회한 목록이 24시간 캐시되지 않도록
-     * 순회를 중단하고 예외를 던집니다.
+     * `totalPages`가 [MAX_PAGES]를 넘거나 순회 시간이 [DataGsmOpenApiProperties.totalTimeout]을
+     * 넘으면, 일부만 조회한 목록이 24시간 캐시되지 않도록 순회를 중단하고 예외를 던집니다.
+     * 시간 상한은 다음 페이지를 요청하기 전에 확인하므로, 진행 중인 요청 1건의 읽기 제한 시간만큼은
+     * 초과할 수 있습니다.
      */
     private fun fetchAllActiveProjects(): List<DataGsmProject> {
+        val deadline = clock.instant().plus(dataGsmOpenApiProperties.totalTimeout)
         val result = mutableListOf<DataGsmProject>()
         var page = 0
 
         while (true) {
+            if (clock.instant().isAfter(deadline)) throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
             val pageDto =
                 fetchProjectPage(mapOf("status" to ACTIVE_STATUS, "page" to page, "size" to PAGE_SIZE)) ?: break
             if (pageDto.totalPages > MAX_PAGES) throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)

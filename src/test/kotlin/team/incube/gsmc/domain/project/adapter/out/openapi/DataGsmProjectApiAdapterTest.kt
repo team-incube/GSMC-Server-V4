@@ -20,6 +20,8 @@ import team.incube.gsmc.domain.project.port.out.DataGsmProjectCachePort
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import java.net.URI
+import java.time.Clock
+import java.time.Instant
 import java.util.function.Function
 
 class DataGsmProjectApiAdapterTest :
@@ -29,7 +31,8 @@ class DataGsmProjectApiAdapterTest :
         val requestSpec = mockk<RestClient.RequestHeadersSpec<*>>()
         val responseSpec = mockk<RestClient.ResponseSpec>()
         val cachePort = mockk<DataGsmProjectCachePort>()
-        val adapter = DataGsmProjectApiAdapter(restClient, cachePort, DataGsmProjectSingleFlight())
+        val properties = DataGsmOpenApiProperties("https://openapi.example.com", "test-key")
+        val adapter = DataGsmProjectApiAdapter(restClient, cachePort, DataGsmProjectSingleFlight(), properties)
         val participant =
             DataGsmProjectParticipant(
                 10L,
@@ -106,7 +109,7 @@ class DataGsmProjectApiAdapterTest :
         Given("전체 프로젝트 캐시가 없어 재조회가 필요할 때") {
             Then("재조회를 SingleFlight로 합쳐 수행한다") {
                 val singleFlight = mockk<DataGsmProjectSingleFlight>()
-                val adapterWithMock = DataGsmProjectApiAdapter(restClient, cachePort, singleFlight)
+                val adapterWithMock = DataGsmProjectApiAdapter(restClient, cachePort, singleFlight, properties)
                 every { cachePort.findAll() } returns null
                 every { singleFlight.load(any()) } returns listOf(project)
 
@@ -118,7 +121,7 @@ class DataGsmProjectApiAdapterTest :
 
             Then("대표 요청이 막 채워둔 캐시가 있으면 외부 API를 호출하지 않는다") {
                 val singleFlight = mockk<DataGsmProjectSingleFlight>()
-                val adapterWithMock = DataGsmProjectApiAdapter(restClient, cachePort, singleFlight)
+                val adapterWithMock = DataGsmProjectApiAdapter(restClient, cachePort, singleFlight, properties)
                 // 합류 블록을 그대로 실행시켜, 블록 안에서 캐시를 한 번 더 확인하는지 검증한다.
                 every { singleFlight.load(any()) } answers { firstArg<() -> List<DataGsmProject>>().invoke() }
                 every { cachePort.findAll() } returnsMany listOf(null, listOf(project))
@@ -176,6 +179,37 @@ class DataGsmProjectApiAdapterTest :
                 val exception =
                     shouldThrow<GsmcException> {
                         adapter.findActiveProjectsByParticipantEmail("student@gsm.hs.kr")
+                    }
+
+                exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
+                verify(exactly = 1) { restClient.get() }
+                verify(exactly = 0) { cachePort.saveAll(any()) }
+            }
+        }
+
+        Given("전체 목록 순회가 전체 시간 상한을 넘을 때") {
+            Then("다음 페이지를 요청하지 않고 일부 목록을 캐시하지 않는다") {
+                val clock = mockk<Clock>()
+                val start = Instant.parse("2026-10-10T00:00:00Z")
+                every { clock.instant() } returnsMany
+                    listOf(
+                        start,
+                        start,
+                        start.plus(properties.totalTimeout).plusMillis(1),
+                    )
+                val adapterWithClock =
+                    DataGsmProjectApiAdapter(restClient, cachePort, DataGsmProjectSingleFlight(), properties, clock)
+                every { cachePort.findAll() } returns null
+                every { restClient.get() } returns uriSpec
+                every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
+                every { requestSpec.retrieve() } returns responseSpec
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } returns DataGsmApiResponseDto(data = DataGsmProjectPageDto(3, 3, listOf(projectDto)))
+
+                val exception =
+                    shouldThrow<GsmcException> {
+                        adapterWithClock.findActiveProjectsByParticipantEmail("student@gsm.hs.kr")
                     }
 
                 exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED

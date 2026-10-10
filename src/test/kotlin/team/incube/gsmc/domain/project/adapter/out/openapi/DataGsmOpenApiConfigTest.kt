@@ -34,11 +34,12 @@ class DataGsmOpenApiConfigTest :
         }
 
         Given("timeout 설정을 생략하면") {
-            Then("connect 3초와 read 5초를 기본값으로 사용한다") {
+            Then("connect 3초, read 5초, 전체 순회 10초를 기본값으로 사용한다") {
                 val properties = DataGsmOpenApiProperties("https://openapi.example.com", "test-key")
 
                 properties.connectTimeout shouldBe Duration.ofSeconds(3)
                 properties.readTimeout shouldBe Duration.ofSeconds(5)
+                properties.totalTimeout shouldBe Duration.ofSeconds(10)
             }
         }
     })
