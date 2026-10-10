@@ -8,6 +8,10 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.springframework.core.ParameterizedTypeReference
+import org.springframework.http.HttpStatus
+import org.springframework.web.client.HttpClientErrorException
+import org.springframework.web.client.HttpServerErrorException
+import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import team.incube.gsmc.domain.project.DataGsmProject
 import team.incube.gsmc.domain.project.DataGsmProjectParticipant
@@ -215,6 +219,46 @@ class DataGsmProjectApiAdapterTest :
                 exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
                 verify(exactly = 1) { restClient.get() }
                 verify(exactly = 0) { cachePort.saveAll(any()) }
+            }
+        }
+
+        Given("DataGSM 호출이 일시적으로 실패할 때") {
+            beforeEach {
+                every { restClient.get() } returns uriSpec
+                every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
+                every { requestSpec.retrieve() } returns responseSpec
+            }
+
+            Then("5xx 응답 뒤 재시도에 성공하면 결과를 반환한다") {
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } throws HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE) andThen
+                    DataGsmApiResponseDto(data = DataGsmProjectPageDto(1, 1, listOf(projectDto)))
+
+                adapter.findProjectById(1L) shouldBe project
+                verify(exactly = 2) { restClient.get() }
+            }
+
+            Then("연결 실패가 반복되면 최대 2회까지만 요청하고 연동 실패로 응답한다") {
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } throws ResourceAccessException("connection refused")
+
+                val exception = shouldThrow<GsmcException> { adapter.findProjectById(1L) }
+
+                exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
+                verify(exactly = 2) { restClient.get() }
+            }
+
+            Then("4xx 응답은 재시도하지 않는다") {
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } throws HttpClientErrorException(HttpStatus.BAD_REQUEST)
+
+                val exception = shouldThrow<GsmcException> { adapter.findProjectById(1L) }
+
+                exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
+                verify(exactly = 1) { restClient.get() }
             }
         }
 
