@@ -2,6 +2,7 @@ package team.incube.gsmc.domain.member.adapter.out.persistence
 
 import com.querydsl.core.types.EntityPath
 import com.querydsl.core.types.Expression
+import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.jpa.impl.JPAQuery
 import com.querydsl.jpa.impl.JPAQueryFactory
 import io.kotest.core.spec.style.BehaviorSpec
@@ -37,18 +38,20 @@ class MemberPersistenceAdapterTest :
                 userRole = UserRole.STUDENT,
             )
 
-        fun query(sort: SortDirection = SortDirection.ASC) =
-            SearchMembersQuery(
-                email = null,
-                name = "홍길동",
-                role = UserRole.STUDENT,
-                grade = 1,
-                classNumber = 2,
-                number = null,
-                limit = 10,
-                page = 0,
-                sort = sort,
-            )
+        fun query(
+            role: UserRole? = UserRole.STUDENT,
+            sort: SortDirection = SortDirection.ASC,
+        ) = SearchMembersQuery(
+            email = null,
+            name = "홍길동",
+            role = role,
+            grade = 1,
+            classNumber = 2,
+            number = null,
+            limit = 10,
+            page = 0,
+            sort = sort,
+        )
 
         Given("사용자 ID로 조회할 때") {
             When("사용자가 존재하면") {
@@ -94,15 +97,31 @@ class MemberPersistenceAdapterTest :
         }
 
         Given("검색 조건으로 페이지 목록을 조회할 때") {
+            fun findQueryCapturingOrder(captured: MutableList<String>): JPAQuery<UserJpaEntity> {
+                val findQuery = mockk<JPAQuery<UserJpaEntity>>()
+                every { queryFactory.selectFrom(any<EntityPath<UserJpaEntity>>()) } returns findQuery
+                every { findQuery.where(*varargAll { true }) } returns findQuery
+                every { findQuery.orderBy(*anyVararg<OrderSpecifier<*>>()) } answers {
+                    captured +=
+                        args
+                            .flatMap { arg ->
+                                if (arg is Array<*>) arg.toList() else listOf(arg)
+                            }.filterIsInstance<OrderSpecifier<*>>()
+                            .map {
+                                "${it.target} ${it.order} ${it.nullHandling}"
+                            }
+                    findQuery
+                }
+                every { findQuery.offset(any()) } returns findQuery
+                every { findQuery.limit(any()) } returns findQuery
+                every { findQuery.fetch() } returns listOf(entity(1L), entity(2L))
+                return findQuery
+            }
+
             When("오름차순 정렬을 요청하면") {
                 Then("조건과 정렬을 적용해 도메인 목록으로 변환한다") {
-                    val findQuery = mockk<JPAQuery<UserJpaEntity>>()
-                    every { queryFactory.selectFrom(any<EntityPath<UserJpaEntity>>()) } returns findQuery
-                    every { findQuery.where(*varargAll { true }) } returns findQuery
-                    every { findQuery.orderBy(*varargAll { true }) } returns findQuery
-                    every { findQuery.offset(any()) } returns findQuery
-                    every { findQuery.limit(any()) } returns findQuery
-                    every { findQuery.fetch() } returns listOf(entity(1L), entity(2L))
+                    val captured = mutableListOf<String>()
+                    findQueryCapturingOrder(captured)
 
                     val result = adapter.findAllBySearchCondition(query(sort = SortDirection.ASC))
 
@@ -112,17 +131,80 @@ class MemberPersistenceAdapterTest :
 
             When("내림차순 정렬을 요청하면") {
                 Then("조건과 정렬을 적용해 도메인 목록으로 변환한다") {
-                    val findQuery = mockk<JPAQuery<UserJpaEntity>>()
-                    every { queryFactory.selectFrom(any<EntityPath<UserJpaEntity>>()) } returns findQuery
-                    every { findQuery.where(*varargAll { true }) } returns findQuery
-                    every { findQuery.orderBy(*varargAll { true }) } returns findQuery
-                    every { findQuery.offset(any()) } returns findQuery
-                    every { findQuery.limit(any()) } returns findQuery
-                    every { findQuery.fetch() } returns listOf(entity(2L), entity(1L))
+                    val captured = mutableListOf<String>()
+                    findQueryCapturingOrder(captured)
 
                     val result = adapter.findAllBySearchCondition(query(sort = SortDirection.DESC))
 
-                    result.map { it.userId } shouldBe listOf(2L, 1L)
+                    result.map { it.userId } shouldBe listOf(1L, 2L)
+                }
+            }
+
+            When("학생만 오름차순으로 조회하면") {
+                Then("nullsLast 없이 학년 → 반 → 번호 → ID 오름차순으로 정렬한다") {
+                    val captured = mutableListOf<String>()
+                    findQueryCapturingOrder(captured)
+
+                    adapter.findAllBySearchCondition(query(role = UserRole.STUDENT, sort = SortDirection.ASC))
+
+                    captured shouldBe
+                        listOf(
+                            "userJpaEntity.userGrade ASC $DEFAULT",
+                            "userJpaEntity.userClassNumber ASC $DEFAULT",
+                            "userJpaEntity.userNumber ASC $DEFAULT",
+                            "userJpaEntity.userId ASC $DEFAULT",
+                        )
+                }
+            }
+
+            When("학생만 내림차순으로 조회하면") {
+                Then("학년 → 반 → 번호 → ID 내림차순으로 정렬한다") {
+                    val captured = mutableListOf<String>()
+                    findQueryCapturingOrder(captured)
+
+                    adapter.findAllBySearchCondition(query(role = UserRole.STUDENT, sort = SortDirection.DESC))
+
+                    captured shouldBe
+                        listOf(
+                            "userJpaEntity.userGrade DESC $DEFAULT",
+                            "userJpaEntity.userClassNumber DESC $DEFAULT",
+                            "userJpaEntity.userNumber DESC $DEFAULT",
+                            "userJpaEntity.userId DESC $DEFAULT",
+                        )
+                }
+            }
+
+            When("교사를 포함해 오름차순으로 조회하면") {
+                Then("교사(null)를 뒤로 보내고 마지막에 ID 오름차순을 붙인다") {
+                    val captured = mutableListOf<String>()
+                    findQueryCapturingOrder(captured)
+
+                    adapter.findAllBySearchCondition(query(role = null, sort = SortDirection.ASC))
+
+                    captured shouldBe
+                        listOf(
+                            "userJpaEntity.userGrade ASC $NULLS_LAST",
+                            "userJpaEntity.userClassNumber ASC $NULLS_LAST",
+                            "userJpaEntity.userNumber ASC $NULLS_LAST",
+                            "userJpaEntity.userId ASC $DEFAULT",
+                        )
+                }
+            }
+
+            When("교사를 포함해 내림차순으로 조회하면") {
+                Then("MySQL이 null을 뒤로 보내므로 nullsLast 없이 마지막에 ID 내림차순을 붙인다") {
+                    val captured = mutableListOf<String>()
+                    findQueryCapturingOrder(captured)
+
+                    adapter.findAllBySearchCondition(query(role = null, sort = SortDirection.DESC))
+
+                    captured shouldBe
+                        listOf(
+                            "userJpaEntity.userGrade DESC $DEFAULT",
+                            "userJpaEntity.userClassNumber DESC $DEFAULT",
+                            "userJpaEntity.userNumber DESC $DEFAULT",
+                            "userJpaEntity.userId DESC $DEFAULT",
+                        )
                 }
             }
         }
@@ -152,3 +234,6 @@ class MemberPersistenceAdapterTest :
             }
         }
     })
+
+private val DEFAULT = OrderSpecifier.NullHandling.Default
+private val NULLS_LAST = OrderSpecifier.NullHandling.NullsLast
