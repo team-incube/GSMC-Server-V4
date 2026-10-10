@@ -40,3 +40,8 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+# env files
+.env
+.env.*
+!.env.example
