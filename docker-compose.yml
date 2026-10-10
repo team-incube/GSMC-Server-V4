@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: gsmc-server:latest
     container_name: gsmc-server
     ports:
       - "8080:8080"
