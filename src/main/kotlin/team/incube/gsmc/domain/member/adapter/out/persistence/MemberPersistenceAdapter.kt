@@ -8,6 +8,7 @@ import team.incube.gsmc.domain.member.SortDirection
 import team.incube.gsmc.domain.member.adapter.out.persistence.repository.MemberUserJpaRepository
 import team.incube.gsmc.domain.member.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.user.User
+import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.QUserJpaEntity.userJpaEntity
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.toDomain
 import team.incube.gsmc.global.annotation.PortDirection
@@ -37,27 +38,47 @@ class MemberPersistenceAdapter(
         queryFactory
             .selectFrom(userJpaEntity)
             .where(*buildSearchConditions(query).toTypedArray())
-            .orderBy(*buildOrderSpecifiers(query.sort))
+            .orderBy(*buildOrderSpecifiers(query.role, query.sort))
             .offset(query.page.toLong() * query.limit)
             .limit(query.limit.toLong())
             .fetch()
             .map { it.toDomain() }
 
     /**
-     * 정렬 방향에 따라 학년 → 반 → 번호 순 정렬 조건을 만든다. null 값(교사)은 항상 뒤로 보낸다.
+     * 정렬 방향에 따라 학년 → 반 → 번호 → ID 순 정렬 조건을 만든다.
+     *
+     * - ID를 마지막 보조 키로 둬서 정렬값이 같은 행(학적정보가 비어 있는 교사 등)도 페이지 사이에서 순서가 흔들리지 않게 한다.
+     * - 학생만 조회하는 경우 `nullsLast()`를 쓰지 않는다. MySQL에는 `NULLS LAST` 문법이 없어 Hibernate가
+     *   `CASE WHEN ... IS NULL` 계산식으로 바꾸는데, 이러면 `uk_user_grade_class_number` 인덱스 순서로 읽지 못하고 filesort가 발생한다.
+     * - 학생 외 권한이 섞이는 ASC에서는 NULL(교사)을 뒤로 보내기 위해 `nullsLast()`를 유지한다.
+     * - DESC는 MySQL이 NULL을 가장 작은 값으로 취급해 자연히 뒤로 가므로 `nullsLast()`가 필요 없다.
      */
-    private fun buildOrderSpecifiers(sortDirection: SortDirection): Array<OrderSpecifier<*>> =
+    private fun buildOrderSpecifiers(
+        role: UserRole?,
+        sortDirection: SortDirection,
+    ): Array<OrderSpecifier<*>> =
         if (sortDirection == SortDirection.ASC) {
-            arrayOf(
-                userJpaEntity.userGrade.asc().nullsLast(),
-                userJpaEntity.userClassNumber.asc().nullsLast(),
-                userJpaEntity.userNumber.asc().nullsLast(),
-            )
+            if (role == UserRole.STUDENT) {
+                arrayOf(
+                    userJpaEntity.userGrade.asc(),
+                    userJpaEntity.userClassNumber.asc(),
+                    userJpaEntity.userNumber.asc(),
+                    userJpaEntity.userId.asc(),
+                )
+            } else {
+                arrayOf(
+                    userJpaEntity.userGrade.asc().nullsLast(),
+                    userJpaEntity.userClassNumber.asc().nullsLast(),
+                    userJpaEntity.userNumber.asc().nullsLast(),
+                    userJpaEntity.userId.asc(),
+                )
+            }
         } else {
             arrayOf(
-                userJpaEntity.userGrade.desc().nullsLast(),
-                userJpaEntity.userClassNumber.desc().nullsLast(),
-                userJpaEntity.userNumber.desc().nullsLast(),
+                userJpaEntity.userGrade.desc(),
+                userJpaEntity.userClassNumber.desc(),
+                userJpaEntity.userNumber.desc(),
+                userJpaEntity.userId.desc(),
             )
         }
 
