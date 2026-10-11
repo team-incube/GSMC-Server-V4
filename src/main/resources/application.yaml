@@ -94,6 +94,7 @@ datagsm:
     api-key: ${DATAGSM_OPENAPI_KEY}
     connect-timeout: ${DATAGSM_OPENAPI_CONNECT_TIMEOUT:3s}
     read-timeout: ${DATAGSM_OPENAPI_READ_TIMEOUT:5s}
+    total-timeout: ${DATAGSM_OPENAPI_TOTAL_TIMEOUT:10s}
 
 aws:
   s3:
