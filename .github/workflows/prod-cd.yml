@@ -42,6 +42,15 @@ jobs:
             set -eu
             cd ~/GSMC-server-V4
 
+            # workflow concurrency는 GitHub Actions 실행끼리만 막는다. 서버에서 직접 실행한 배포나
+            # 취소된 실행의 남은 원격 프로세스와도 겹치지 않도록 서버 측 잠금을 잡는다.
+            # 잠금은 이 셸이 끝나면(성공·실패·연결 끊김 모두) 파일 디스크립터가 닫히면서 자동으로 풀린다.
+            exec 9> ~/.gsmc-deploy.lock
+            if ! flock --wait 900 9; then
+              echo "다른 배포가 15분 넘게 진행 중이라 잠금을 얻지 못했습니다."
+              exit 1
+            fi
+
             # 그 시점의 최신 develop이 아니라 이 실행을 유발한 커밋을 정확히 배포한다.
             # 서버 작업 디렉터리에 커밋되지 않은 변경이 있으면 checkout이 실패해 컨테이너를 건드리기 전에 중단된다.
             DEPLOY_SHA="${{ github.sha }}"
