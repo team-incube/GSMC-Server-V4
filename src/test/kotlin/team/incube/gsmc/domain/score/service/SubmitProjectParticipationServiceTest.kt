@@ -275,6 +275,7 @@ class SubmitProjectParticipationServiceTest :
                         )
                     every { filePersistencePort.findAllByIdIn(emptyList()) } returns emptyList()
                     every { scorePersistencePort.findByUserIdAndDgProjectId(userId, dgProjectId) } returns pending
+                    every { scorePersistencePort.findByIdForUpdate(pending.scoreId) } returns pending
 
                     val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
 
@@ -317,6 +318,7 @@ class SubmitProjectParticipationServiceTest :
                             updatedAt = LocalDateTime.now(),
                         )
                     every { scorePersistencePort.findByUserIdAndDgProjectId(userId, dgProjectId) } returns rejected
+                    every { scorePersistencePort.findByIdForUpdate(rejected.scoreId) } returns rejected
                     every { evidencePersistencePort.save(any()) } answers { firstArg() }
                     every { filePersistencePort.findAllByEvidenceId(50L) } returns listOf(file(15L))
                     every { filePersistencePort.unlinkFromEvidence(15L) } just runs
@@ -326,8 +328,8 @@ class SubmitProjectParticipationServiceTest :
                     val result = service.execute(dgProjectId, "수정된 내용", listOf(20L))
 
                     result.scoreId shouldBe 3L
-                    result.scoreStatus shouldBe ScoreStatus.PENDING
-                    result.rejectionReason shouldBe null
+                    result.scoreStatus shouldBe ScoreStatus.REJECTED
+                    result.rejectionReason shouldBe "사진이 불분명합니다"
                     verify(exactly = 1) { filePersistencePort.unlinkFromEvidence(15L) }
                     verify(exactly = 1) { filePersistencePort.linkToEvidence(20L, 50L) }
                     verify(exactly = 1) { evidencePersistencePort.save(match { it.evidenceContent == "수정된 내용" }) }

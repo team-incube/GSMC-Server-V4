@@ -100,7 +100,12 @@ class SubmitProjectParticipationService(
             if (file.userId != userId) throw GsmcException(ErrorCode.FORBIDDEN)
         }
 
-        val existing = scorePersistencePort.findByUserIdAndDgProjectId(userId, dgProjectId)
+        val existingCandidate = scorePersistencePort.findByUserIdAndDgProjectId(userId, dgProjectId)
+        val existing =
+            existingCandidate?.let {
+                scorePersistencePort.findByIdForUpdate(it.scoreId)
+                    ?: throw GsmcException(ErrorCode.SCORE_NOT_FOUND)
+            }
         if (existing != null && existing.scoreStatus != ScoreStatus.REJECTED) {
             throw GsmcException(ErrorCode.PROJECT_PARTICIPATION_ALREADY_SUBMITTED)
         }
@@ -159,8 +164,8 @@ class SubmitProjectParticipationService(
                 base.copy(
                     evidence = evidence,
                     activityName = dgProject.name,
-                    scoreStatus = ScoreStatus.PENDING,
-                    rejectionReason = null,
+                    scoreStatus = if (existing == null) ScoreStatus.PENDING else ScoreStatus.REJECTED,
+                    rejectionReason = existing?.rejectionReason,
                     dgProjectId = dgProjectId,
                 ),
             )

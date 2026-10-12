@@ -7,6 +7,7 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreWithValueUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.statusAfterStudentEdit
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
@@ -31,6 +32,7 @@ class AppendMyScoreWithValueService(
     override fun execute(
         categoryType: CategoryType,
         value: String?,
+        scoreId: Long?,
     ): Score {
         if (categoryType == CategoryType.ACADEMIC_GRADE) {
             throw GsmcException(ErrorCode.INVALID_CATEGORY_TYPE)
@@ -40,14 +42,14 @@ class AppendMyScoreWithValueService(
 
         val scoreValue = appendScoreSupport.parseScoreValue(value, category)
 
-        val target = appendScoreSupport.findOrCreateScore(userId, category)
+        val target = appendScoreSupport.findOrCreateScore(userId, category, scoreId)
         val saved =
             scorePersistencePort.save(
                 target.copy(
-                    scoreStatus = ScoreStatus.PENDING,
+                    scoreStatus = target.statusAfterStudentEdit(),
                     activityName = null,
                     scoreValue = scoreValue,
-                    rejectionReason = null,
+                    rejectionReason = target.rejectionReason,
                 ),
             )
         scoreTotalCacheInvalidator.invalidate(userId)

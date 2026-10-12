@@ -18,5 +18,6 @@ interface AppendMyScoreWithValueUseCase {
     fun execute(
         categoryType: CategoryType,
         value: String?,
+        scoreId: Long? = null,
     ): Score
 }

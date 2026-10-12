@@ -19,6 +19,7 @@ import team.incube.gsmc.domain.file.port.out.FilePersistencePort
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreStatusHistoryPersistencePort
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
@@ -28,6 +29,7 @@ import java.time.LocalDateTime
 class RemoveScoreServiceTest :
     BehaviorSpec({
         val scorePersistencePort = mockk<ScorePersistencePort>()
+        val scoreStatusHistoryPersistencePort = mockk<ScoreStatusHistoryPersistencePort>()
         val filePersistencePort = mockk<FilePersistencePort>()
         val alertPersistencePort = mockk<AlertPersistencePort>()
         val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
@@ -35,6 +37,7 @@ class RemoveScoreServiceTest :
         val service =
             RemoveScoreService(
                 scorePersistencePort,
+                scoreStatusHistoryPersistencePort,
                 filePersistencePort,
                 alertPersistencePort,
                 scoreTotalCacheInvalidator,
@@ -44,6 +47,7 @@ class RemoveScoreServiceTest :
         beforeEach {
             clearAllMocks()
             every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreStatusHistoryPersistencePort.existsByScoreId(any()) } returns false
         }
 
         fun approvedScore(file: File? = null) =
@@ -116,6 +120,18 @@ class RemoveScoreServiceTest :
                     val exception = shouldThrow<GsmcException> { service.execute(999L) }
 
                     exception.errorCode shouldBe ErrorCode.SCORE_NOT_FOUND
+                    verify(exactly = 0) { scorePersistencePort.deleteById(any()) }
+                    verify(exactly = 0) { alertPersistencePort.unlinkAllByScoreId(any()) }
+                }
+            }
+
+            When("상태 변경 이력이 있는 점수를 삭제하면") {
+                Then("감사 이력을 보존하기 위해 삭제를 거부한다") {
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
+                    every { scorePersistencePort.findById(1L) } returns approvedScore()
+                    every { scoreStatusHistoryPersistencePort.existsByScoreId(1L) } returns true
+
+                    shouldThrow<GsmcException> { service.execute(1L) }.errorCode shouldBe ErrorCode.SCORE_REVIEW_LOCKED
                     verify(exactly = 0) { scorePersistencePort.deleteById(any()) }
                     verify(exactly = 0) { alertPersistencePort.unlinkAllByScoreId(any()) }
                 }

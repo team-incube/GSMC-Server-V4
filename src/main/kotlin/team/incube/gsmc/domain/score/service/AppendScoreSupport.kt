@@ -9,6 +9,7 @@ import team.incube.gsmc.domain.category.port.out.CategoryPersistencePort
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.converter.ScoreValueConverterRegistry
+import team.incube.gsmc.domain.score.isReviewLocked
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
@@ -103,11 +104,26 @@ class AppendScoreSupport(
     fun findOrCreateScore(
         userId: Long,
         category: Category,
+        scoreId: Long? = null,
     ): Score {
+        if (scoreId != null) {
+            val target =
+                scorePersistencePort.findByIdForUpdate(scoreId) ?: throw GsmcException(ErrorCode.SCORE_NOT_FOUND)
+            if (target.userId != userId) throw GsmcException(ErrorCode.FORBIDDEN)
+            if (target.category.categoryId != category.categoryId) throw GsmcException(ErrorCode.INVALID_CATEGORY_TYPE)
+            if (target.scoreStatus.isReviewLocked()) throw GsmcException(ErrorCode.SCORE_REVIEW_LOCKED)
+            return target
+        }
         if (!category.isAccumulated) {
             scorePersistencePort
                 .findUnapprovedByUserIdAndCategoryType(userId, category.categoryType)
-                ?.let { return it }
+                ?.let {
+                    val locked =
+                        scorePersistencePort.findByIdForUpdate(it.scoreId)
+                            ?: throw GsmcException(ErrorCode.SCORE_NOT_FOUND)
+                    if (locked.scoreStatus.isReviewLocked()) throw GsmcException(ErrorCode.SCORE_REVIEW_LOCKED)
+                    return locked
+                }
         }
 
         val now = LocalDateTime.now()

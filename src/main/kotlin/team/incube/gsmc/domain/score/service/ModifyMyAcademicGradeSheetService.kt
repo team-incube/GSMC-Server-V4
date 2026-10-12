@@ -36,16 +36,17 @@ class ModifyMyAcademicGradeSheetService(
         val userId = memberUtil.getCurrentUserId()
         val student = academicGradeSheetSupport.loadStudent(userId)
         academicGradeSheetSupport.ensureEditable(userId)
+        val editableScore = academicGradeSheetSupport.findEditableForUpdate(userId)
 
         val curriculum = academicGradeSheetSupport.curriculum()
         val newEntries = toEntries(curriculum, userId, student, entries)
         academicGradeEntryPersistencePort.replaceAll(userId, student.grade, newEntries)
 
         val sheet = AcademicGradeSheet.of(curriculum, student.grade, student.department, newEntries)
-        academicGradeSheetSupport.findPending(userId)?.let { pending ->
-            val scoreValue = academicGradeSheetSupport.toScoreValue(sheet, pending.category)
-            if (pending.scoreValue != scoreValue) {
-                scorePersistencePort.save(pending.copy(scoreValue = scoreValue))
+        editableScore?.let { editable ->
+            val scoreValue = academicGradeSheetSupport.toScoreValue(sheet, editable.category)
+            if (editable.scoreValue != scoreValue) {
+                scorePersistencePort.save(editable.copy(scoreValue = scoreValue))
                 scoreTotalCacheInvalidator.invalidate(userId)
             }
         }

@@ -7,6 +7,7 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreOnlyUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.statusAfterStudentEdit
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.util.MemberUtil
@@ -33,10 +34,10 @@ class AppendMyScoreOnlyService(
         val saved =
             scorePersistencePort.save(
                 target.copy(
-                    scoreStatus = ScoreStatus.PENDING,
+                    scoreStatus = target.statusAfterStudentEdit(),
                     activityName = null,
                     scoreValue = null,
-                    rejectionReason = null,
+                    rejectionReason = target.rejectionReason,
                 ),
             )
         scoreTotalCacheInvalidator.invalidate(userId)

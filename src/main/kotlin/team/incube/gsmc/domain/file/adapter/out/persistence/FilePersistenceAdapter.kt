@@ -90,7 +90,10 @@ class FilePersistenceAdapter(
     }
 
     override fun isLinkedToApprovedScore(fileId: Long): Boolean =
-        fileJpaRepository.existsByFileIdAndScoreScoreStatus(fileId, ScoreStatus.APPROVED)
+        fileJpaRepository.existsByFileIdAndScoreScoreStatusIn(
+            fileId,
+            listOf(ScoreStatus.PENDING, ScoreStatus.REVIEWED, ScoreStatus.APPROVED),
+        )
 
     private fun throwLinkFailure(fileId: Long): Nothing {
         val errorCode =

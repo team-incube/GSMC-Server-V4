@@ -9,6 +9,7 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreWithFileUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.statusAfterStudentEdit
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
@@ -37,6 +38,7 @@ class AppendMyScoreWithFileService(
         categoryType: CategoryType,
         value: String?,
         fileId: Long,
+        scoreId: Long?,
     ): Score {
         val userId = memberUtil.getCurrentUserId()
         val category = appendScoreSupport.resolveCategory(categoryType, EvidenceType.FILE)
@@ -57,7 +59,7 @@ class AppendMyScoreWithFileService(
         // 실제 제출된 시험 종류를 감사 추적용으로 별도 보존한다. 직접 TOEIC을 제출한 경우는 중복이라 null.
         val submittedCategoryType = if (categoryType != category.categoryType) categoryType else null
 
-        val target = appendScoreSupport.findOrCreateScore(userId, category)
+        val target = appendScoreSupport.findOrCreateScore(userId, category, scoreId)
         val oldFile = target.file
         if (oldFile != null && oldFile.fileId != fileId) {
             filePersistencePort.unlinkFromScore(oldFile.fileId)
@@ -66,10 +68,10 @@ class AppendMyScoreWithFileService(
         val saved =
             scorePersistencePort.save(
                 target.copy(
-                    scoreStatus = ScoreStatus.PENDING,
+                    scoreStatus = target.statusAfterStudentEdit(),
                     activityName = activityName,
                     scoreValue = scoreValue,
-                    rejectionReason = null,
+                    rejectionReason = target.rejectionReason,
                     submittedCategoryType = submittedCategoryType,
                 ),
             )

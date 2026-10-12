@@ -135,8 +135,8 @@ class FetchMyPercentInGradeServiceTest :
                 }
             }
 
-            When("허가되지 않는 점수도 포함하면") {
-                Then("허가되지 않은 점수도 포함한 총점의 학년 내 백분위가 반환된다") {
+            When("허가되지 않은 점수 포함 옵션을 요청해도") {
+                Then("최종 승인 점수만 포함한 학년 내 백분위가 반환된다") {
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1L, 2, UserRole.STUDENT)
@@ -145,7 +145,7 @@ class FetchMyPercentInGradeServiceTest :
 
                     val result = service.execute(false)
 
-                    result shouldBe percentileOf(100, 25)
+                    result shouldBe percentileOf(50, 75)
                 }
             }
 

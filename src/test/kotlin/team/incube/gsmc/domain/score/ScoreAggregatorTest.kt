@@ -86,6 +86,18 @@ class ScoreAggregatorTest :
                 }
             }
 
+            When("교사 검토를 마친 REVIEWED 점수가 있으면") {
+                Then("예상 총점 옵션에서도 최종 집계에 포함하지 않는다") {
+                    val scores =
+                        listOf(
+                            score(toeicCategory, ScoreStatus.APPROVED, scoreValue = 8),
+                            score(toeicCategory, ScoreStatus.REVIEWED, scoreValue = 10),
+                        )
+
+                    ScoreAggregator.totalScoreOf(scores, includeApprovedOnly = false, userGrade = 1) shouldBe 8
+                }
+            }
+
             When("비누적 SCORE_BASED 카테고리에 점수가 여러 건이면") {
                 Then("updatedAt이 가장 최신인 점수로 계산한다") {
                     val base = LocalDateTime.of(2026, 9, 1, 0, 0)

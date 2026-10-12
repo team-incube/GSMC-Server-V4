@@ -77,7 +77,12 @@ class AcademicGradeSheetSupport(
         userId: Long,
         now: LocalDateTime = LocalDateTime.now(),
     ) {
-        if (findUnapproved(userId) != null) return
+        findUnapproved(userId)?.let {
+            if (it.scoreStatus != ScoreStatus.REJECTED && it.scoreStatus != ScoreStatus.INCOMPLETE) {
+                throw GsmcException(ErrorCode.ACADEMIC_GRADE_LOCKED)
+            }
+            return
+        }
         val approved =
             scorePersistencePort.findApprovedByUserIdAndCategoryType(userId, CategoryType.ACADEMIC_GRADE) ?: return
         if (isInCurrentSchoolYear(approved.updatedAt, now)) {
@@ -95,8 +100,17 @@ class AcademicGradeSheetSupport(
     fun findUnapproved(userId: Long): Score? =
         scorePersistencePort.findUnapprovedByUserIdAndCategoryType(userId, CategoryType.ACADEMIC_GRADE)
 
-    /** 심사 중인 교과성적 점수 */
-    fun findPending(userId: Long): Score? = findUnapproved(userId)?.takeIf { it.scoreStatus == ScoreStatus.PENDING }
+    /** 반려/미완성 점수 행을 잠그고 입력표 수정 가능 상태를 다시 검증한다. */
+    fun findEditableForUpdate(userId: Long): Score? {
+        val candidate = findUnapproved(userId) ?: return null
+        val locked =
+            scorePersistencePort.findByIdForUpdate(candidate.scoreId)
+                ?: throw GsmcException(ErrorCode.SCORE_NOT_FOUND)
+        if (locked.scoreStatus != ScoreStatus.REJECTED && locked.scoreStatus != ScoreStatus.INCOMPLETE) {
+            throw GsmcException(ErrorCode.ACADEMIC_GRADE_LOCKED)
+        }
+        return locked
+    }
 
     private fun schoolYearStart(today: LocalDate): LocalDateTime {
         val year = if (today.monthValue >= SCHOOL_YEAR_START_MONTH) today.year else today.year - 1

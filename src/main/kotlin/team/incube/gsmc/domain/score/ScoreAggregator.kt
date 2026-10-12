@@ -49,18 +49,15 @@ object ScoreAggregator {
             }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun totalScoreOf(
         allScores: List<ScoreCalculationSource>,
         includeApprovedOnly: Boolean,
         userGrade: Int?,
     ): Int {
         val excludedCategoryTypes = excludedCategoryTypesFor(userGrade)
-        val target =
-            if (includeApprovedOnly) {
-                allScores.filter { it.scoreStatus == ScoreStatus.APPROVED }
-            } else {
-                allScores.filter { it.scoreStatus != ScoreStatus.REJECTED }
-            }
+        // 기존 GraphQL 인자는 호환성을 위해 유지하지만, 최종 집계는 정책상 항상 최종 승인만 사용한다.
+        val target = allScores.filter { it.scoreStatus == ScoreStatus.APPROVED }
         val grouped = target.groupBy { it.category }
 
         return grouped.keys

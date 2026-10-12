@@ -43,12 +43,12 @@ interface FileJpaRepository : JpaRepository<FileJpaEntity, Long> {
      * 특정 파일이 주어진 상태의 점수 요청에 연결되어 있는지 확인한다.
      *
      * @param fileId 확인할 파일 ID
-     * @param scoreStatus 확인할 점수 요청 심사 상태
+     * @param scoreStatuses 확인할 점수 요청 심사 상태 목록
      * @return 연결되어 있으면 true
      */
-    fun existsByFileIdAndScoreScoreStatus(
+    fun existsByFileIdAndScoreScoreStatusIn(
         fileId: Long,
-        scoreStatus: ScoreStatus,
+        scoreStatuses: Collection<ScoreStatus>,
     ): Boolean
 
     /** 다른 점수에 연결된 파일이나 score 연결이 남은 파일을 Evidence로 이동시키지 않습니다. */

@@ -33,8 +33,29 @@ type Percentile {
 enum ScoreStatus {
     INCOMPLETE
     PENDING
+    REVIEWED
     APPROVED
     REJECTED
+}
+
+enum ScoreStatusHistoryAction {
+    TEACHER_REVIEWED
+    TEACHER_REJECTED
+    COMMITTEE_APPROVED
+    COMMITTEE_REJECTED
+    RESUBMITTED
+}
+
+type ScoreStatusHistory {
+    historyId: ID!
+    scoreId: ID!
+    action: ScoreStatusHistoryAction!
+    previousStatus: ScoreStatus!
+    nextStatus: ScoreStatus!
+    actorId: ID!
+    actorRole: UserRole!
+    occurredAt: DateTime!
+    reason: String
 }
 
 type Query {
@@ -47,14 +68,17 @@ type Query {
     myPercentInClass(includeApprovedOnly: Boolean = true): Percentile!
     myPercentInGrade(includeApprovedOnly: Boolean = true): Percentile!
     scoresByDgProjectId(dgProjectId: ID!): [Score!]!
+    scoreStatusHistories(scoreId: ID!): [ScoreStatusHistory!]!
 }
 
 input ScoreWithValueAndFileInput {
+    scoreId: ID
     value: String
     fileId: ID!
 }
 
 input ScoreWithValueInput {
+    scoreId: ID
     value: String
 }
 
@@ -74,5 +98,8 @@ type Mutation {
     submitProjectParticipation(dgProjectId: ID!, input: SubmitProjectParticipationInput!): Score!
     approveScore(scoreId: ID!): Boolean!
     rejectScore(scoreId: ID!, input: RejectScoreInput!): Boolean!
+    approveReviewedScore(scoreId: ID!): Boolean!
+    rejectReviewedScore(scoreId: ID!, input: RejectScoreInput!): Boolean!
+    resubmitScore(scoreId: ID!): Score!
     deleteScore(scoreId: ID!): Boolean!
 }

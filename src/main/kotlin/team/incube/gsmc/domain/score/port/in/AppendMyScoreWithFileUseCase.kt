@@ -20,5 +20,6 @@ interface AppendMyScoreWithFileUseCase {
         categoryType: CategoryType,
         value: String?,
         fileId: Long,
+        scoreId: Long? = null,
     ): Score
 }

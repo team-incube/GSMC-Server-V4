@@ -22,6 +22,7 @@ import team.incube.gsmc.domain.score.adapter.out.persistence.entity.toDomain
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.toEntity
 import team.incube.gsmc.domain.score.adapter.out.persistence.repository.ScoreJpaRepository
 import team.incube.gsmc.domain.score.adapter.out.persistence.repository.ScoreUniqueSlotJpaRepository
+import team.incube.gsmc.domain.score.isReviewLocked
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
 import team.incube.gsmc.global.annotation.PortDirection
@@ -246,7 +247,7 @@ class ScorePersistenceAdapter(
     override fun isEvidenceLinkedToApprovedScore(evidenceId: Long): Boolean =
         scoreJpaRepository
             .findAllByEvidenceIdForUpdate(evidenceId)
-            .any { it.scoreStatus == ScoreStatus.APPROVED }
+            .any { it.scoreStatus.isReviewLocked() }
 
     override fun unlinkProject(projectId: Long) {
         scoreJpaRepository.unlinkProject(projectId)

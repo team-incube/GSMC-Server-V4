@@ -249,7 +249,7 @@ class AppendScoreSupportTest :
                 updatedAt = LocalDateTime.now(),
             )
 
-            listOf(ScoreStatus.REJECTED, ScoreStatus.PENDING, ScoreStatus.INCOMPLETE).forEach { status ->
+            listOf(ScoreStatus.REJECTED, ScoreStatus.INCOMPLETE).forEach { status ->
                 When("비누적 카테고리에 승인되지 않은 $status 점수가 있으면") {
                     Then("그 점수를 그대로 반환해 덮어쓰게 한다") {
                         val cat = category(EvidenceType.FILE, ScoreCalculationType.SCORE_BASED, isAccumulated = false)
@@ -257,8 +257,24 @@ class AppendScoreSupportTest :
                         every {
                             scorePersistencePort.findUnapprovedByUserIdAndCategoryType(userId, cat.categoryType)
                         } returns existing
+                        every { scorePersistencePort.findByIdForUpdate(existing.scoreId) } returns existing
 
                         support.findOrCreateScore(userId, cat) shouldBe existing
+                    }
+                }
+            }
+
+            listOf(ScoreStatus.PENDING, ScoreStatus.REVIEWED).forEach { status ->
+                When("비누적 카테고리에 $status 점수가 있으면") {
+                    Then("학생 수정을 거부한다") {
+                        val cat = category(EvidenceType.FILE, ScoreCalculationType.SCORE_BASED, isAccumulated = false)
+                        every {
+                            scorePersistencePort.findUnapprovedByUserIdAndCategoryType(userId, cat.categoryType)
+                        } returns existingScore(cat, status)
+                        every { scorePersistencePort.findByIdForUpdate(any()) } returns existingScore(cat, status)
+
+                        shouldThrow<GsmcException> { support.findOrCreateScore(userId, cat) }.errorCode shouldBe
+                            ErrorCode.SCORE_REVIEW_LOCKED
                     }
                 }
             }
@@ -274,6 +290,28 @@ class AppendScoreSupportTest :
 
                     result.scoreId shouldBe 0L
                     result.scoreStatus shouldBe ScoreStatus.PENDING
+                }
+            }
+
+            When("누적 카테고리의 반려 점수 ID를 지정하면") {
+                Then("소유권과 카테고리를 확인해 해당 행을 편집 대상으로 반환한다") {
+                    val cat = category(EvidenceType.FILE, ScoreCalculationType.SCORE_BASED, isAccumulated = true)
+                    val existing = existingScore(cat, ScoreStatus.REJECTED)
+                    every { scorePersistencePort.findByIdForUpdate(existing.scoreId) } returns existing
+
+                    support.findOrCreateScore(userId, cat, existing.scoreId) shouldBe existing
+                }
+            }
+
+            When("심사 중인 점수 ID를 편집 대상으로 지정하면") {
+                Then("SCORE_REVIEW_LOCKED로 거부한다") {
+                    val cat = category(EvidenceType.FILE, ScoreCalculationType.SCORE_BASED, isAccumulated = true)
+                    val existing = existingScore(cat, ScoreStatus.REVIEWED)
+                    every { scorePersistencePort.findByIdForUpdate(existing.scoreId) } returns existing
+
+                    shouldThrow<GsmcException> {
+                        support.findOrCreateScore(userId, cat, existing.scoreId)
+                    }.errorCode shouldBe ErrorCode.SCORE_REVIEW_LOCKED
                 }
             }
 

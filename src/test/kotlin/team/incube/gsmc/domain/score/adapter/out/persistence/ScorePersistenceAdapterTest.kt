@@ -406,12 +406,12 @@ class ScorePersistenceAdapterTest :
             }
 
             When("연결된 점수가 대기·반려뿐이거나 없으면") {
-                Then("false를 반환한다") {
+                Then("심사 대기는 잠그고 반려나 미연결은 잠그지 않는다") {
                     every { scoreJpaRepository.findAllByEvidenceIdForUpdate(5L) } returns
                         listOf(scoreEntity(10L, ScoreStatus.PENDING), scoreEntity(11L, ScoreStatus.REJECTED))
                     every { scoreJpaRepository.findAllByEvidenceIdForUpdate(6L) } returns emptyList()
 
-                    adapter.isEvidenceLinkedToApprovedScore(5L) shouldBe false
+                    adapter.isEvidenceLinkedToApprovedScore(5L) shouldBe true
                     adapter.isEvidenceLinkedToApprovedScore(6L) shouldBe false
                 }
             }

@@ -57,7 +57,7 @@ class AppendMyScoreWithValueServiceTest :
 
         fun freshScore(cat: Category) =
             Score(
-                scoreId = 0,
+                scoreId = 30,
                 userId = userId,
                 category = cat,
                 evidence = null,
@@ -88,7 +88,7 @@ class AppendMyScoreWithValueServiceTest :
 
         Given("값 기반 카테고리에 값을 입력하면") {
             When("유효한 값이면") {
-                Then("PENDING으로 저장하고 반려 사유를 지운 뒤 캐시를 무효화한다") {
+                Then("REJECTED 상태와 사유를 유지해 저장하고 캐시를 무효화한다") {
                     every {
                         appendScoreSupport.resolveUnrequiredCategory(CategoryType.NCS, ScoreCalculationType.SCORE_BASED)
                     } returns ncsCategory
@@ -99,8 +99,8 @@ class AppendMyScoreWithValueServiceTest :
                     val result = service.execute(CategoryType.NCS, "2")
 
                     result.scoreValue shouldBe 4
-                    result.scoreStatus shouldBe ScoreStatus.PENDING
-                    result.rejectionReason shouldBe null
+                    result.scoreStatus shouldBe ScoreStatus.REJECTED
+                    result.rejectionReason shouldBe "사유"
                     verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(userId) }
                 }
             }

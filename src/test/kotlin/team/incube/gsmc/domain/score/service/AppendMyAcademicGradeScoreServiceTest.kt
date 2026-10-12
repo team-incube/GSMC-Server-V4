@@ -60,7 +60,7 @@ class AppendMyAcademicGradeScoreServiceTest :
 
         Given("교과성적을 신청할 때") {
             When("입력표가 완성됐으면") {
-                Then("환산한 인정점수로 반려됐던 행을 PENDING으로 덮어쓰고 캐시를 무효화한다") {
+                Then("환산한 인정점수로 반려됐던 행을 수정하되 명시적 재제출 전까지 REJECTED를 유지한다") {
                     every { sheetSupport.toScoreValue(sheet, academicGradeCategory) } returns 7
                     every {
                         appendScoreSupport.findOrCreateScore(USER_ID, academicGradeCategory)
@@ -70,9 +70,9 @@ class AppendMyAcademicGradeScoreServiceTest :
                     val result = service.execute()
 
                     result.scoreId shouldBe 10
-                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    result.scoreStatus shouldBe ScoreStatus.REJECTED
                     result.scoreValue shouldBe 7
-                    result.rejectionReason shouldBe null
+                    result.rejectionReason shouldBe "사유"
                     verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(USER_ID) }
                 }
             }

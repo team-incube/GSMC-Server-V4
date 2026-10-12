@@ -135,15 +135,16 @@ interface ScorePersistencePort {
     fun unlinkEvidence(evidenceId: Long)
 
     /**
-     * 증빙이 승인(`APPROVED`) 상태의 점수 요청에 연결되어 있는지 확인한다. 이미 심사가 끝난
-     * 점수 요청의 증빙이 임의로 수정·삭제되어 감사 추적이 깨지는 것을 막는 데 사용한다.
+     * 증빙이 심사 중(`PENDING`, `REVIEWED`)이거나 최종 승인(`APPROVED`)된 점수 요청에 연결되어
+     * 있는지 확인한다. 메서드 이름은 기존 포트 호환성을 유지하며, 해당 점수 요청의 증빙이 임의로
+     * 수정·삭제되어 감사 추적이 깨지는 것을 막는 데 사용한다.
      *
      * 반드시 트랜잭션 안에서 호출해야 하며, 증빙에 연결된 점수 행에 비관적 쓰기 락을 건다. 승인/거절
      * 트랜잭션과 같은 행을 잠그므로, 진행 중인 심사가 있으면 그 커밋 이후의 상태로 판단한다. 락은 호출한
      * 트랜잭션이 끝날 때까지 유지되어 이후의 수정·삭제와 심사가 겹치지 않는다.
      *
      * @param evidenceId 확인할 증빙 ID
-     * @return 승인된 점수 요청에 연결되어 있으면 true
+     * @return 수정이 잠긴 점수 요청에 연결되어 있으면 true
      */
     fun isEvidenceLinkedToApprovedScore(evidenceId: Long): Boolean
 

@@ -58,7 +58,7 @@ class ModifyMyAcademicGradeSheetServiceTest :
             savedEntries.clear()
             every { memberUtil.getCurrentUserId() } returns USER_ID
             every { support.ensureEditable(USER_ID, any()) } just runs
-            every { support.findPending(USER_ID) } returns null
+            every { support.findEditableForUpdate(USER_ID) } returns null
             every { support.curriculum() } returns curriculum
             every { academicGradeEntryPersistencePort.replaceAll(USER_ID, any(), capture(savedEntries)) } answers
                 { thirdArg() }
@@ -155,11 +155,11 @@ class ModifyMyAcademicGradeSheetServiceTest :
             }
         }
 
-        Given("심사 중인 교과성적이 있을 때") {
+        Given("반려된 교과성적이 있을 때") {
             When("입력값을 바꿔 평균이 달라지면") {
                 Then("같은 점수 행의 인정점수를 다시 계산해 저장하고 캐시를 무효화한다") {
-                    val pending = score(ScoreStatus.PENDING, scoreValue = 8)
-                    every { support.findPending(USER_ID) } returns pending
+                    val pending = score(ScoreStatus.REJECTED, scoreValue = 8)
+                    every { support.findEditableForUpdate(USER_ID) } returns pending
                     every { support.toScoreValue(any(), academicGradeCategory) } returns 7
                     val saved = slot<Score>()
                     every { scorePersistencePort.save(capture(saved)) } answers { firstArg() }
@@ -168,14 +168,14 @@ class ModifyMyAcademicGradeSheetServiceTest :
 
                     saved.captured.scoreId shouldBe pending.scoreId
                     saved.captured.scoreValue shouldBe 7
-                    saved.captured.scoreStatus shouldBe ScoreStatus.PENDING
+                    saved.captured.scoreStatus shouldBe ScoreStatus.REJECTED
                     verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(USER_ID) }
                 }
             }
 
             When("인정점수가 그대로면") {
                 Then("점수를 저장하지 않는다") {
-                    every { support.findPending(USER_ID) } returns score(ScoreStatus.PENDING, scoreValue = 8)
+                    every { support.findEditableForUpdate(USER_ID) } returns score(ScoreStatus.REJECTED, scoreValue = 8)
                     every { support.toScoreValue(any(), academicGradeCategory) } returns 8
 
                     service.execute(completeCommands())
@@ -186,7 +186,7 @@ class ModifyMyAcademicGradeSheetServiceTest :
 
             When("입력표를 미완성으로 만들면") {
                 Then("ACADEMIC_GRADE_INCOMPLETE 예외가 발생한다") {
-                    every { support.findPending(USER_ID) } returns score(ScoreStatus.PENDING, scoreValue = 8)
+                    every { support.findEditableForUpdate(USER_ID) } returns score(ScoreStatus.REJECTED, scoreValue = 8)
                     every {
                         support.toScoreValue(any(), academicGradeCategory)
                     } throws GsmcException(ErrorCode.ACADEMIC_GRADE_INCOMPLETE)

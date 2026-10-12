@@ -98,11 +98,12 @@ interface FilePersistencePort {
     fun unlinkFromScore(fileId: Long)
 
     /**
-     * 파일이 승인(`APPROVED`) 상태의 점수 요청에 연결되어 있는지 확인한다. 이미 심사가 끝난
-     * 점수 요청의 근거 파일이 임의로 삭제되어 감사 추적이 깨지는 것을 막는 데 사용한다.
+     * 파일이 심사 중(`PENDING`, `REVIEWED`)이거나 최종 승인(`APPROVED`)된 점수 요청에 연결되어
+     * 있는지 확인한다. 메서드 이름은 기존 포트 호환성을 유지하며, 근거 파일이 임의로 삭제되어
+     * 감사 추적이 깨지는 것을 막는 데 사용한다.
      *
      * @param fileId 확인할 파일 ID
-     * @return 승인된 점수 요청에 연결되어 있으면 true
+     * @return 수정이 잠긴 점수 요청에 연결되어 있으면 true
      */
     fun isLinkedToApprovedScore(fileId: Long): Boolean
 }

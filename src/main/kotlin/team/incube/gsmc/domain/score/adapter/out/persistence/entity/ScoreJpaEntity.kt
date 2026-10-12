@@ -64,7 +64,7 @@ class ScoreJpaEntity(
     /** 활동명 — [team.incube.gsmc.domain.category.EvidenceType.EVIDENCE] 카테고리에서 활동 내용을 직접 기재할 때 사용 */
     @Column(name = "activity_name", nullable = true, length = 255)
     val activityName: String?,
-    /** 인정 점수 값 — 심사 전([ScoreStatus.INCOMPLETE]/[ScoreStatus.PENDING])에는 null일 수 있음 */
+    /** 인정 점수 값 — 심사 전에는 null일 수 있음 */
     @Column(name = "score_value", nullable = true)
     val scoreValue: Int?,
     /** 반려 사유 — [ScoreStatus.REJECTED]가 아니면 null */

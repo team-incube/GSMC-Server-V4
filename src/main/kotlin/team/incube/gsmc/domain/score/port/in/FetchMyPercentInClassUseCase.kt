@@ -17,7 +17,7 @@ interface FetchMyPercentInClassUseCase {
      * 현재 로그인한 학생의 같은 반 내 백분위를 계산한다. 학생(STUDENT)만 호출할 수 있다.
      * 반 전체 총점 캐시가 최대 5초 지연 무효화되므로, 직전 점수 변경이 결과에 반영되지 않을 수 있다.
      *
-     * @param includeApprovedOnly true면 승인된 점수만 합산, false면 전체 상태 포함
+     * @param includeApprovedOnly 기존 클라이언트 호환용 인자. 현재는 값과 무관하게 최종 승인 점수만 합산한다.
      * @return 학급 내 백분위
      * @throws team.incube.gsmc.global.exception.GsmcException 호출자가 학생이 아니면 [team.incube.gsmc.global.exception.ErrorCode.FORBIDDEN]
      */

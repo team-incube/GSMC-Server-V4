@@ -92,15 +92,15 @@ class FetchTotalScoreServiceTest :
                 }
             }
 
-            When("권한이 선생님 이상이고 허가되지 않은 점수도 조회하면") {
-                Then("허가되지 않은 점수들을 포함한 총점이 반환된다") {
+            When("권한이 선생님 이상이고 허가되지 않은 점수 포함 옵션을 요청해도") {
+                Then("최종 승인 점수만 포함한 총점이 반환된다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1, UserRole.STUDENT)
                     every { scorePersistencePort.findCalculationRowsByUserIdIn(listOf(1L)) } returns scores
 
                     val result = service.execute(1L, false)
 
-                    result shouldBe totalScoreOf(3)
+                    result shouldBe totalScoreOf(2)
                 }
             }
 

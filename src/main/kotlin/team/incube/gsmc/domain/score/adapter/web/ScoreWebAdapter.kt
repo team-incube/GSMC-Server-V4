@@ -9,22 +9,27 @@ import team.incube.gsmc.domain.score.Percentile
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreCategoryGroup
 import team.incube.gsmc.domain.score.ScoreStatus
+import team.incube.gsmc.domain.score.ScoreStatusHistory
 import team.incube.gsmc.domain.score.TotalScore
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreOnlyUseCase
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreWithFileUseCase
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreWithValueUseCase
+import team.incube.gsmc.domain.score.port.`in`.ApproveReviewedScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.ApproveScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchMyPercentInClassUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchMyPercentInGradeUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchMyScoresByCategoryUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchMyScoresUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchMyTotalScoreUseCase
+import team.incube.gsmc.domain.score.port.`in`.FetchScoreStatusHistoriesUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByCategoryUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByDgProjectIdUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchTotalScoreUseCase
+import team.incube.gsmc.domain.score.port.`in`.RejectReviewedScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.RejectScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.RemoveScoreUseCase
+import team.incube.gsmc.domain.score.port.`in`.ResubmitScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.SubmitProjectParticipationUseCase
 
 /**
@@ -48,6 +53,10 @@ class ScoreWebAdapter(
     private val submitProjectParticipationUseCase: SubmitProjectParticipationUseCase,
     private val approveScoreUseCase: ApproveScoreUseCase,
     private val rejectScoreUseCase: RejectScoreUseCase,
+    private val approveReviewedScoreUseCase: ApproveReviewedScoreUseCase,
+    private val rejectReviewedScoreUseCase: RejectReviewedScoreUseCase,
+    private val resubmitScoreUseCase: ResubmitScoreUseCase,
+    private val fetchScoreStatusHistoriesUseCase: FetchScoreStatusHistoriesUseCase,
     private val removeScoreUseCase: RemoveScoreUseCase,
 ) {
     @QueryMapping
@@ -98,17 +107,22 @@ class ScoreWebAdapter(
         @Argument dgProjectId: Long,
     ): List<Score> = fetchScoresByDgProjectIdUseCase.execute(dgProjectId)
 
+    @QueryMapping
+    fun scoreStatusHistories(
+        @Argument scoreId: Long,
+    ): List<ScoreStatusHistory> = fetchScoreStatusHistoriesUseCase.execute(scoreId)
+
     @MutationMapping
     fun addScoreWithFile(
         @Argument categoryType: CategoryType,
         @Argument input: ScoreWithValueAndFileInput,
-    ): Score = appendMyScoreWithFileUseCase.execute(categoryType, input.value, input.fileId)
+    ): Score = appendMyScoreWithFileUseCase.execute(categoryType, input.value, input.fileId, input.scoreId)
 
     @MutationMapping
     fun addScoreWithValue(
         @Argument categoryType: CategoryType,
         @Argument input: ScoreWithValueInput,
-    ): Score = appendMyScoreWithValueUseCase.execute(categoryType, input.value)
+    ): Score = appendMyScoreWithValueUseCase.execute(categoryType, input.value, input.scoreId)
 
     @MutationMapping
     fun addScoreOnly(
@@ -131,6 +145,22 @@ class ScoreWebAdapter(
         @Argument scoreId: Long,
         @Argument input: RejectScoreInput,
     ): Boolean = rejectScoreUseCase.execute(scoreId, input.rejectionReason)
+
+    @MutationMapping
+    fun approveReviewedScore(
+        @Argument scoreId: Long,
+    ): Boolean = approveReviewedScoreUseCase.execute(scoreId)
+
+    @MutationMapping
+    fun rejectReviewedScore(
+        @Argument scoreId: Long,
+        @Argument input: RejectScoreInput,
+    ): Boolean = rejectReviewedScoreUseCase.execute(scoreId, input.rejectionReason)
+
+    @MutationMapping
+    fun resubmitScore(
+        @Argument scoreId: Long,
+    ): Score = resubmitScoreUseCase.execute(scoreId)
 
     @MutationMapping
     fun deleteScore(

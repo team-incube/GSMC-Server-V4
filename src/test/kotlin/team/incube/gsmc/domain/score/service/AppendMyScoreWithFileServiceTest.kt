@@ -345,8 +345,8 @@ class AppendMyScoreWithFileServiceTest :
 
                     val result = service.execute(CategoryType.CERTIFICATE, "900", 20L)
 
-                    result.scoreStatus shouldBe ScoreStatus.PENDING
-                    result.rejectionReason shouldBe null
+                    result.scoreStatus shouldBe ScoreStatus.REJECTED
+                    result.rejectionReason shouldBe "다시 제출하세요"
                     result.scoreValue shouldBe 900
                     verify(exactly = 1) { filePersistencePort.unlinkFromScore(15L) }
                     verify(exactly = 1) { filePersistencePort.linkToScore(20L, 55L) }
@@ -376,7 +376,7 @@ class AppendMyScoreWithFileServiceTest :
 
                     val result = service.execute(CategoryType.CERTIFICATE, "900", 20L)
 
-                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    result.scoreStatus shouldBe ScoreStatus.REJECTED
                     verify(exactly = 0) { filePersistencePort.unlinkFromScore(any()) }
                     verify(exactly = 0) { filePersistencePort.linkToScore(any(), any()) }
                 }
