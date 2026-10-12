@@ -41,7 +41,12 @@ jobs:
           script: |
             set -eu
             cd ~/GSMC-server-V4
-            git pull origin develop
+
+            # 그 시점의 최신 develop이 아니라 이 실행을 유발한 커밋을 정확히 배포한다.
+            # 서버 작업 디렉터리에 커밋되지 않은 변경이 있으면 checkout이 실패해 컨테이너를 건드리기 전에 중단된다.
+            DEPLOY_SHA="${{ github.sha }}"
+            git fetch --quiet origin "$DEPLOY_SHA"
+            git checkout --quiet --detach "$DEPLOY_SHA"
 
             # 교체에 실패하면 되돌릴 수 있도록 현재 실행 중인 backend 이미지를 보존한다.
             if sudo docker inspect gsmc-server > /dev/null 2>&1; then
@@ -90,6 +95,6 @@ jobs:
             fi
 
             # 실제로 구동 중인 이미지와 배포 대상 커밋을 기록한다.
-            echo "배포 대상 커밋: ${{ github.sha }}"
+            echo "배포 대상 커밋: $DEPLOY_SHA"
             echo "서버 체크아웃 커밋: $(git rev-parse HEAD)"
             echo "실행 중인 이미지: $(sudo docker inspect --format '{{.Image}}' gsmc-server)"
