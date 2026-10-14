@@ -105,4 +105,8 @@ interface FilePersistencePort {
      * @return 승인된 점수 요청에 연결되어 있으면 true
      */
     fun isLinkedToApprovedScore(fileId: Long): Boolean
+
+    fun isLinkedToProject(fileId: Long): Boolean
+
+    fun isLinkedToProjectDraft(fileId: Long): Boolean
 }

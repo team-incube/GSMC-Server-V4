@@ -41,6 +41,9 @@ class RemoveFileService(
         ) {
             throw GsmcException(ErrorCode.FILE_LINKED_TO_APPROVED_SCORE)
         }
+        if (filePersistencePort.isLinkedToProject(fileId) || filePersistencePort.isLinkedToProjectDraft(fileId)) {
+            throw GsmcException(ErrorCode.FILE_LINKED_TO_PROJECT)
+        }
 
         filePersistencePort.deleteById(fileId)
 

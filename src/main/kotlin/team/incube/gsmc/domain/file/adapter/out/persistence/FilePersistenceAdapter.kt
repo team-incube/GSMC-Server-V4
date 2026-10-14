@@ -92,6 +92,24 @@ class FilePersistenceAdapter(
     override fun isLinkedToApprovedScore(fileId: Long): Boolean =
         fileJpaRepository.existsByFileIdAndScoreScoreStatus(fileId, ScoreStatus.APPROVED)
 
+    override fun isLinkedToProject(fileId: Long): Boolean =
+        entityManager
+            .createQuery(
+                "select 1 from ProjectJpaEntity p join p.files f where f.fileId = :fileId",
+            ).setParameter("fileId", fileId)
+            .setMaxResults(1)
+            .resultList
+            .isNotEmpty()
+
+    override fun isLinkedToProjectDraft(fileId: Long): Boolean =
+        entityManager
+            .createQuery(
+                "select 1 from ProjectDraftJpaEntity d join d.files f where f.fileId = :fileId",
+            ).setParameter("fileId", fileId)
+            .setMaxResults(1)
+            .resultList
+            .isNotEmpty()
+
     private fun throwLinkFailure(fileId: Long): Nothing {
         val errorCode =
             if (fileJpaRepository.existsById(fileId)) {
