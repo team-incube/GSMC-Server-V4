@@ -14,6 +14,15 @@ interface FilePersistencePort {
      */
     fun findById(fileId: Long): File?
 
+    /**
+     * ID로 파일을 조회하면서 해당 행에 비관적 쓰기 락을 건다. 삭제 전 연결 여부 검사와 삭제 사이에
+     * 다른 트랜잭션이 같은 파일을 프로젝트에 첨부하는 경쟁 조건을 막는 데 사용한다. 트랜잭션 안에서만 호출한다.
+     *
+     * @param fileId 조회할 파일 ID
+     * @return 해당 파일, 없으면 null
+     */
+    fun findByIdForUpdate(fileId: Long): File?
+
     fun findAllByIdIn(fileIds: Collection<Long>): List<File>
 
     /**

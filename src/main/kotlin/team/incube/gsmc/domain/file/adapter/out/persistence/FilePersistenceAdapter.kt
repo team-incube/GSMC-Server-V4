@@ -29,6 +29,8 @@ class FilePersistenceAdapter(
 ) : FilePersistencePort {
     override fun findById(fileId: Long): File? = fileJpaRepository.findById(fileId).orElse(null)?.toDomain()
 
+    override fun findByIdForUpdate(fileId: Long): File? = fileJpaRepository.findByIdForUpdate(fileId)?.toDomain()
+
     override fun findAllByIdIn(fileIds: Collection<Long>): List<File> =
         if (fileIds.isEmpty()) emptyList() else fileJpaRepository.findAllByFileIdIn(fileIds).map { it.toDomain() }
 

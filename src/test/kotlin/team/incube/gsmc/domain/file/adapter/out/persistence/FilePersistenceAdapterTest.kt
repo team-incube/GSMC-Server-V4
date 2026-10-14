@@ -69,6 +69,27 @@ class FilePersistenceAdapterTest :
             }
         }
 
+        Given("findByIdForUpdate로 잠금 조회할 때") {
+            When("해당 ID의 파일이 존재하면") {
+                Then("잠금 조회 쿼리 결과를 도메인 객체로 변환해 반환한다") {
+                    every { fileJpaRepository.findByIdForUpdate(10L) } returns entity(10L)
+
+                    val result = adapter.findByIdForUpdate(10L)
+
+                    result?.fileId shouldBe 10L
+                    result?.fileKey shouldBe "key-10"
+                    verify(exactly = 0) { fileJpaRepository.findById(any()) }
+                }
+            }
+            When("해당 ID의 파일이 존재하지 않으면") {
+                Then("null을 반환한다") {
+                    every { fileJpaRepository.findByIdForUpdate(999L) } returns null
+
+                    adapter.findByIdForUpdate(999L).shouldBeNull()
+                }
+            }
+        }
+
         Given("findByFileKey로 조회할 때") {
             When("해당 key의 파일이 존재하면") {
                 Then("도메인 객체로 변환해 반환한다") {

@@ -28,6 +28,8 @@ class RemoveSupersededFileService(
 ) : RemoveSupersededFileUseCase {
     @Transactional
     override fun execute(file: File) {
+        filePersistencePort.findByIdForUpdate(file.fileId) ?: return
+
         if (filePersistencePort.isLinkedToProject(file.fileId) ||
             filePersistencePort.isLinkedToProjectDraft(file.fileId)
         ) {
