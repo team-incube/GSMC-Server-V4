@@ -10,6 +10,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import jakarta.persistence.EntityManager
+import jakarta.persistence.Query
 import team.incube.gsmc.domain.evidence.adapter.out.persistence.entity.EvidenceJpaEntity
 import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.FileJpaEntity
@@ -65,6 +66,79 @@ class FilePersistenceAdapterTest :
                     every { fileJpaRepository.findById(999L) } returns Optional.empty()
 
                     adapter.findById(999L).shouldBeNull()
+                }
+            }
+        }
+
+        Given("findByIdForUpdate로 잠금 조회할 때") {
+            When("해당 ID의 파일이 존재하면") {
+                Then("잠금 조회 쿼리 결과를 도메인 객체로 변환해 반환한다") {
+                    every { fileJpaRepository.findByIdForUpdate(10L) } returns entity(10L)
+
+                    val result = adapter.findByIdForUpdate(10L)
+
+                    result?.fileId shouldBe 10L
+                    result?.fileKey shouldBe "key-10"
+                    verify(exactly = 0) { fileJpaRepository.findById(any()) }
+                }
+            }
+            When("해당 ID의 파일이 존재하지 않으면") {
+                Then("null을 반환한다") {
+                    every { fileJpaRepository.findByIdForUpdate(999L) } returns null
+
+                    adapter.findByIdForUpdate(999L).shouldBeNull()
+                }
+            }
+        }
+
+        fun stubLinkQuery(
+            jpqlFragment: String,
+            rows: List<Any>,
+        ): Query {
+            val query = mockk<Query>()
+            every { entityManager.createQuery(match<String> { it.contains(jpqlFragment) }) } returns query
+            every { query.setParameter("fileId", any<Long>()) } returns query
+            every { query.setMaxResults(1) } returns query
+            every { query.resultList } returns rows
+            return query
+        }
+
+        Given("isLinkedToProject로 프로젝트 첨부 여부를 확인할 때") {
+            When("해당 파일을 첨부한 프로젝트가 없으면") {
+                Then("false를 반환한다") {
+                    stubLinkQuery("ProjectJpaEntity", emptyList())
+
+                    adapter.isLinkedToProject(10L) shouldBe false
+                }
+            }
+            When("해당 파일을 첨부한 프로젝트가 있으면") {
+                Then("true를 반환하고 fileId 파라미터와 최대 1건 제한으로 조회한다") {
+                    val query = stubLinkQuery("ProjectJpaEntity", listOf(1))
+
+                    adapter.isLinkedToProject(10L) shouldBe true
+
+                    verify(exactly = 1) { query.setParameter("fileId", 10L) }
+                    verify(exactly = 1) { query.setMaxResults(1) }
+                }
+            }
+        }
+
+        Given("isLinkedToProjectDraft로 프로젝트 초안 첨부 여부를 확인할 때") {
+            When("해당 파일을 첨부한 초안이 없으면") {
+                Then("false를 반환한다") {
+                    stubLinkQuery("ProjectDraftJpaEntity", emptyList())
+
+                    adapter.isLinkedToProjectDraft(10L) shouldBe false
+                }
+            }
+            When("해당 파일을 첨부한 초안이 있으면") {
+                Then("true를 반환하고 fileId 파라미터와 최대 1건 제한으로 조회한다") {
+                    val query = stubLinkQuery("ProjectDraftJpaEntity", listOf(1))
+
+                    adapter.isLinkedToProjectDraft(10L) shouldBe true
+
+                    verify(exactly = 1) { query.setParameter("fileId", 10L) }
+                    verify(exactly = 1) { query.setMaxResults(1) }
                 }
             }
         }

@@ -33,13 +33,16 @@ class RemoveFileService(
 ) : RemoveFileUseCase {
     @Transactional
     override fun execute(fileId: Long): Boolean {
-        val file = filePersistencePort.findById(fileId) ?: throw GsmcException(ErrorCode.FILE_NOT_FOUND)
+        val file = filePersistencePort.findByIdForUpdate(fileId) ?: throw GsmcException(ErrorCode.FILE_NOT_FOUND)
         if (file.userId != memberUtil.getCurrentUserId()) throw GsmcException(ErrorCode.FORBIDDEN)
         val evidenceId = file.evidenceId
         if (filePersistencePort.isLinkedToApprovedScore(fileId) ||
             (evidenceId != null && scorePersistencePort.isEvidenceLinkedToApprovedScore(evidenceId))
         ) {
             throw GsmcException(ErrorCode.FILE_LINKED_TO_APPROVED_SCORE)
+        }
+        if (filePersistencePort.isLinkedToProject(fileId) || filePersistencePort.isLinkedToProjectDraft(fileId)) {
+            throw GsmcException(ErrorCode.FILE_LINKED_TO_PROJECT)
         }
 
         filePersistencePort.deleteById(fileId)
