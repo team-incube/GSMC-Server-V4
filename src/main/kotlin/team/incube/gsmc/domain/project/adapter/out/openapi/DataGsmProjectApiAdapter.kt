@@ -37,19 +37,39 @@ private val RETRY_BACKOFF: Duration = Duration.ofMillis(200)
 /**
  * DataGSM 프로젝트 데이터 OpenAPI(`GET /v1/projects`) 연동을 담당하는 아웃바운드 어댑터 클래스입니다.
  * [DataGsmProjectApiPort]를 구현하며, `X-API-KEY` 헤더 인증을 사용하는 순수 REST 호출을 [RestClient]로 처리합니다.
- * 참여자 이메일 필터는 API가 직접 지원하지 않아 클라이언트 측에서 전체 ACTIVE 프로젝트를 조회한 뒤 걸러낸다.
+ * 참여자 이메일 필터는 API가 직접 지원하지 않아 전체 목록을 갱신할 때 Redis 참여자 인덱스를 함께 구성한다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class DataGsmProjectApiAdapter(
     private val dataGsmOpenApiRestClient: RestClient,
     private val dataGsmProjectCachePort: DataGsmProjectCachePort,
     private val dataGsmProjectSingleFlight: DataGsmProjectSingleFlight,
+    private val participantIndexSingleFlight: DataGsmProjectParticipantIndexSingleFlight,
     private val dataGsmOpenApiProperties: DataGsmOpenApiProperties,
     private val clock: Clock = Clock.systemUTC(),
 ) : DataGsmProjectApiPort {
     /** DataGSM에서 현재 사용자가 참여한 활성 프로젝트를 조회합니다. */
-    override fun findActiveProjectsByParticipantEmail(email: String): List<DataGsmProject> =
-        findAllActiveProjects().filter { project -> project.participants.any { it.participantEmail == email } }
+    override fun findActiveProjectsByParticipantEmail(email: String): List<DataGsmProject> {
+        dataGsmProjectCachePort.findByParticipantEmail(email)?.let { return it }
+
+        val backfilledProjects =
+            participantIndexSingleFlight.load {
+                if (dataGsmProjectCachePort.isParticipantIndexAvailable()) {
+                    null
+                } else {
+                    findAllActiveProjects().also { projects ->
+                        if (!dataGsmProjectCachePort.isParticipantIndexAvailable()) {
+                            dataGsmProjectCachePort.saveParticipantIndex(projects)
+                        }
+                    }
+                }
+            }
+
+        dataGsmProjectCachePort.findByParticipantEmail(email)?.let { return it }
+
+        // Redis 장애나 인덱스 저장 실패 때도 기존의 전체 목록 조회 계약을 유지한다.
+        return (backfilledProjects ?: findAllActiveProjects()).filterByParticipantEmail(email)
+    }
 
     /** DataGSM 프로젝트 식별자로 외부 프로젝트를 조회합니다. */
     override fun findProjectById(dgProjectId: Long): DataGsmProject? =
@@ -168,4 +188,7 @@ class DataGsmProjectApiAdapter(
         val withinDeadline = deadline == null || clock.instant().plus(RETRY_BACKOFF).isBefore(deadline)
         return transient && attempt < MAX_ATTEMPTS && withinDeadline
     }
+
+    private fun List<DataGsmProject>.filterByParticipantEmail(email: String): List<DataGsmProject> =
+        filter { project -> project.participants.any { it.participantEmail == email } }
 }
