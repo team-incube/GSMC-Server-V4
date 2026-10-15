@@ -13,10 +13,12 @@ import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
+import team.incube.gsmc.domain.score.MemberSchoolInfo
 import team.incube.gsmc.domain.score.Percentile
 import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
+import team.incube.gsmc.domain.score.port.out.MemberSchoolInfoCachePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
 import team.incube.gsmc.domain.user.User
@@ -39,6 +41,7 @@ class FetchMyPercentInGradeServiceTest :
                 memberPersistencePort,
                 scoreTotalCachePort,
                 scoreTotalCacheSingleFlight,
+                PassThroughMemberSchoolInfoCachePort(),
                 memberUtil,
             )
 
@@ -253,6 +256,28 @@ class FetchMyPercentInGradeServiceTest :
                     val result = service.execute(true)
 
                     result shouldBe percentileOf(100, 50)
+                }
+            }
+            When("학년·반이 캐시돼 있으면") {
+                Then("회원 조회 없이 캐시된 학년·반으로 백분위를 계산한다") {
+                    val schoolInfoCachePort = mockk<MemberSchoolInfoCachePort>()
+                    val cachedService =
+                        FetchMyPercentInGradeService(
+                            scorePersistencePort,
+                            memberPersistencePort,
+                            scoreTotalCachePort,
+                            scoreTotalCacheSingleFlight,
+                            schoolInfoCachePort,
+                            memberUtil,
+                        )
+                    every { memberUtil.getCurrentUserId() } returns 1L
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
+                    every { schoolInfoCachePort.load(1L, any()) } returns MemberSchoolInfo(2, 3)
+                    every { scoreTotalCachePort.findGradeTotals(2, any()) } returns mapOf(1L to 2, 2L to 1)
+
+                    cachedService.execute(true)
+
+                    verify(exactly = 0) { memberPersistencePort.findByUserId(any()) }
                 }
             }
         }
