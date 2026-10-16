@@ -1,0 +1,18 @@
+query ProjectDetail($projectId: ID!) {
+  project(projectId: $projectId) {
+    id
+    title
+    description
+    ownerId
+    participants {
+      id
+      name
+    }
+    files {
+      id
+      name
+      url
+    }
+    scoreIds
+  }
+}

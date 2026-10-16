@@ -1,0 +1,14 @@
+query MyScores($categoryType: CategoryType, $status: ScoreStatus) {
+  myScores(categoryType: $categoryType, status: $status) {
+    scoreId
+    scoreStatus
+    activityName
+    scoreValue
+    rejectionReason
+    updatedAt
+    category {
+      categoryType
+      categoryKoreanName
+    }
+  }
+}

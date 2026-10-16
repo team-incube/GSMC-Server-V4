@@ -1,0 +1,11 @@
+query MyMember {
+  myMember {
+    id
+    name
+    email
+    grade
+    classNumber
+    number
+    role
+  }
+}
