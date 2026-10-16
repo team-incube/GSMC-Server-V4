@@ -58,7 +58,9 @@ class SecurityConfig(
                 "/swagger-ui.html",
                 "/swagger-ui/**",
                 "/v3/api-docs/**",
+                "/graphiql",
                 "/graphiql/**",
+                "/graphql/schema",
             ).permitAll()
             .anyRequest()
             .authenticated()

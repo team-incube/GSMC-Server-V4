@@ -5,9 +5,16 @@ spring:
     # 교과성적 과목 목록. 기본은 JAR에 포함된 파일이고, 운영에서 바꾸려면 외부 파일 경로(file:...)를 지정한다.
     import: ${ACADEMIC_CURRICULUM_PATH:classpath:academic-curriculum.yml}
   graphql:
+    http:
+      path: /graphql
     graphiql:
       # API 문서 UI(GraphiQL·Swagger)는 운영에 노출되지 않도록 기본은 끄고, 로컬 등 필요한 환경에서만 API_DOCS_ENABLED=true로 켠다.
       enabled: ${API_DOCS_ENABLED:false}
+      path: /graphiql
+    schema:
+      printer:
+        # GraphiQL과 같은 정책으로 병합된 SDL 조회 경로(/graphql/schema)를 제어한다.
+        enabled: ${API_DOCS_ENABLED:false}
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}

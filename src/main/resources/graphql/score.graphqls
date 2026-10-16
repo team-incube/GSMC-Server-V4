@@ -1,78 +1,121 @@
+"""회원의 역량인증 점수 신청과 심사 상태입니다."""
 type Score {
+    """점수 식별자입니다."""
     scoreId: ID!
+    """점수 소유자의 회원 식별자입니다."""
     userId: ID!
+    """점수가 속한 카테고리입니다."""
     category: Category!
+    """연결된 증빙자료입니다. 증빙자료가 없는 점수이면 null입니다."""
     evidence: Evidence
+    """점수에 직접 연결된 파일입니다. 직접 첨부 파일이 없으면 null입니다."""
     file: File
+    """현재 신청 또는 심사 상태입니다."""
     scoreStatus: ScoreStatus!
+    """활동 이름입니다. 해당 카테고리에서 사용하지 않으면 null입니다."""
     activityName: String
+    """입력값을 기준으로 계산된 점수입니다. 아직 계산할 수 없으면 null입니다."""
     scoreValue: Int
+    """반려 상태의 사유입니다. 반려 사유가 없으면 null입니다."""
     rejectionReason: String
+    """연결된 DataGSM 프로젝트 식별자입니다. 프로젝트 참여 점수가 아니면 null입니다."""
     dgProjectId: ID
+    """점수의 최근 수정 시각입니다."""
     updatedAt: DateTime!
+    """신청할 때 사용한 카테고리 유형입니다. 저장된 값이 없으면 null입니다."""
     submittedCategoryType: CategoryType
 }
 
+"""카테고리별 점수 목록과 인정 점수입니다."""
 type ScoreCategoryGroup {
     categoryType: CategoryType!
     categoryEnglishName: String!
     categoryKoreanName: String!
     recognizedScore: Int!
+    """해당 카테고리의 점수 목록입니다. 결과가 없으면 빈 배열입니다."""
     scores: [Score!]!
 }
 
+"""점수 합계 응답입니다."""
 type TotalScore {
     totalScore: Int!
 }
 
+"""현재 사용자의 상위·하위 백분위입니다."""
 type Percentile {
     topPercentile: Int!
     bottomPercentile: Int!
 }
 
+"""점수 신청과 심사의 현재 상태입니다."""
 enum ScoreStatus {
+    """신청에 필요한 정보가 아직 완성되지 않은 상태입니다."""
     INCOMPLETE
+    """신청 후 심사를 기다리는 상태입니다."""
     PENDING
+    """교사 이상 권한으로 승인된 상태입니다."""
     APPROVED
+    """교사 이상 권한으로 반려된 상태입니다."""
     REJECTED
 }
 
 type Query {
+    """현재 사용자의 점수를 선택한 카테고리 유형과 상태로 필터링해 반환합니다."""
     myScores(categoryType: CategoryType, status: ScoreStatus): [Score!]!
+    """점수 소유자 또는 교사 이상 권한이 점수 한 건을 조회합니다."""
     score(scoreId: ID!): Score!
+    """현재 사용자의 점수를 카테고리별로 묶어 반환합니다."""
     myScoresByCategory(status: ScoreStatus): [ScoreCategoryGroup!]!
+    """교사 이상 권한이 지정 회원의 점수를 카테고리별로 조회합니다."""
     scoresByCategory(memberId: ID!, status: ScoreStatus): [ScoreCategoryGroup!]!
+    """현재 사용자의 점수 합계를 반환합니다. 기본값은 승인된 점수만 포함합니다."""
     myTotalScore(includeApprovedOnly: Boolean = true): TotalScore!
+    """교사 이상 권한이 지정 회원의 점수 합계를 조회합니다."""
     totalScore(memberId: ID!, includeApprovedOnly: Boolean = true): TotalScore!
+    """학생인 현재 사용자의 반 내 백분위를 반환합니다."""
     myPercentInClass(includeApprovedOnly: Boolean = true): Percentile!
+    """학생인 현재 사용자의 학년 내 백분위를 반환합니다."""
     myPercentInGrade(includeApprovedOnly: Boolean = true): Percentile!
+    """교사 이상 권한이 DataGSM 프로젝트 식별자로 점수를 조회합니다."""
     scoresByDgProjectId(dgProjectId: ID!): [Score!]!
 }
 
+"""값과 파일이 모두 필요한 점수 신청 입력입니다."""
 input ScoreWithValueAndFileInput {
     value: String
     fileId: ID!
 }
 
+"""값만 필요한 점수 신청 입력입니다."""
 input ScoreWithValueInput {
     value: String
 }
 
+"""점수 반려 입력입니다."""
 input RejectScoreInput {
+    """1자 이상 500자 이하의 반려 사유입니다."""
     rejectionReason: String!
 }
 
+"""DataGSM 프로젝트 참여 점수 신청 입력입니다."""
 input SubmitProjectParticipationInput {
     content: String!
     fileIds: [ID!]!
 }
 
 type Mutation {
+    """현재 사용자가 값과 본인 소유 파일로 점수를 신청합니다."""
     addScoreWithFile(categoryType: CategoryType!, input: ScoreWithValueAndFileInput!): Score!
+    """현재 사용자가 값으로 점수를 신청합니다."""
     addScoreWithValue(categoryType: CategoryType!, input: ScoreWithValueInput!): Score!
+    """현재 사용자가 추가 입력 없이 점수를 신청합니다."""
     addScoreOnly(categoryType: CategoryType!): Score!
+    """학생인 현재 사용자가 참여 중인 활성 DataGSM 프로젝트의 점수를 신청합니다."""
     submitProjectParticipation(dgProjectId: ID!, input: SubmitProjectParticipationInput!): Score!
+    """교사 이상 권한이 점수를 승인합니다."""
     approveScore(scoreId: ID!): Boolean!
+    """교사 이상 권한이 사유와 함께 점수를 반려합니다."""
     rejectScore(scoreId: ID!, input: RejectScoreInput!): Boolean!
+    """교사 이상 권한이 점수를 삭제합니다."""
     deleteScore(scoreId: ID!): Boolean!
 }

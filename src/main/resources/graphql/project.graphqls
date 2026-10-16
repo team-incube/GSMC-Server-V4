@@ -1,4 +1,4 @@
-# DataGSM 동아리 요약입니다.
+"""DataGSM 동아리 요약입니다."""
 type DataGsmClub {
     # 동아리 식별자입니다.
     clubId: ID!
@@ -8,7 +8,7 @@ type DataGsmClub {
     clubType: String
 }
 
-# DataGSM 프로젝트 참여자입니다.
+"""DataGSM 프로젝트 참여자입니다."""
 type DataGsmProjectParticipant {
     # 참여자 식별자입니다.
     participantId: ID!
@@ -24,13 +24,15 @@ type DataGsmProjectParticipant {
     sex: String
 }
 
-# DataGSM 프로젝트 상태입니다.
+"""DataGSM 프로젝트 상태입니다."""
 enum DataGsmProjectStatus {
+    """현재 참여할 수 있는 프로젝트입니다."""
     ACTIVE
+    """종료된 프로젝트입니다."""
     ENDED
 }
 
-# DataGSM에서 조회한 외부 프로젝트입니다.
+"""DataGSM에서 조회한 외부 프로젝트입니다."""
 type DataGsmProject {
     # DataGSM 프로젝트 식별자입니다.
     dgProjectId: ID!
@@ -50,7 +52,7 @@ type DataGsmProject {
     participants: [DataGsmProjectParticipant!]!
 }
 
-# 내부 프로젝트 요약입니다.
+"""내부 프로젝트 목록에서 사용하는 요약 정보입니다."""
 type ProjectSummary {
     # 프로젝트 식별자입니다.
     id: ID!
@@ -60,15 +62,15 @@ type ProjectSummary {
     ownerId: ID!
 }
 
-# 내부 프로젝트 제목 검색 결과입니다.
+"""내부 프로젝트 제목 검색의 페이지 응답입니다."""
 type ProjectSearchResult {
     # 검색된 전체 프로젝트 수입니다.
     totalElements: Long!
-    # 현재 페이지의 프로젝트 목록입니다.
+    """현재 페이지의 프로젝트 목록입니다. 결과가 없으면 빈 배열입니다."""
     projects: [ProjectSummary!]!
 }
 
-# 내부 프로젝트 참여자 요약입니다.
+"""내부 프로젝트 참여자 요약입니다."""
 type ProjectParticipant {
     # 참여자 식별자입니다.
     id: ID!
@@ -76,7 +78,7 @@ type ProjectParticipant {
     name: String!
 }
 
-# 내부 프로젝트에 연결된 파일 요약입니다.
+"""내부 프로젝트에 연결된 파일 요약입니다."""
 type ProjectFile {
     # 파일 식별자입니다.
     id: ID!
@@ -86,7 +88,7 @@ type ProjectFile {
     url: String
 }
 
-# 내부 프로젝트 상세입니다.
+"""내부 프로젝트 상세 정보입니다."""
 type Project {
     # 프로젝트 식별자입니다.
     id: ID!
@@ -100,11 +102,11 @@ type Project {
     participants: [ProjectParticipant!]!
     # 프로젝트에 연결된 파일 목록입니다.
     files: [ProjectFile!]!
-    # 프로젝트에 연결된 Score 식별자 목록입니다.
+    """프로젝트에 연결된 점수 식별자 목록입니다. 연결된 점수가 없으면 빈 배열입니다."""
     scoreIds: [ID!]!
 }
 
-# 내부 프로젝트 초안입니다.
+"""현재 사용자가 임시 저장한 내부 프로젝트 초안입니다."""
 type ProjectDraft {
     # 초안 제목입니다.
     title: String!
@@ -116,7 +118,7 @@ type ProjectDraft {
     fileIds: [ID!]!
 }
 
-# 현재 사용자의 내부 프로젝트 Score와 Evidence입니다.
+"""현재 사용자가 참여한 내부 프로젝트의 점수와 증빙자료입니다."""
 type ProjectScoreAndEvidence {
     # 프로젝트에 연결된 현재 사용자의 Score입니다.
     score: Score!
@@ -124,31 +126,31 @@ type ProjectScoreAndEvidence {
     evidence: [Evidence!]!
 }
 
-# 내부 프로젝트 생성 입력입니다.
+"""내부 프로젝트 생성 입력입니다."""
 input CreateProjectInput {
     # 프로젝트 제목입니다.
     title: String!
     # 프로젝트 설명입니다.
     description: String!
-    # 연결할 파일 식별자 목록입니다.
+    """연결할 현재 사용자 소유 파일 식별자 목록입니다."""
     fileIds: [ID!] = []
-    # 참여자 식별자 목록입니다.
+    """프로젝트 참여자 식별자 목록입니다."""
     participantIds: [ID!]!
 }
 
-# 내부 프로젝트 부분 수정 입력입니다.
+"""내부 프로젝트 부분 수정 입력입니다. null인 필드는 기존 값을 유지합니다."""
 input PatchProjectInput {
     # 변경할 프로젝트 제목입니다.
     title: String
     # 변경할 프로젝트 설명입니다.
     description: String
-    # 명시하면 파일 연결을 이 목록으로 교체합니다.
+    """명시하면 파일 연결을 이 목록으로 교체합니다."""
     fileIds: [ID!]
-    # 명시하면 참여자 연결을 이 목록으로 교체합니다.
+    """명시하면 참여자 연결을 이 목록으로 교체합니다."""
     participantIds: [ID!]
 }
 
-# 내부 프로젝트 초안 저장 입력입니다.
+"""현재 사용자의 내부 프로젝트 초안 저장 입력입니다."""
 input CreateProjectDraftInput {
     # 초안 제목입니다.
     title: String = ""
@@ -161,29 +163,33 @@ input CreateProjectDraftInput {
 }
 
 extend type Query {
-    # 현재 사용자가 소유하거나 참여한 프로젝트 목록입니다.
+    """현재 사용자가 소유하거나 참여한 프로젝트 목록입니다. 결과가 없으면 빈 배열입니다."""
     myProjects: [ProjectSummary!]!
-    # 제목 부분 일치 프로젝트 검색 결과입니다.
+    """
+    제목이 부분 일치하는 프로젝트를 검색합니다.
+
+    page는 0부터 시작하고 size의 기본값은 10이며, 검색 결과가 없으면 projects는 빈 배열입니다.
+    """
     searchProjects(title: String!, page: Int = 0, size: Int = 10): ProjectSearchResult!
-    # 현재 사용자의 프로젝트 초안입니다.
+    """현재 사용자의 프로젝트 초안을 반환합니다. 초안이 없으면 null입니다."""
     myProjectDraft: ProjectDraft
-    # 내부 프로젝트 상세입니다.
+    """인증된 사용자가 내부 프로젝트 상세 정보를 조회합니다."""
     project(projectId: ID!): Project!
-    # 현재 사용자의 프로젝트 Score와 Evidence입니다.
+    """프로젝트 참여자인 현재 사용자의 점수와 증빙자료를 조회합니다."""
     myProjectScoreAndEvidence(projectId: ID!): ProjectScoreAndEvidence!
-    # 현재 사용자가 참여자로 등록된 DataGSM 활성 프로젝트 목록입니다.
+    """학생인 현재 사용자가 참여자로 등록된 DataGSM 활성 프로젝트 목록입니다."""
     myWritableDataGsmProjects: [DataGsmProject!]!
 }
 
 extend type Mutation {
-    # 내부 프로젝트를 생성합니다.
+    """현재 사용자를 소유자로 하는 내부 프로젝트를 생성합니다."""
     createProject(input: CreateProjectInput!): Project!
-    # 내부 프로젝트를 부분 수정합니다.
+    """프로젝트 소유자가 내부 프로젝트를 부분 수정합니다."""
     updateProject(projectId: ID!, input: PatchProjectInput!): Project!
-    # 내부 프로젝트를 삭제합니다.
+    """프로젝트 소유자가 내부 프로젝트를 삭제합니다."""
     deleteProject(projectId: ID!): Boolean!
-    # 현재 사용자의 프로젝트 초안을 저장합니다.
+    """현재 사용자의 프로젝트 초안을 저장합니다."""
     createProjectDraft(input: CreateProjectDraftInput!): ProjectDraft!
-    # 현재 사용자의 프로젝트 초안을 삭제합니다.
+    """현재 사용자의 프로젝트 초안을 삭제합니다."""
     deleteProjectDraft: Boolean!
 }

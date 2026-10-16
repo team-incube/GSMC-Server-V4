@@ -1,0 +1,14 @@
+query MyEvidences {
+  myEvidences {
+    evidenceId
+    title
+    content
+    createdAt
+    updatedAt
+    files {
+      fileId
+      originalName
+      fileUrl
+    }
+  }
+}

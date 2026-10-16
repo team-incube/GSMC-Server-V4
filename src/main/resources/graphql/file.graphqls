@@ -1,25 +1,30 @@
+"""서버에서 관리하는 업로드 파일입니다."""
 type File {
     fileId: ID!
     userId: ID!
     id: ID!
     originalName: String!
     uri: String!
+    """파일을 조회할 수 있는 일회성 URL입니다."""
     fileUrl: String
     fileOriginalName: String
     fileStoredName: String
 }
 
+"""파일 직접 업로드를 위한 URL 생성 입력입니다."""
 input CreatePresignedUploadUrlInput {
     fileName: String!
     fileSize: Long!
     contentType: String!
 }
 
+"""스토리지 업로드 완료 확인 입력입니다."""
 input ConfirmFileUploadInput {
     fileKey: String!
     originalFileName: String!
 }
 
+"""스토리지에 파일을 직접 업로드할 때 사용하는 일회성 정보입니다."""
 type PresignedUploadUrlPayload {
     presignedUrl: String!
     fileKey: String!
@@ -27,12 +32,17 @@ type PresignedUploadUrlPayload {
 }
 
 extend type Query {
+    """현재 사용자가 소유한 파일 목록을 반환합니다."""
     myFiles: [File!]!
+    """현재 사용자가 소유한 파일 한 건을 조회합니다."""
     file(fileId: ID!): File!
 }
 
 extend type Mutation {
+    """현재 사용자가 소유한 파일을 삭제합니다."""
     deleteFile(fileId: ID!): Boolean!
+    """스토리지 업로드를 마친 파일을 현재 사용자 소유로 확정합니다."""
     confirmFileUpload(input: ConfirmFileUploadInput!): File!
+    """현재 사용자가 스토리지에 직접 업로드할 일회성 URL을 생성합니다."""
     createPresignedUploadUrl(input: CreatePresignedUploadUrlInput!): PresignedUploadUrlPayload!
 }
