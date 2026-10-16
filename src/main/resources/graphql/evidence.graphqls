@@ -1,31 +1,54 @@
+"""사용자가 점수에 연결해 제출한 증빙자료입니다."""
 type Evidence {
+    """증빙자료 식별자입니다."""
     evidenceId: ID!
+    """증빙자료 소유자의 회원 식별자입니다."""
     userId: ID!
+    """증빙자료 제목입니다."""
     title: String!
+    """증빙자료 본문입니다."""
     content: String!
+    """생성 시각입니다. 저장 상태에 따라 값이 없을 수 있습니다."""
     createdAt: DateTime
+    """최근 수정 시각입니다. 저장 상태에 따라 값이 없을 수 있습니다."""
     updatedAt: DateTime
+    """이전 클라이언트 호환을 위해 유지하는 제목 필드입니다."""
     evidenceTitle: String
+    """이전 클라이언트 호환을 위해 유지하는 본문 필드입니다."""
     evidenceContent: String
+    """이전 클라이언트 호환을 위해 유지하는 생성 시각 필드입니다."""
     evidenceCreatedAt: DateTime
+    """이전 클라이언트 호환을 위해 유지하는 수정 시각 필드입니다."""
     evidenceUpdatedAt: DateTime
+    """증빙자료에 연결된 파일 목록입니다. 연결된 파일이 없으면 빈 배열입니다."""
     files: [File!]!
 }
 
+"""본인 점수에 제출할 증빙자료 입력입니다."""
 input CreateEvidenceInput {
+    """증빙자료를 연결할 본인 소유 점수 식별자입니다."""
     scoreId: ID!
+    """증빙자료 제목입니다."""
     title: String!
+    """증빙자료 본문입니다."""
     content: String!
+    """연결할 본인 소유 파일 식별자 목록입니다."""
     fileIds: [ID!] = []
 }
 
+"""제출한 증빙자료의 부분 수정 입력입니다. null인 필드는 기존 값을 유지합니다."""
 input PatchEvidenceInput {
+    """현재 수정 동작에서는 사용하지 않는 호환 필드입니다."""
     scoreId: ID
+    """변경할 제목입니다."""
     title: String
+    """변경할 본문입니다."""
     content: String
+    """명시하면 파일 연결을 이 목록으로 교체합니다."""
     fileIds: [ID!]
 }
 
+"""현재 사용자의 증빙자료 초안 저장 입력입니다."""
 input CreateEvidenceDraftInput {
     title: String = ""
     content: String = ""
@@ -33,15 +56,23 @@ input CreateEvidenceDraftInput {
 }
 
 extend type Query {
+    """현재 사용자의 제출 완료 증빙자료를 반환합니다. 결과가 없으면 빈 배열입니다."""
     myEvidences: [Evidence!]!
+    """현재 사용자의 증빙자료 초안을 반환합니다. 초안이 없으면 null입니다."""
     myEvidenceDraft: Evidence
+    """현재 사용자가 소유한 제출 완료 증빙자료를 조회합니다."""
     evidence(evidenceId: ID!): Evidence!
 }
 
 extend type Mutation {
+    """현재 사용자가 소유한 점수에 증빙자료를 생성하고 파일을 연결합니다."""
     createEvidence(input: CreateEvidenceInput!): Evidence!
+    """현재 사용자가 소유한 제출 완료 증빙자료를 부분 수정합니다."""
     patchEvidence(evidenceId: ID!, input: PatchEvidenceInput!): Evidence!
+    """현재 사용자가 소유한 제출 완료 증빙자료를 삭제합니다."""
     deleteEvidence(evidenceId: ID!): Boolean!
+    """현재 사용자의 증빙자료 초안을 저장합니다."""
     createEvidenceDraft(input: CreateEvidenceDraftInput!): Evidence!
+    """현재 사용자의 증빙자료 초안을 삭제합니다."""
     deleteEvidenceDraft: Boolean!
 }
