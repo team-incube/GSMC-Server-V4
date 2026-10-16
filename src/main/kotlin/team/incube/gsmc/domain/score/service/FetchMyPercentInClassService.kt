@@ -1,9 +1,11 @@
 package team.incube.gsmc.domain.score.service
 
+import team.incube.gsmc.domain.score.MemberSchoolInfo
 import team.incube.gsmc.domain.score.Percentile
 import team.incube.gsmc.domain.score.ScoreAggregator
 import team.incube.gsmc.domain.score.port.`in`.FetchMyPercentInClassUseCase
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
+import team.incube.gsmc.domain.score.port.out.MemberSchoolInfoCachePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
 import team.incube.gsmc.domain.user.UserRole
@@ -26,6 +28,7 @@ class FetchMyPercentInClassService(
     private val memberPersistencePort: MemberPersistencePort,
     private val scoreTotalCachePort: ScoreTotalCachePort,
     private val scoreTotalCacheSingleFlight: ScoreTotalCacheSingleFlight,
+    private val memberSchoolInfoCachePort: MemberSchoolInfoCachePort,
     private val memberUtil: MemberUtil,
 ) : FetchMyPercentInClassUseCase {
     override fun execute(includeApprovedOnly: Boolean): Percentile {
@@ -34,7 +37,10 @@ class FetchMyPercentInClassService(
         }
 
         val userId = memberUtil.getCurrentUserId()
-        val me = memberPersistencePort.findByUserId(userId) ?: throw GsmcException(ErrorCode.USER_NOT_FOUND)
+        val me =
+            memberSchoolInfoCachePort.load(userId) {
+                memberPersistencePort.findByUserId(userId)?.let { MemberSchoolInfo(it.userGrade, it.userClassNumber) }
+            } ?: throw GsmcException(ErrorCode.USER_NOT_FOUND)
         val userGrade = requireNotNull(me.userGrade) { "학생은 userGrade가 null일 수 없습니다." }
         val userClassNumber = requireNotNull(me.userClassNumber) { "학생은 userClassNumber가 null일 수 없습니다." }
 
