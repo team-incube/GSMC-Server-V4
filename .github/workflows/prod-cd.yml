@@ -5,7 +5,14 @@ on:
     branches:
       - develop
   workflow_dispatch:
-  
+
+# 같은 운영 서버를 조작하는 배포는 한 번에 하나만 실행한다.
+# 진행 중인 배포를 취소하면 교체·복구 도중에 끊길 수 있으므로 취소하지 않고 끝날 때까지 기다린다.
+# 대기 중인 실행은 하나만 유지되며, 더 새로운 실행이 들어오면 대기 중이던 실행이 취소된다.
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -34,7 +41,28 @@ jobs:
           script: |
             set -eu
             cd ~/GSMC-server-V4
-            git pull origin develop
+
+            # workflow concurrency는 GitHub Actions 실행끼리만 막는다. 서버에서 직접 실행한 배포나
+            # 취소된 실행의 남은 원격 프로세스와도 겹치지 않도록 서버 측 잠금을 잡는다.
+            # 잠금은 이 셸이 끝나면(성공·실패·연결 끊김 모두) 파일 디스크립터가 닫히면서 자동으로 풀린다.
+            exec 9> ~/.gsmc-deploy.lock
+            if ! flock --wait 900 9; then
+              echo "다른 배포가 15분 넘게 진행 중이라 잠금을 얻지 못했습니다."
+              exit 1
+            fi
+
+            # 그 시점의 최신 develop이 아니라 이 실행을 유발한 커밋을 정확히 배포한다.
+            # checkout은 대상 커밋과 충돌하지 않는 로컬 변경·미추적 파일을 그대로 남기므로,
+            # 작업 디렉터리가 깨끗한지 먼저 확인해 서버 로컬 파일이 빌드에 섞이지 않게 한다.
+            # .gitignore에 포함된 파일(.env 등)은 검사 대상이 아니다.
+            DEPLOY_SHA="${{ github.sha }}"
+            if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+              echo "서버 작업 디렉터리에 커밋되지 않은 변경이 있어 배포를 중단합니다."
+              git status --short --untracked-files=all
+              exit 1
+            fi
+            git fetch --quiet origin "$DEPLOY_SHA"
+            git checkout --quiet --detach "$DEPLOY_SHA"
 
             # 교체에 실패하면 되돌릴 수 있도록 현재 실행 중인 backend 이미지를 보존한다.
             if sudo docker inspect gsmc-server > /dev/null 2>&1; then
@@ -83,6 +111,6 @@ jobs:
             fi
 
             # 실제로 구동 중인 이미지와 배포 대상 커밋을 기록한다.
-            echo "배포 대상 커밋: ${{ github.sha }}"
+            echo "배포 대상 커밋: $DEPLOY_SHA"
             echo "서버 체크아웃 커밋: $(git rev-parse HEAD)"
             echo "실행 중인 이미지: $(sudo docker inspect --format '{{.Image}}' gsmc-server)"
