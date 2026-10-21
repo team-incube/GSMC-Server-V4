@@ -24,6 +24,7 @@ import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.category.adapter.out.persistence.entity.CategoryJpaEntity
 import team.incube.gsmc.domain.category.adapter.out.persistence.entity.QCategoryJpaEntity.categoryJpaEntity
+import team.incube.gsmc.domain.evidence.adapter.out.persistence.entity.EvidenceJpaEntity
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.FileJpaEntity
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.QFileJpaEntity.fileJpaEntity
 import team.incube.gsmc.domain.file.adapter.out.persistence.repository.FileJpaRepository
@@ -101,15 +102,24 @@ class ScorePersistenceAdapterTest :
                 conversionDivisor = 100,
             )
 
+        fun evidenceEntity(evidenceId: Long) =
+            EvidenceJpaEntity(
+                evidenceId = evidenceId,
+                user = userEntity(),
+                evidenceTitle = "근거 자료 $evidenceId",
+                evidenceContent = "내용",
+            )
+
         fun scoreEntity(
             scoreId: Long,
             status: ScoreStatus,
             isAccumulated: Boolean = false,
+            evidence: EvidenceJpaEntity? = null,
         ) = ScoreJpaEntity(
             scoreId = scoreId,
             user = userEntity(),
             category = categoryEntity(isAccumulated),
-            evidence = null,
+            evidence = evidence,
             scoreStatus = status,
             activityName = null,
             scoreValue = 900,
@@ -160,6 +170,19 @@ class ScorePersistenceAdapterTest :
             user = userEntity(),
             score = score,
             evidence = null,
+            fileKey = "key-$fileId",
+            fileOriginalName = "orig-$fileId.png",
+            fileStoredName = "stored-$fileId.png",
+        )
+
+        fun evidenceFileEntity(
+            fileId: Long,
+            evidence: EvidenceJpaEntity,
+        ) = FileJpaEntity(
+            fileId = fileId,
+            user = userEntity(),
+            score = null,
+            evidence = evidence,
             fileKey = "key-$fileId",
             fileOriginalName = "orig-$fileId.png",
             fileStoredName = "stored-$fileId.png",
@@ -374,6 +397,31 @@ class ScorePersistenceAdapterTest :
                     adapter.findById(999L).shouldBeNull()
                 }
             }
+
+            When("점수에 첨부가 있는 근거 자료가 연결되어 있으면") {
+                Then("근거 자료의 첨부 파일을 함께 채워 반환한다") {
+                    val evidence = evidenceEntity(5L)
+                    mockSingleScoreQuery(scoreEntity(10L, ScoreStatus.PENDING, evidence = evidence))
+                    mockSingleFileQuery(null)
+                    every { fileJpaRepository.findAllByEvidenceEvidenceId(5L) } returns
+                        listOf(evidenceFileEntity(7L, evidence), evidenceFileEntity(8L, evidence))
+
+                    val result = adapter.findById(10L)
+
+                    result?.evidence?.files?.map { it.fileId } shouldBe listOf(7L, 8L)
+                }
+            }
+
+            When("점수에 근거 자료가 연결되어 있지 않으면") {
+                Then("근거 자료 첨부 파일을 조회하지 않는다") {
+                    mockSingleScoreQuery(scoreEntity(10L, ScoreStatus.PENDING))
+                    mockSingleFileQuery(null)
+
+                    adapter.findById(10L)?.evidence.shouldBeNull()
+
+                    verify(exactly = 0) { fileJpaRepository.findAllByEvidenceEvidenceId(any()) }
+                }
+            }
         }
 
         Given("findByIdForUpdate로 조회할 때") {
@@ -469,6 +517,34 @@ class ScorePersistenceAdapterTest :
 
                     result.find { it.scoreId == 30L }?.file?.fileId shouldBe 2L
                     result.find { it.scoreId == 31L }?.file.shouldBeNull()
+                }
+            }
+
+            When("점수들에 근거 자료가 연결되어 있으면") {
+                Then("근거 자료 첨부 파일을 한 번에 조회해 각 근거 자료에 나눠 채운다") {
+                    val evidenceA = evidenceEntity(5L)
+                    val evidenceB = evidenceEntity(6L)
+                    mockMultiScoreQuery(
+                        listOf(
+                            scoreEntity(30L, ScoreStatus.PENDING, evidence = evidenceA),
+                            scoreEntity(31L, ScoreStatus.PENDING, evidence = evidenceB),
+                            scoreEntity(32L, ScoreStatus.PENDING),
+                        ),
+                    )
+                    mockFileBatchQuery(emptyList())
+                    every { fileJpaRepository.findAllByEvidenceEvidenceIdIn(listOf(5L, 6L)) } returns
+                        listOf(evidenceFileEntity(7L, evidenceA))
+
+                    val result = adapter.findAllByUserIdIn(listOf(userId))
+
+                    result
+                        .find { it.scoreId == 30L }
+                        ?.evidence
+                        ?.files
+                        ?.map { it.fileId } shouldBe listOf(7L)
+                    result.find { it.scoreId == 31L }?.evidence?.files shouldBe emptyList()
+                    result.find { it.scoreId == 32L }?.evidence.shouldBeNull()
+                    verify(exactly = 1) { fileJpaRepository.findAllByEvidenceEvidenceIdIn(any()) }
                 }
             }
         }
