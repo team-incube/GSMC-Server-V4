@@ -26,6 +26,7 @@ import team.incube.gsmc.domain.category.adapter.out.persistence.entity.CategoryJ
 import team.incube.gsmc.domain.category.adapter.out.persistence.entity.QCategoryJpaEntity.categoryJpaEntity
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.FileJpaEntity
 import team.incube.gsmc.domain.file.adapter.out.persistence.entity.QFileJpaEntity.fileJpaEntity
+import team.incube.gsmc.domain.file.adapter.out.persistence.repository.FileJpaRepository
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreJpaEntity.scoreJpaEntity
@@ -45,9 +46,16 @@ class ScorePersistenceAdapterTest :
         val queryFactory = mockk<JPAQueryFactory>()
         val scoreJpaRepository = mockk<ScoreJpaRepository>()
         val scoreUniqueSlotJpaRepository = mockk<ScoreUniqueSlotJpaRepository>()
+        val fileJpaRepository = mockk<FileJpaRepository>()
         val entityManager = mockk<EntityManager>()
         val adapter =
-            ScorePersistenceAdapter(queryFactory, scoreJpaRepository, scoreUniqueSlotJpaRepository, entityManager)
+            ScorePersistenceAdapter(
+                queryFactory,
+                scoreJpaRepository,
+                scoreUniqueSlotJpaRepository,
+                fileJpaRepository,
+                entityManager,
+            )
 
         beforeEach { clearAllMocks() }
 
