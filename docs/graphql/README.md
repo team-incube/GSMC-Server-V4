@@ -24,6 +24,28 @@ GraphiQL에서 인증이 필요한 operation을 실행할 때 요청 헤더 영�
 
 operation 파일 내용을 왼쪽 편집기에 붙여 넣고, 대응하는 variables 파일이 있으면 하단 변수 영역에 JSON 내용을 붙여 넣은 다음 실행합니다.
 
+## 개발 서버 익명 GraphQL 접근
+
+기본값에서는 `/graphql`이 JWT 인증을 요구합니다. 개발 서버에서 GraphiQL의 스키마 탐색이나 인증 정보가 필요 없는 operation을 익명으로 실행하려면 다음 두 환경변수를 모두 설정합니다.
+
+```text
+API_DOCS_ENABLED=true
+GRAPHQL_DEV_ANONYMOUS_ACCESS_ENABLED=true
+```
+
+`GRAPHQL_DEV_ANONYMOUS_ACCESS_ENABLED`의 기본값은 `false`입니다. 두 설정이 모두 `true`일 때에만 Spring Security가 `/graphql` 요청을 익명으로 통과시킵니다. `API_DOCS_ENABLED=true`만 설정한 경우에는 기존과 같이 `/graphql`이 401을 반환합니다. `/graphiql`, `/graphql/schema`, Swagger의 기존 활성화 정책은 바뀌지 않습니다.
+
+이 기능은 Spring Security의 경로 인증만 제어합니다. Resolver와 서비스의 권한 검사는 제거하지 않으므로 `myMember`처럼 현재 로그인 사용자가 필요한 Query 또는 Mutation은 계속 JWT가 필요할 수 있습니다. 익명 접근으로 성공하는 것은 introspection과 인증 정보가 필요 없는 operation에 한정해서 확인해야 하며, 임의 사용자·교사·ROOT 권한은 주입하지 않습니다. 잘못된 JWT를 전달하면 익명 요청으로 처리하지 않고 401로 거부합니다.
+
+개발 서버에 실제 학생·점수 데이터가 있거나 인터넷에 공개되어 있다면 이 기능을 켜면 안 됩니다. 활성화가 꼭 필요하면 IP allowlist, Basic Auth 또는 내부망 제한을 먼저 적용합니다. 운영 서버에서는 다음처럼 두 설정을 모두 비활성화합니다.
+
+```text
+API_DOCS_ENABLED=false
+GRAPHQL_DEV_ANONYMOUS_ACCESS_ENABLED=false
+```
+
+현재 배포 설정에는 운영 Spring profile이 정의되어 있지 않아 애플리케이션이 profile만으로 운영 환경을 판별할 수 없습니다. DevOps는 운영 환경을 신뢰할 수 있게 식별하는 설정을 확정한 뒤, 익명 접근이 활성화되면 기동을 거부하는 보호 장치를 별도 적용해야 합니다. 기능을 끄거나 되돌리려면 `GRAPHQL_DEV_ANONYMOUS_ACCESS_ENABLED=false`로 변경한 뒤 애플리케이션을 재기동하고, 필요하면 이전 이미지를 배포합니다.
+
 ## 실행 예제
 
 | 예제 | 목적 | 확인된 권한 | variables |

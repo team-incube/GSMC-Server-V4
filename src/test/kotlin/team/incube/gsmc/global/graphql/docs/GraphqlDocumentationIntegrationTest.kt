@@ -16,6 +16,8 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.test.context.TestConstructor
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RestController
 import team.incube.gsmc.domain.auth.TokenClaims
 import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
 import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
@@ -82,6 +84,88 @@ class GraphqlDocumentationEnabledIntegrationTest(
     properties = [
         "cors.allowed-origins=http://localhost",
         "spring.graphql.schema.locations=classpath:graphql-documentation/",
+        "API_DOCS_ENABLED=true",
+        "GRAPHQL_DEV_ANONYMOUS_ACCESS_ENABLED=true",
+        "management.endpoint.health.group.readiness.include=readinessState",
+    ],
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+)
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+class GraphqlAnonymousAccessIntegrationTest(
+    @LocalServerPort private val port: Int,
+) {
+    private val httpClient = HttpClient.newHttpClient()
+
+    @Test
+    fun `문서와 익명 접근 기능을 모두 켜면 익명 introspection이 통과한다`() {
+        assertEquals(200, post("{ __typename }").statusCode())
+    }
+
+    @Test
+    fun `익명 접근 상태에서도 잘못된 JWT는 거부한다`() {
+        assertEquals(401, post("{ __typename }", "invalid-token").statusCode())
+    }
+
+    @Test
+    fun `익명 접근 상태에서도 유효한 JWT는 기존처럼 인증한다`() {
+        assertEquals(200, post("{ __typename }", "valid-token").statusCode())
+    }
+
+    @Test
+    fun `익명 접근 상태에서도 REST API는 인증이 필요하다`() {
+        val request = HttpRequest.newBuilder(URI.create("http://localhost:$port/private")).GET().build()
+
+        assertEquals(401, httpClient.send(request, HttpResponse.BodyHandlers.discarding()).statusCode())
+    }
+
+    private fun post(
+        query: String,
+        token: String? = null,
+    ): HttpResponse<String> {
+        val request =
+            HttpRequest
+                .newBuilder(URI.create("http://localhost:$port/graphql"))
+                .header("Content-Type", "application/json")
+                .apply { token?.let { header("Authorization", "Bearer $it") } }
+                .POST(HttpRequest.BodyPublishers.ofString("{\"query\":\"$query\"}"))
+                .build()
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+    }
+}
+
+@SpringBootTest(
+    classes = [GraphqlDocumentationTestApplication::class],
+    properties = [
+        "cors.allowed-origins=http://localhost",
+        "spring.graphql.schema.locations=classpath:graphql-documentation/",
+        "API_DOCS_ENABLED=false",
+        "GRAPHQL_DEV_ANONYMOUS_ACCESS_ENABLED=true",
+        "management.endpoint.health.group.readiness.include=readinessState",
+    ],
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+)
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+class GraphqlAnonymousAccessWithoutDocsIntegrationTest(
+    @LocalServerPort private val port: Int,
+) {
+    @Test
+    fun `문서 기능 없이 익명 접근 설정만 켜도 GraphQL은 인증이 필요하다`() {
+        val request =
+            HttpRequest
+                .newBuilder(URI.create("http://localhost:$port/graphql"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"query\":\"{ __typename }\"}"))
+                .build()
+
+        assertEquals(401, HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.discarding()).statusCode())
+    }
+}
+
+@SpringBootTest(
+    classes = [GraphqlDocumentationTestApplication::class],
+    properties = [
+        "cors.allowed-origins=http://localhost",
+        "spring.graphql.schema.locations=classpath:graphql-documentation/",
         "API_DOCS_ENABLED=false",
         "management.endpoint.health.group.readiness.include=readinessState",
     ],
@@ -95,11 +179,22 @@ class GraphqlDocumentationDisabledIntegrationTest(
     fun `문서 기능을 끄면 GraphiQL과 schema printer를 제공하지 않는다`() {
         assertEquals(404, get("/graphiql"))
         assertEquals(404, get("/graphql/schema"))
+        assertEquals(401, postGraphql().statusCode())
     }
 
     private fun get(path: String): Int {
         val request = HttpRequest.newBuilder(URI.create("http://localhost:$port$path")).GET().build()
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.discarding()).statusCode()
+    }
+
+    private fun postGraphql(): HttpResponse<String> {
+        val request =
+            HttpRequest
+                .newBuilder(URI.create("http://localhost:$port/graphql"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"query\":\"{ __typename }\"}"))
+                .build()
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString())
     }
 }
 
@@ -115,8 +210,19 @@ class GraphqlDocumentationDisabledIntegrationTest(
     ],
 )
 @EnableWebSecurity
-@Import(SecurityConfig::class, GlobalExceptionHandler::class, GraphqlDocumentationTestConfiguration::class)
+@Import(
+    SecurityConfig::class,
+    GlobalExceptionHandler::class,
+    GraphqlDocumentationTestConfiguration::class,
+    GraphqlDocumentationTestController::class,
+)
 class GraphqlDocumentationTestApplication
+
+@RestController
+class GraphqlDocumentationTestController {
+    @GetMapping("/private")
+    fun privateEndpoint() = mapOf("status" to "UP")
+}
 
 @Configuration(proxyBeanMethods = false)
 class GraphqlDocumentationTestConfiguration {
@@ -142,7 +248,8 @@ class GraphqlDocumentationTestConfiguration {
 
             override fun getRoleFromToken(token: String) = UserRole.STUDENT
 
-            override fun parseTokenClaims(token: String): TokenClaims? = null
+            override fun parseTokenClaims(token: String): TokenClaims? =
+                if (token == "valid-token") TokenClaims(1L, UserRole.STUDENT, 0L) else null
         }
 
     @Bean
