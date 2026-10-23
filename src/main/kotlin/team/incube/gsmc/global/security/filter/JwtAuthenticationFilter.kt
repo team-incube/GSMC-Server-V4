@@ -8,6 +8,7 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.filter.OncePerRequestFilter
+import team.incube.gsmc.domain.auth.TokenClaims
 import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
 import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.global.auth.CustomUserDetails
@@ -25,7 +26,7 @@ class JwtAuthenticationFilter(
     ) {
         val token = extractToken(request)
         val claims = token?.let(authTokenPort::parseTokenClaims)
-        if (token != null && (claims == null || tokenInvalidationPort.isInvalidated(claims.userId, claims.issuedAt))) {
+        if (isInvalidGraphQlToken(request, token, claims)) {
             jwtAuthenticationEntryPoint.commence(
                 request,
                 response,
@@ -54,7 +55,17 @@ class JwtAuthenticationFilter(
             ?.takeIf { it.startsWith("Bearer ") }
             ?.substring(7)
 
+    private fun isInvalidGraphQlToken(
+        request: HttpServletRequest,
+        token: String?,
+        claims: TokenClaims?,
+    ): Boolean =
+        request.servletPath == GRAPHQL_PATH &&
+            token != null &&
+            (claims == null || tokenInvalidationPort.isInvalidated(claims.userId, claims.issuedAt))
+
     companion object {
         private const val MDC_USER_ID_KEY = "userId"
+        private const val GRAPHQL_PATH = "/graphql"
     }
 }

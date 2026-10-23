@@ -118,6 +118,18 @@ class GraphqlAnonymousAccessIntegrationTest(
         assertEquals(401, httpClient.send(request, HttpResponse.BodyHandlers.discarding()).statusCode())
     }
 
+    @Test
+    fun `잘못된 JWT가 있어도 공개 인증 경로는 기존처럼 접근할 수 있다`() {
+        val request =
+            HttpRequest
+                .newBuilder(URI.create("http://localhost:$port/api/auth/signin"))
+                .header("Authorization", "Bearer invalid-token")
+                .GET()
+                .build()
+
+        assertEquals(200, httpClient.send(request, HttpResponse.BodyHandlers.discarding()).statusCode())
+    }
+
     private fun post(
         query: String,
         token: String? = null,
@@ -222,6 +234,9 @@ class GraphqlDocumentationTestApplication
 class GraphqlDocumentationTestController {
     @GetMapping("/private")
     fun privateEndpoint() = mapOf("status" to "UP")
+
+    @GetMapping("/api/auth/signin")
+    fun signIn() = mapOf("status" to "OK")
 }
 
 @Configuration(proxyBeanMethods = false)
