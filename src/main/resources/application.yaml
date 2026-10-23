@@ -54,6 +54,9 @@ spring:
     baseline-on-migrate: true
     baseline-version: ${FLYWAY_BASELINE_VERSION:10}
 
+graphql:
+  dev-anonymous-access-enabled: ${GRAPHQL_DEV_ANONYMOUS_ACCESS_ENABLED:false}
+
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
