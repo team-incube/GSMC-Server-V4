@@ -92,24 +92,7 @@ class ScorePersistenceAdapter(
                 .where(scoreJpaEntity.user.userId.`in`(userIds))
                 .fetch()
 
-        if (entities.isEmpty()) return emptyList()
-
-        val filesByScoreId =
-            queryFactory
-                .selectFrom(fileJpaEntity)
-                .join(fileJpaEntity.score)
-                .fetchJoin()
-                .where(fileJpaEntity.score.scoreId.`in`(entities.map { it.scoreId }))
-                .fetch()
-                .groupBy { it.score!!.scoreId }
-        val evidenceFilesByEvidenceId = findEvidenceFilesByEvidenceId(entities)
-
-        return entities.map { entity ->
-            entity.toDomain(
-                filesByScoreId[entity.scoreId]?.firstOrNull()?.toDomain(),
-                entity.evidence?.let { evidenceFilesByEvidenceId[it.evidenceId] }.orEmpty(),
-            )
-        }
+        return toDomainsWithFiles(entities)
     }
 
     override fun findCalculationRowsByUserIdIn(userIds: List<Long>): List<ScoreCalculationRow> {
@@ -184,24 +167,7 @@ class ScorePersistenceAdapter(
                 .where(scoreJpaEntity.dgProjectId.eq(dgProjectId))
                 .fetch()
 
-        if (entities.isEmpty()) return emptyList()
-
-        val filesByScoreId =
-            queryFactory
-                .selectFrom(fileJpaEntity)
-                .join(fileJpaEntity.score)
-                .fetchJoin()
-                .where(fileJpaEntity.score.scoreId.`in`(entities.map { it.scoreId }))
-                .fetch()
-                .groupBy { it.score!!.scoreId }
-        val evidenceFilesByEvidenceId = findEvidenceFilesByEvidenceId(entities)
-
-        return entities.map { entity ->
-            entity.toDomain(
-                filesByScoreId[entity.scoreId]?.firstOrNull()?.toDomain(),
-                entity.evidence?.let { evidenceFilesByEvidenceId[it.evidenceId] }.orEmpty(),
-            )
-        }
+        return toDomainsWithFiles(entities)
     }
 
     override fun findByUserIdAndProjectId(
@@ -330,6 +296,28 @@ class ScorePersistenceAdapter(
             ?.let { fileJpaRepository.findAllByEvidenceEvidenceId(it.evidenceId) }
             ?.map { it.toDomain() }
             .orEmpty()
+
+    /** 점수 목록의 첨부 파일과 근거 자료 첨부 파일을 각각 한 번에 조회해 도메인 객체로 조립한다. */
+    private fun toDomainsWithFiles(entities: List<ScoreJpaEntity>): List<Score> {
+        if (entities.isEmpty()) return emptyList()
+
+        val filesByScoreId =
+            queryFactory
+                .selectFrom(fileJpaEntity)
+                .join(fileJpaEntity.score)
+                .fetchJoin()
+                .where(fileJpaEntity.score.scoreId.`in`(entities.map { it.scoreId }))
+                .fetch()
+                .groupBy { it.score!!.scoreId }
+        val evidenceFilesByEvidenceId = findEvidenceFilesByEvidenceId(entities)
+
+        return entities.map { entity ->
+            entity.toDomain(
+                filesByScoreId[entity.scoreId]?.firstOrNull()?.toDomain(),
+                entity.evidence?.let { evidenceFilesByEvidenceId[it.evidenceId] }.orEmpty(),
+            )
+        }
+    }
 
     /** 점수 목록에 연결된 근거 자료의 첨부 파일을 한 번에 조회한다. 근거 자료가 없으면 쿼리하지 않는다. */
     private fun findEvidenceFilesByEvidenceId(entities: List<ScoreJpaEntity>): Map<Long, List<File>> {
