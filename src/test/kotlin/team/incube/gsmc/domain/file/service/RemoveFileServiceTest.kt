@@ -16,6 +16,7 @@ import team.incube.gsmc.domain.file.FileStorageDeletionTask
 import team.incube.gsmc.domain.file.FileStorageDeletionTaskStatus
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
 import team.incube.gsmc.domain.file.port.out.FileStorageDeletionTaskPersistencePort
+import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
@@ -24,8 +25,15 @@ class RemoveFileServiceTest :
     BehaviorSpec({
         val filePersistencePort = mockk<FilePersistencePort>()
         val fileStorageDeletionTaskPersistencePort = mockk<FileStorageDeletionTaskPersistencePort>()
+        val scorePersistencePort = mockk<ScorePersistencePort>()
         val memberUtil = mockk<MemberUtil>()
-        val service = RemoveFileService(filePersistencePort, fileStorageDeletionTaskPersistencePort, memberUtil)
+        val service =
+            RemoveFileService(
+                filePersistencePort,
+                fileStorageDeletionTaskPersistencePort,
+                scorePersistencePort,
+                memberUtil,
+            )
 
         beforeEach { clearAllMocks() }
 
@@ -41,7 +49,7 @@ class RemoveFileServiceTest :
         Given("파일을 삭제할 때") {
             When("존재하지 않는 파일이면") {
                 Then("FILE_NOT_FOUND 예외를 던진다") {
-                    every { filePersistencePort.findById(999L) } returns null
+                    every { filePersistencePort.findByIdForUpdate(999L) } returns null
 
                     val exception = shouldThrow<GsmcException> { service.execute(999L) }
 
@@ -51,12 +59,14 @@ class RemoveFileServiceTest :
 
             When("소유자가 아니면") {
                 Then("FORBIDDEN 예외를 던지고 삭제하지도, 삭제 작업을 기록하지도 않는다") {
-                    every { filePersistencePort.findById(7L) } returns file
+                    every { filePersistencePort.findByIdForUpdate(7L) } returns file.copy(evidenceId = 30L)
                     every { memberUtil.getCurrentUserId() } returns 999L
 
                     val exception = shouldThrow<GsmcException> { service.execute(7L) }
 
                     exception.errorCode shouldBe ErrorCode.FORBIDDEN
+                    verify(exactly = 0) { filePersistencePort.isLinkedToApprovedScore(any()) }
+                    verify(exactly = 0) { scorePersistencePort.isEvidenceLinkedToApprovedScore(any()) }
                     verify(exactly = 0) { filePersistencePort.deleteById(any()) }
                     verify(exactly = 0) { fileStorageDeletionTaskPersistencePort.save(any()) }
                 }
@@ -64,7 +74,7 @@ class RemoveFileServiceTest :
 
             When("승인된 점수 요청에 연결되어 있으면") {
                 Then("FILE_LINKED_TO_APPROVED_SCORE 예외를 던지고 삭제하지도, 삭제 작업을 기록하지도 않는다") {
-                    every { filePersistencePort.findById(7L) } returns file
+                    every { filePersistencePort.findByIdForUpdate(7L) } returns file
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { filePersistencePort.isLinkedToApprovedScore(7L) } returns true
 
@@ -76,11 +86,94 @@ class RemoveFileServiceTest :
                 }
             }
 
-            When("소유자 본인이 승인되지 않은 파일을 삭제하면") {
-                Then("DB row를 삭제하고 같은 트랜잭션에 해당 key의 스토리지 삭제 작업을 기록한다") {
-                    every { filePersistencePort.findById(7L) } returns file
+            When("승인된 점수 요청에 연결된 증빙자료의 첨부 파일이면") {
+                Then("FILE_LINKED_TO_APPROVED_SCORE 예외를 던지고 삭제하지도, 삭제 작업을 기록하지도 않는다") {
+                    every { filePersistencePort.findByIdForUpdate(8L) } returns file.copy(fileId = 8L, evidenceId = 30L)
+                    every { memberUtil.getCurrentUserId() } returns 1L
+                    every { filePersistencePort.isLinkedToApprovedScore(8L) } returns false
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(30L) } returns true
+
+                    val exception = shouldThrow<GsmcException> { service.execute(8L) }
+
+                    exception.errorCode shouldBe ErrorCode.FILE_LINKED_TO_APPROVED_SCORE
+                    verify(exactly = 0) { filePersistencePort.deleteById(any()) }
+                    verify(exactly = 0) { fileStorageDeletionTaskPersistencePort.save(any()) }
+                }
+            }
+
+            When("프로젝트에 첨부된 파일이면") {
+                Then("FILE_LINKED_TO_PROJECT 예외를 던지고 삭제하지도, 삭제 작업을 기록하지도 않는다") {
+                    every { filePersistencePort.findByIdForUpdate(7L) } returns file
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { filePersistencePort.isLinkedToApprovedScore(7L) } returns false
+                    every { filePersistencePort.isLinkedToProject(7L) } returns true
+
+                    val exception = shouldThrow<GsmcException> { service.execute(7L) }
+
+                    exception.errorCode shouldBe ErrorCode.FILE_LINKED_TO_PROJECT
+                    verify(exactly = 0) { filePersistencePort.deleteById(any()) }
+                    verify(exactly = 0) { fileStorageDeletionTaskPersistencePort.save(any()) }
+                }
+            }
+
+            When("프로젝트 초안에 첨부된 파일이면") {
+                Then("FILE_LINKED_TO_PROJECT 예외를 던지고 삭제하지도, 삭제 작업을 기록하지도 않는다") {
+                    every { filePersistencePort.findByIdForUpdate(7L) } returns file
+                    every { memberUtil.getCurrentUserId() } returns 1L
+                    every { filePersistencePort.isLinkedToApprovedScore(7L) } returns false
+                    every { filePersistencePort.isLinkedToProject(7L) } returns false
+                    every { filePersistencePort.isLinkedToProjectDraft(7L) } returns true
+
+                    val exception = shouldThrow<GsmcException> { service.execute(7L) }
+
+                    exception.errorCode shouldBe ErrorCode.FILE_LINKED_TO_PROJECT
+                    verify(exactly = 0) { filePersistencePort.deleteById(any()) }
+                    verify(exactly = 0) { fileStorageDeletionTaskPersistencePort.save(any()) }
+                }
+            }
+
+            When("승인되지 않은 증빙자료의 첨부 파일이면") {
+                Then("기존대로 삭제하고 삭제 작업을 기록한다") {
+                    every { filePersistencePort.findByIdForUpdate(8L) } returns file.copy(fileId = 8L, evidenceId = 30L)
+                    every { memberUtil.getCurrentUserId() } returns 1L
+                    every { filePersistencePort.isLinkedToApprovedScore(8L) } returns false
+                    every { scorePersistencePort.isEvidenceLinkedToApprovedScore(30L) } returns false
+                    every { filePersistencePort.isLinkedToProject(8L) } returns false
+                    every { filePersistencePort.isLinkedToProjectDraft(8L) } returns false
+                    every { filePersistencePort.deleteById(8L) } just runs
+                    every { fileStorageDeletionTaskPersistencePort.save(any()) } just runs
+
+                    service.execute(8L) shouldBe true
+
+                    verify(exactly = 1) { filePersistencePort.deleteById(8L) }
+                    verify(exactly = 1) { fileStorageDeletionTaskPersistencePort.save(any()) }
+                }
+            }
+
+            When("증빙자료에 연결되지 않은 파일이면") {
+                Then("증빙 승인 조회 없이 기존대로 삭제한다") {
+                    every { filePersistencePort.findByIdForUpdate(7L) } returns file
+                    every { memberUtil.getCurrentUserId() } returns 1L
+                    every { filePersistencePort.isLinkedToApprovedScore(7L) } returns false
+                    every { filePersistencePort.isLinkedToProject(7L) } returns false
+                    every { filePersistencePort.isLinkedToProjectDraft(7L) } returns false
+                    every { filePersistencePort.deleteById(7L) } just runs
+                    every { fileStorageDeletionTaskPersistencePort.save(any()) } just runs
+
+                    service.execute(7L) shouldBe true
+
+                    verify(exactly = 0) { scorePersistencePort.isEvidenceLinkedToApprovedScore(any()) }
+                    verify(exactly = 1) { filePersistencePort.deleteById(7L) }
+                }
+            }
+
+            When("소유자 본인이 승인되지 않은 파일을 삭제하면") {
+                Then("DB row를 삭제하고 같은 트랜잭션에 해당 key의 스토리지 삭제 작업을 기록한다") {
+                    every { filePersistencePort.findByIdForUpdate(7L) } returns file
+                    every { memberUtil.getCurrentUserId() } returns 1L
+                    every { filePersistencePort.isLinkedToApprovedScore(7L) } returns false
+                    every { filePersistencePort.isLinkedToProject(7L) } returns false
+                    every { filePersistencePort.isLinkedToProjectDraft(7L) } returns false
                     every { filePersistencePort.deleteById(7L) } just runs
                     val taskSlot = slot<FileStorageDeletionTask>()
                     every { fileStorageDeletionTaskPersistencePort.save(capture(taskSlot)) } just runs

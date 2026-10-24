@@ -9,8 +9,15 @@ object ScoreValueConverterRegistry {
 
     fun resolve(categoryType: CategoryType): ScoreValueConverter =
         when (categoryType) {
-            CategoryType.TOPCIT, CategoryType.TOEIC, CategoryType.JLPT, CategoryType.NEWRROW_SCHOOL -> divisor
+            CategoryType.TOPCIT,
+            CategoryType.TOEIC,
+            CategoryType.JLPT,
+            CategoryType.JPT,
+            CategoryType.NEWRROW_SCHOOL,
+            -> divisor
+
             CategoryType.ACADEMIC_GRADE, CategoryType.NCS -> academicGrade
+
             else -> default
         }
 }

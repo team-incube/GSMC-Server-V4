@@ -6,6 +6,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import team.incube.gsmc.global.discord.DiscordWebhookClient
+import team.incube.gsmc.global.erroralert.ErrorAlertProperties
 
 private fun SimpleClientHttpRequestFactory.timeout(fieldName: String): Int =
     javaClass
@@ -17,7 +18,7 @@ class RestClientConfigTest :
     BehaviorSpec({
         Given("Discord 전용 RestClient 설정이 있으면") {
             Then("connect 1초와 read 2초 timeout을 적용한다") {
-                val config = RestClientConfig()
+                val config = RestClientConfig(ErrorAlertProperties())
                 val requestFactory = config.discordRequestFactory()
                 val simpleRequestFactory = requestFactory.shouldBeInstanceOf<SimpleClientHttpRequestFactory>()
 
@@ -28,6 +29,7 @@ class RestClientConfigTest :
                 val context = AnnotationConfigApplicationContext()
                 try {
                     context.register(RestClientConfig::class.java)
+                    context.beanFactory.registerSingleton("errorAlertProperties", ErrorAlertProperties())
                     context.register(DiscordWebhookClient::class.java)
                     context.refresh()
                     context.getBean(DiscordWebhookClient::class.java)

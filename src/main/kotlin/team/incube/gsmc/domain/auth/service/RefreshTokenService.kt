@@ -9,6 +9,7 @@ import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+import team.incube.gsmc.global.exception.orThrow
 
 /**
  * 토큰 갱신 유스케이스 구현 클래스입니다.
@@ -33,7 +34,7 @@ class RefreshTokenService(
     override fun execute(refreshToken: String): TokenResult {
         val userId =
             runCatching { authTokenPort.getUserIdFromToken(refreshToken) }
-                .getOrElse { throw GsmcException(ErrorCode.INVALID_REFRESH_TOKEN) }
+                .orThrow(ErrorCode.INVALID_REFRESH_TOKEN)
 
         if (refreshTokenPersistencePort.find(userId) != refreshToken) {
             throw GsmcException(ErrorCode.INVALID_REFRESH_TOKEN)

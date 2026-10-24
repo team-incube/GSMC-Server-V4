@@ -9,6 +9,7 @@ object Libs {
     const val SPRING_BOOT_GRAPHQL = "org.springframework.boot:spring-boot-starter-graphql"
     const val SPRING_BOOT_SECURITY = "org.springframework.boot:spring-boot-starter-security"
     const val SPRING_BOOT_WEB = "org.springframework.boot:spring-boot-starter-web"
+    const val SPRING_BOOT_ACTUATOR = "org.springframework.boot:spring-boot-starter-actuator"
 
     // Kotlin
     const val JACKSON_KOTLIN = "com.fasterxml.jackson.module:jackson-module-kotlin"

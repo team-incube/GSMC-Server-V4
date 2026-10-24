@@ -2,6 +2,7 @@ package team.incube.gsmc.domain.evidence.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager
+import org.springframework.dao.DataIntegrityViolationException
 import team.incube.gsmc.domain.evidence.Evidence
 import team.incube.gsmc.domain.evidence.adapter.out.persistence.entity.QEvidenceJpaEntity.evidenceJpaEntity
 import team.incube.gsmc.domain.evidence.adapter.out.persistence.entity.toDomain
@@ -11,6 +12,8 @@ import team.incube.gsmc.domain.evidence.port.out.EvidencePersistencePort
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
+import team.incube.gsmc.global.exception.ErrorCode
+import team.incube.gsmc.global.exception.GsmcException
 
 /**
  * 근거 자료 영속성 처리를 담당하는 아웃바운드 어댑터 클래스입니다.
@@ -42,15 +45,26 @@ class EvidencePersistenceAdapter(
             .where(
                 evidenceJpaEntity.user.userId.eq(userId),
                 evidenceJpaEntity.isDraft.isTrue,
-            ).fetchFirst()
+            ).fetchOne()
             ?.toDomain()
 
     override fun save(evidence: Evidence): Evidence {
         val user = entityManager.getReference(UserJpaEntity::class.java, evidence.userId)
-        return evidenceJpaRepository.save(evidence.toEntity(user)).toDomain()
+        return try {
+            evidenceJpaRepository.saveAndFlush(evidence.toEntity(user)).toDomain()
+        } catch (e: DataIntegrityViolationException) {
+            if (e.mostSpecificCause.message?.contains(DRAFT_UNIQUE_CONSTRAINT) == true) {
+                throw GsmcException(ErrorCode.EVIDENCE_DRAFT_ALREADY_EXISTS)
+            }
+            throw e
+        }
     }
 
     override fun deleteById(evidenceId: Long) {
         evidenceJpaRepository.deleteById(evidenceId)
+    }
+
+    private companion object {
+        const val DRAFT_UNIQUE_CONSTRAINT = "uk_evidence_draft_user"
     }
 }

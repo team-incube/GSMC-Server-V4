@@ -15,6 +15,7 @@ import team.incube.gsmc.global.util.MemberUtil
  * 증빙자료 삭제 유스케이스 구현 클래스입니다.
  * [RemoveEvidenceUseCase]를 구현하며, 현재 사용자가 소유한 제출 완료 자료를 삭제합니다.
  * 삭제 전에 Score와 File의 Evidence 연결만 해제하고, File 레코드와 스토리지 객체는 유지합니다.
+ * 승인된 점수 요청에 연결된 자료는 삭제를 거부합니다.
  */
 @Port(direction = PortDirection.INBOUND)
 class RemoveEvidenceService(
@@ -28,6 +29,9 @@ class RemoveEvidenceService(
         val evidence = evidencePersistencePort.findById(evidenceId)
         if (evidence == null || evidence.userId != memberUtil.getCurrentUserId() || evidence.isDraft) {
             throw GsmcException(ErrorCode.EVIDENCE_NOT_FOUND)
+        }
+        if (scorePersistencePort.isEvidenceLinkedToApprovedScore(evidenceId)) {
+            throw GsmcException(ErrorCode.EVIDENCE_LINKED_TO_APPROVED_SCORE)
         }
         scorePersistencePort.unlinkEvidence(evidenceId)
         filePersistencePort.unlinkAllFromEvidence(evidenceId)

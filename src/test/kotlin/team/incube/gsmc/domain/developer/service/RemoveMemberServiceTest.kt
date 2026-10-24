@@ -3,11 +3,15 @@ package team.incube.gsmc.domain.developer.service
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import io.mockk.Runs
 import io.mockk.clearAllMocks
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
+import team.incube.gsmc.domain.developer.port.out.MemberEventPublisherPort
+import team.incube.gsmc.domain.user.StudentCohort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -18,7 +22,13 @@ class RemoveMemberServiceTest :
     BehaviorSpec({
         val developerPersistencePort = mockk<DeveloperPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
-        val service = RemoveMemberService(developerPersistencePort, memberUtil)
+        val memberEventPublisherPort = mockk<MemberEventPublisherPort>()
+        val service =
+            RemoveMemberService(
+                developerPersistencePort,
+                memberUtil,
+                memberEventPublisherPort,
+            )
 
         beforeEach { clearAllMocks() }
 
@@ -46,6 +56,8 @@ class RemoveMemberServiceTest :
                     exception.errorCode shouldBe ErrorCode.FORBIDDEN
                     verify(exactly = 0) { developerPersistencePort.findByMemberId(any()) }
                     verify(exactly = 0) { developerPersistencePort.delete(any()) }
+                    verify(exactly = 0) { memberEventPublisherPort.publishRemoved(any()) }
+                    verify(exactly = 0) { memberEventPublisherPort.publishCohortChanged(any()) }
                 }
             }
         }
@@ -58,6 +70,8 @@ class RemoveMemberServiceTest :
                     val exception = shouldThrow<GsmcException> { service.execute(999L) }
 
                     exception.errorCode shouldBe ErrorCode.USER_NOT_FOUND
+                    verify(exactly = 0) { memberEventPublisherPort.publishRemoved(any()) }
+                    verify(exactly = 0) { memberEventPublisherPort.publishCohortChanged(any()) }
                 }
             }
 
@@ -71,15 +85,19 @@ class RemoveMemberServiceTest :
 
                     exception.errorCode shouldBe ErrorCode.USER_HAS_RELATED_DATA
                     verify(exactly = 0) { developerPersistencePort.delete(any()) }
+                    verify(exactly = 0) { memberEventPublisherPort.publishRemoved(any()) }
+                    verify(exactly = 0) { memberEventPublisherPort.publishCohortChanged(any()) }
                 }
             }
 
             When("참조 데이터가 없는 회원을 삭제하면") {
-                Then("삭제에 성공해 true를 반환한다") {
+                Then("삭제에 성공해 true를 반환하고 회원 삭제·집단 변경 이벤트를 발행한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.ROOT
                     every { developerPersistencePort.findByMemberId(1L) } returns student()
                     every { developerPersistencePort.hasRelatedData(1L) } returns false
                     every { developerPersistencePort.delete(any()) } returns Unit
+                    every { memberEventPublisherPort.publishRemoved(1L) } just Runs
+                    every { memberEventPublisherPort.publishCohortChanged(any()) } just Runs
 
                     val result = service.execute(1L)
 
@@ -89,6 +107,8 @@ class RemoveMemberServiceTest :
                             match { it.userId == 1L },
                         )
                     }
+                    verify(exactly = 1) { memberEventPublisherPort.publishRemoved(1L) }
+                    verify(exactly = 1) { memberEventPublisherPort.publishCohortChanged(setOf(StudentCohort(1, 2))) }
                 }
             }
         }

@@ -1,0 +1,7 @@
+query MyProjects {
+  myProjects {
+    id
+    title
+    ownerId
+  }
+}

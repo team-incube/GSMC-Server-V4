@@ -1,0 +1,13 @@
+mutation CreateEvidence($input: CreateEvidenceInput!) {
+  createEvidence(input: $input) {
+    evidenceId
+    title
+    content
+    createdAt
+    files {
+      fileId
+      originalName
+      fileUrl
+    }
+  }
+}

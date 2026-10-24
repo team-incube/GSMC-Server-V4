@@ -14,7 +14,7 @@ import tools.jackson.databind.ObjectMapper
 /**
  * 카테고리 조회 결과의 캐싱을 담당하는 아웃바운드 어댑터 클래스입니다.
  * [CategoryPersistencePort]를 구현하며, DB 조회를 담당하는 [CategoryPersistenceAdapter]를 감싸는
- * 데코레이터로 동작한다. `findAll()` 결과를 Redis에 단일 키(`category:all`)로 캐싱하고,
+ * 데코레이터로 동작한다. `findAll()` 결과를 Redis에 단일 키(`category:all:v2`)로 캐싱하고,
  * `findByCategoryType`/`searchByKeyword`는 캐시된 전체 목록을 메모리에서 필터링해 구현한다.
  *
  * `category_tb`는 생성/수정/삭제 API가 없어 런타임에 사실상 불변이므로 TTL 없이 캐싱한다. Redis
@@ -34,7 +34,11 @@ class CategoryCachePersistenceAdapter(
     private val categoryPersistenceAdapter: CategoryPersistenceAdapter,
 ) : CategoryPersistencePort {
     companion object {
-        private const val KEY_ALL = "category:all"
+        // TTL 없이 캐싱되는 값이라 배포만으로는 무효화되지 않는다(Redis 볼륨이 배포 간 유지됨).
+        // category_tb의 데이터 자체를 바꾸는 마이그레이션(예: V14 — VOLUNTEER의 evidence_type
+        // 변경)을 추가할 때는 이 키의 버전을 올려, 배포 시 이전 캐시를 자동으로 미스 처리하고
+        // DB에서 새로 읽어 오도록 한다.
+        private const val KEY_ALL = "category:all:v2"
     }
 
     private val log = LoggerFactory.getLogger(CategoryCachePersistenceAdapter::class.java)

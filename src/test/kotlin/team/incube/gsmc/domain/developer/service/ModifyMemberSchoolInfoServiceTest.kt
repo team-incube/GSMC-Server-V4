@@ -8,6 +8,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import team.incube.gsmc.domain.developer.port.out.DeveloperPersistencePort
+import team.incube.gsmc.domain.developer.port.out.MemberEventPublisherPort
+import team.incube.gsmc.domain.user.StudentCohort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -18,7 +20,8 @@ class ModifyMemberSchoolInfoServiceTest :
     BehaviorSpec({
         val developerPersistencePort = mockk<DeveloperPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
-        val service = ModifyMemberSchoolInfoService(developerPersistencePort, memberUtil)
+        val memberEventPublisherPort = mockk<MemberEventPublisherPort>(relaxUnitFun = true)
+        val service = ModifyMemberSchoolInfoService(developerPersistencePort, memberUtil, memberEventPublisherPort)
 
         beforeEach { clearAllMocks() }
 
@@ -136,6 +139,47 @@ class ModifyMemberSchoolInfoServiceTest :
 
                     result shouldBe true
                     verify(exactly = 1) { developerPersistencePort.save(any()) }
+                }
+            }
+
+            When("학생을 다른 반으로 옮기면") {
+                Then("이전 반과 새 반 집단을 모두 발행한다") {
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.ROOT
+                    every { developerPersistencePort.findByMemberId(1L) } returns student(grade = 1, classNumber = 2)
+                    every { developerPersistencePort.findBySchoolInfo(1, 3, 10) } returns null
+                    every { developerPersistencePort.save(any()) } answers { firstArg() }
+
+                    service.execute(1L, 1, 3, 10)
+
+                    verify(exactly = 1) {
+                        memberEventPublisherPort.publishCohortChanged(setOf(StudentCohort(1, 2), StudentCohort(1, 3)))
+                    }
+                }
+            }
+
+            When("같은 반 안에서 번호만 바꾸면") {
+                Then("같은 집단 하나만 발행한다") {
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.ROOT
+                    every { developerPersistencePort.findByMemberId(1L) } returns student(grade = 1, classNumber = 2)
+                    every { developerPersistencePort.findBySchoolInfo(1, 2, 11) } returns null
+                    every { developerPersistencePort.save(any()) } answers { firstArg() }
+
+                    service.execute(1L, 1, 2, 11)
+
+                    verify(exactly = 1) { memberEventPublisherPort.publishCohortChanged(setOf(StudentCohort(1, 2))) }
+                }
+            }
+
+            When("다른 회원의 학년·반·번호와 겹쳐 변경에 실패하면") {
+                Then("집단 변경을 발행하지 않는다") {
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.ROOT
+                    every { developerPersistencePort.findByMemberId(1L) } returns student()
+                    every { developerPersistencePort.findBySchoolInfo(1, 3, 5) } returns
+                        student(memberId = 9L, grade = 1, classNumber = 3, number = 5)
+
+                    shouldThrow<GsmcException> { service.execute(1L, 1, 3, 5) }
+
+                    verify(exactly = 0) { memberEventPublisherPort.publishCohortChanged(any()) }
                 }
             }
         }

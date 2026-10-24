@@ -12,14 +12,20 @@ import team.incube.gsmc.domain.file.PresignedUpload
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+import team.incube.gsmc.global.util.MemberUtil
 import java.time.Instant
 
 class CreatePresignedUploadUrlServiceTest :
     BehaviorSpec({
         val fileStoragePort = mockk<FileStoragePort>()
-        val service = CreatePresignedUploadUrlService(fileStoragePort)
+        val memberUtil = mockk<MemberUtil>()
+        val service = CreatePresignedUploadUrlService(fileStoragePort, memberUtil)
+        val currentUserId = 10L
 
-        beforeEach { clearAllMocks() }
+        beforeEach {
+            clearAllMocks()
+            every { memberUtil.getCurrentUserId() } returns currentUserId
+        }
 
         Given("업로드용 presigned URL을 발급할 때") {
             When("파일 크기가 최대 허용치를 초과하면") {
@@ -34,7 +40,7 @@ class CreatePresignedUploadUrlServiceTest :
             }
 
             When("파일 크기가 허용 범위 내이면") {
-                Then("UUID가 포함된 key로 presigned URL을 발급한다") {
+                Then("file/{userId}/ 접두사와 UUID가 포함된 key로 presigned URL을 발급한다") {
                     val keySlot = slot<String>()
                     every {
                         fileStoragePort.createPresignedUploadUrl(capture(keySlot), "image/png", 1024L)
@@ -49,7 +55,7 @@ class CreatePresignedUploadUrlServiceTest :
                     val result = service.execute("original.png", 1024L, "image/png")
 
                     result.key shouldBe keySlot.captured
-                    keySlot.captured.startsWith("file/") shouldBe true
+                    keySlot.captured.startsWith("file/$currentUserId/") shouldBe true
                     keySlot.captured.endsWith("_original.png") shouldBe true
                 }
             }

@@ -33,7 +33,10 @@ class SearchMembersServiceTest :
                 userRole = UserRole.STUDENT,
             )
 
-        fun query(limit: Int = 10) =
+        fun query(
+            limit: Int = 10,
+            page: Int = 0,
+        ): SearchMembersQuery =
             SearchMembersQuery(
                 email = null,
                 name = "홍길동",
@@ -42,18 +45,46 @@ class SearchMembersServiceTest :
                 classNumber = 2,
                 number = null,
                 limit = limit,
-                page = 0,
+                page = page,
                 sort = SortDirection.ASC,
             )
 
-        Given("limit이 0 이하인 검색 조건으로") {
-            When("검색을 요청하면") {
-                Then("INVALID_PAGE_SIZE 예외가 발생하고 조회하지 않는다") {
-                    val exception = shouldThrow<GsmcException> { service.execute(query(limit = 0)) }
+        listOf(0, -1, 101).forEach { limit ->
+            Given("limit이 ${limit}인 검색 조건으로") {
+                When("검색을 요청하면") {
+                    Then("INVALID_PAGE_SIZE 예외가 발생하고 조회하지 않는다") {
+                        val exception = shouldThrow<GsmcException> { service.execute(query(limit = limit)) }
 
-                    exception.errorCode shouldBe ErrorCode.INVALID_PAGE_SIZE
+                        exception.errorCode shouldBe ErrorCode.INVALID_PAGE_SIZE
+                        verify(exactly = 0) { memberPersistencePort.findAllBySearchCondition(any()) }
+                        verify(exactly = 0) { memberPersistencePort.countBySearchCondition(any()) }
+                    }
+                }
+            }
+        }
+
+        Given("page가 음수인 검색 조건으로") {
+            When("검색을 요청하면") {
+                Then("INVALID_PAGE 예외가 발생하고 조회하지 않는다") {
+                    val exception = shouldThrow<GsmcException> { service.execute(query(page = -1)) }
+
+                    exception.errorCode shouldBe ErrorCode.INVALID_PAGE
                     verify(exactly = 0) { memberPersistencePort.findAllBySearchCondition(any()) }
                     verify(exactly = 0) { memberPersistencePort.countBySearchCondition(any()) }
+                }
+            }
+        }
+
+        Given("최대 크기(limit=100)인 검색 조건으로") {
+            When("검색을 요청하면") {
+                Then("기본값과 같은 최대 크기는 정상 검색된다") {
+                    val searchQuery = query(limit = 100)
+                    every { memberPersistencePort.findAllBySearchCondition(searchQuery) } returns listOf(member(1L))
+                    every { memberPersistencePort.countBySearchCondition(searchQuery) } returns 201L
+
+                    val result = service.execute(searchQuery)
+
+                    result.totalPages shouldBe 3
                 }
             }
         }

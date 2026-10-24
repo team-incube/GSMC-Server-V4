@@ -10,6 +10,7 @@ enum class ErrorCode(
 ) {
     // 공통
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.", "INTERNAL_SERVER_ERROR"),
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 경로를 찾을 수 없습니다.", "NOT_FOUND"),
 
     // 인증
     INVALID_OAUTH_STATE(HttpStatus.BAD_REQUEST, "유효하지 않은 OAuth state입니다.", "BAD_REQUEST"),
@@ -23,7 +24,7 @@ enum class ErrorCode(
 
     // 멤버
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.", "NOT_FOUND"),
-    INVALID_PAGE_SIZE(HttpStatus.BAD_REQUEST, "페이지 크기는 1 이상이어야 합니다.", "BAD_REQUEST"),
+    INVALID_PAGE_SIZE(HttpStatus.BAD_REQUEST, "페이지 크기는 1 이상 100 이하이어야 합니다.", "BAD_REQUEST"),
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "데이터 제약 조건을 위반했습니다.", "DUPLICATE_RESOURCE"),
 
     // 점수
@@ -32,6 +33,10 @@ enum class ErrorCode(
     INVALID_CATEGORY_TYPE(HttpStatus.BAD_REQUEST, "해당 요청에 사용할 수 없는 카테고리입니다.", "BAD_REQUEST"),
     INVALID_SCORE_VALUE(HttpStatus.BAD_REQUEST, "점수 값이 올바르지 않습니다.", "BAD_REQUEST"),
     SCORE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 신청한 카테고리입니다.", "CONFLICT"),
+    INVALID_ACADEMIC_SUBJECT(HttpStatus.BAD_REQUEST, "해당 학년·학기·학과에서 입력할 수 없는 과목입니다.", "BAD_REQUEST"),
+    ACADEMIC_GRADE_INCOMPLETE(HttpStatus.BAD_REQUEST, "교과성적 입력이 완료되지 않았습니다.", "BAD_REQUEST"),
+    ACADEMIC_GRADE_LOCKED(HttpStatus.CONFLICT, "승인된 교과성적은 수정할 수 없습니다.", "CONFLICT"),
+    EVIDENCE_DRAFT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 작성 중인 증빙 초안이 있습니다.", "CONFLICT"),
     FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "파일을 찾을 수 없습니다.", "NOT_FOUND"),
     INVALID_REJECTION_REASON(HttpStatus.BAD_REQUEST, "거절 사유는 1자 이상 500자 이하여야 합니다.", "BAD_REQUEST"),
     INVALID_FILE_SIZE(HttpStatus.BAD_REQUEST, "파일 크기는 20MB를 초과할 수 없습니다.", "BAD_REQUEST"),
@@ -43,6 +48,8 @@ enum class ErrorCode(
     SHEET_PRESIGNED_URL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Sheet 다운로드 URL 생성에 실패했습니다.", "INTERNAL_SERVER_ERROR"),
     FILE_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "이미 업로드 확인이 완료된 파일입니다.", "CONFLICT"),
     FILE_LINKED_TO_APPROVED_SCORE(HttpStatus.CONFLICT, "승인된 점수 요청에 연결된 파일은 삭제할 수 없습니다.", "CONFLICT"),
+    FILE_LINKED_TO_PROJECT(HttpStatus.CONFLICT, "프로젝트에 첨부된 파일은 삭제할 수 없습니다.", "CONFLICT"),
+    EVIDENCE_LINKED_TO_APPROVED_SCORE(HttpStatus.CONFLICT, "승인된 점수 요청에 연결된 증빙자료는 수정하거나 삭제할 수 없습니다.", "CONFLICT"),
     EVIDENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "증빙자료를 찾을 수 없습니다.", "NOT_FOUND"),
     INVALID_EVIDENCE_INPUT(HttpStatus.BAD_REQUEST, "증빙자료 입력값이 올바르지 않습니다.", "BAD_REQUEST"),
     EVIDENCE_ALREADY_CONNECTED(HttpStatus.CONFLICT, "Score에 이미 증빙자료가 연결되어 있습니다.", "CONFLICT"),

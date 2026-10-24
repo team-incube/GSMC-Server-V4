@@ -20,7 +20,9 @@ import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
 import team.incube.gsmc.domain.auth.port.out.OAuthPort
 import team.incube.gsmc.domain.auth.port.out.OAuthStatePersistencePort
 import team.incube.gsmc.domain.auth.port.out.RefreshTokenPersistencePort
+import team.incube.gsmc.domain.auth.port.out.UserEventPublisherPort
 import team.incube.gsmc.domain.auth.port.out.UserPersistencePort
+import team.incube.gsmc.domain.user.StudentCohort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -33,6 +35,7 @@ class LoginServiceTest :
         val userPersistencePort = mockk<UserPersistencePort>()
         val refreshTokenPersistencePort = mockk<RefreshTokenPersistencePort>()
         val authTokenPort = mockk<AuthTokenPort>()
+        val userEventPublisherPort = mockk<UserEventPublisherPort>(relaxUnitFun = true)
         val transactionManager = mockk<PlatformTransactionManager>()
         val loginService =
             LoginService(
@@ -41,6 +44,7 @@ class LoginServiceTest :
                 userPersistencePort = userPersistencePort,
                 refreshTokenPersistencePort = refreshTokenPersistencePort,
                 authTokenPort = authTokenPort,
+                userEventPublisherPort = userEventPublisherPort,
                 transactionManager = transactionManager,
             )
 
@@ -114,6 +118,7 @@ class LoginServiceTest :
                     (result.accessTokenExpiresIn in (before + 3600 * 1000)..(after + 3600 * 1000)) shouldBe true
                     (result.refreshTokenExpiresIn in (before + 7200 * 1000)..(after + 7200 * 1000)) shouldBe true
                     verify(exactly = 0) { userPersistencePort.save(any()) }
+                    verify(exactly = 0) { userEventPublisherPort.publishCohortChanged(any()) }
                     verify(exactly = 1) { refreshTokenPersistencePort.save(user.userId, "refresh-token") }
                     verifyOrder {
                         transactionManager.commit(any())
@@ -123,7 +128,7 @@ class LoginServiceTest :
             }
 
             When("신규 학생이 로그인하면") {
-                Then("학생 사용자로 저장한 뒤 토큰을 발급한다") {
+                Then("학생 사용자로 저장하고 소속 집단 변경을 발행한 뒤 토큰을 발급한다") {
                     val savedUser = studentUser()
                     val userSlot = slot<User>()
 
@@ -152,6 +157,7 @@ class LoginServiceTest :
                     userSlot.captured.userClassNumber shouldBe 3
                     userSlot.captured.userNumber shouldBe 4
                     userSlot.captured.userRole shouldBe UserRole.STUDENT
+                    verify(exactly = 1) { userEventPublisherPort.publishCohortChanged(setOf(StudentCohort(2, 3))) }
                 }
             }
 
@@ -204,6 +210,7 @@ class LoginServiceTest :
                     userSlot.captured.userGrade shouldBe null
                     userSlot.captured.userClassNumber shouldBe null
                     userSlot.captured.userNumber shouldBe null
+                    verify(exactly = 1) { userEventPublisherPort.publishCohortChanged(emptySet()) }
                 }
             }
         }

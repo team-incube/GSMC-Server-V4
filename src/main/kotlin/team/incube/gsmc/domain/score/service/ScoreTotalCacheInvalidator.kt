@@ -2,6 +2,8 @@ package team.incube.gsmc.domain.score.service
 
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.stereotype.Component
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
 import team.themoment.sdk.logging.logger.logger
@@ -22,6 +24,11 @@ import java.util.concurrent.ScheduledFuture
  * 예약하지 않고 이미 예약된 한 번의 무효화에 묶는다(디바운스). [TaskScheduler]는 단일 인스턴스
  * 기준으로 동작하므로, 이 서비스가 여러 인스턴스로 스케일아웃되면 인스턴스별로 최대 1회씩 무효화될
  * 수 있으나 여전히 요청당 1회보다는 훨씬 적고, 5분 TTL이 최종 안전장치로 남아있다.
+ *
+ * 디바운스 예약은 호출 시점이 아니라 트랜잭션 커밋 이후에 시작한다. 커밋 전에 캐시를 지우면 커밋이 늦어지는
+ * 동안 다른 조회가 커밋 전 값으로 캐시를 다시 채울 수 있고, 롤백된 쓰기에도 무효화가 실행되기 때문이다.
+ * 트랜잭션 밖에서 호출되면 즉시 예약한다. 회원의 학적·역할 변경처럼 변경 전 집단을 DB에서 다시 알 수 없는
+ * 경우에는 [invalidateCohort]로 학년/반을 직접 지정한다.
  *
  * 캐시 무효화는 순수 성능 최적화이고 5분 TTL이 최종 안전장치로 남아있으므로, 예외가 나더라도 로그만
  * 남기고 삼킨다. [invalidate]가 던지는 예외(예: TaskScheduler가 셧다운 중이라 스케줄 자체를 거부하는
@@ -50,10 +57,45 @@ class ScoreTotalCacheInvalidator(
         runCatching {
             val member = memberPersistencePort.findByUserId(userId) ?: return@runCatching
             val userGrade = member.userGrade ?: return@runCatching
-
-            debounceGradeEviction(userGrade)
-            member.userClassNumber?.let { debounceClassEviction(userGrade, it) }
+            invalidateCohort(userGrade, member.userClassNumber)
         }.onFailure { logger().warn("반/학년 백분위 캐시 무효화 실패 (userId={})", userId, it) }
+    }
+
+    /**
+     * 트랜잭션 안이면 커밋 성공 후에 [action]을 실행하고, 롤백되면 실행하지 않는다.
+     * 트랜잭션 밖에서 호출되면 즉시 실행한다.
+     */
+    private fun runAfterCommit(action: () -> Unit) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action()
+            return
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() {
+                    runCatching(action)
+                        .onFailure { logger().warn("커밋 후 백분위 캐시 무효화 예약 실패", it) }
+                }
+            },
+        )
+    }
+
+    /**
+     * 지정한 학년(과 반)의 백분위 캐시를 무효화한다. 회원 조회 없이 호출자가 넘긴 범위를 그대로 사용하므로,
+     * 반 이동처럼 변경 전 집단을 DB에서 더 이상 알 수 없는 경우에 쓴다. 반이 없으면 학년 캐시만 무효화한다.
+     */
+    fun invalidateCohort(
+        userGrade: Int,
+        userClassNumber: Int?,
+    ) {
+        runCatching {
+            runAfterCommit {
+                debounceGradeEviction(userGrade)
+                userClassNumber?.let { debounceClassEviction(userGrade, it) }
+            }
+        }.onFailure {
+            logger().warn("반/학년 백분위 캐시 무효화 실패 (userGrade={}, userClassNumber={})", userGrade, userClassNumber, it)
+        }
     }
 
     private fun debounceGradeEviction(userGrade: Int) {

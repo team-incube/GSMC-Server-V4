@@ -38,7 +38,7 @@ class DefaultScoreValueConverterTest :
                             categoryKoreanName = "봉사활동",
                             categoryMaximumValue = 10,
                             isAccumulated = false,
-                            evidenceType = EvidenceType.UNREQUIRED,
+                            evidenceType = EvidenceType.FILE,
                             categoryType = CategoryType.VOLUNTEER,
                             calculationType = ScoreCalculationType.SCORE_BASED,
                         )

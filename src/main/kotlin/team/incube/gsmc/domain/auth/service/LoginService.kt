@@ -9,7 +9,9 @@ import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
 import team.incube.gsmc.domain.auth.port.out.OAuthPort
 import team.incube.gsmc.domain.auth.port.out.OAuthStatePersistencePort
 import team.incube.gsmc.domain.auth.port.out.RefreshTokenPersistencePort
+import team.incube.gsmc.domain.auth.port.out.UserEventPublisherPort
 import team.incube.gsmc.domain.auth.port.out.UserPersistencePort
+import team.incube.gsmc.domain.user.StudentCohort
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.annotation.PortDirection
@@ -21,6 +23,7 @@ import team.incube.gsmc.global.exception.GsmcException
  * OAuth 로그인 유스케이스 구현 클래스입니다.
  * [LoginUseCase]를 구현하며, OAuth 인가 코드를 검증하고 JWT 토큰을 발급합니다.
  * 최초 로그인 시 [UserPersistencePort]를 통해 사용자를 자동으로 생성하며, 발급된 리프레시 토큰은 [RefreshTokenPersistencePort]에 저장합니다.
+ * 신규 학생이 생성되면 같은 학년·반 백분위 집단의 구성이 바뀌므로 [UserEventPublisherPort]로 집단 변경을 발행합니다.
  */
 @Port(direction = PortDirection.INBOUND)
 class LoginService(
@@ -29,6 +32,7 @@ class LoginService(
     private val userPersistencePort: UserPersistencePort,
     private val refreshTokenPersistencePort: RefreshTokenPersistencePort,
     private val authTokenPort: AuthTokenPort,
+    private val userEventPublisherPort: UserEventPublisherPort,
     transactionManager: PlatformTransactionManager,
 ) : LoginUseCase {
     private val transactionTemplate = TransactionTemplate(transactionManager)
@@ -78,16 +82,17 @@ class LoginService(
      */
     private fun persistUser(oAuthUserInfo: OAuthUserInfo): User =
         userPersistencePort.findByEmail(oAuthUserInfo.email)
-            ?: userPersistencePort.save(
-                User(
-                    userId = 0,
-                    // 교사는 SDK에서 이름을 제공하지 않으므로 이메일을 대체 식별자로 사용
-                    userName = oAuthUserInfo.name ?: oAuthUserInfo.email,
-                    userEmail = oAuthUserInfo.email,
-                    userGrade = oAuthUserInfo.grade,
-                    userClassNumber = oAuthUserInfo.classNum,
-                    userNumber = oAuthUserInfo.number,
-                    userRole = if (oAuthUserInfo.isStudent) UserRole.STUDENT else UserRole.TEACHER,
-                ),
-            )
+            ?: userPersistencePort
+                .save(
+                    User(
+                        userId = 0,
+                        // 교사는 SDK에서 이름을 제공하지 않으므로 이메일을 대체 식별자로 사용
+                        userName = oAuthUserInfo.name ?: oAuthUserInfo.email,
+                        userEmail = oAuthUserInfo.email,
+                        userGrade = oAuthUserInfo.grade,
+                        userClassNumber = oAuthUserInfo.classNum,
+                        userNumber = oAuthUserInfo.number,
+                        userRole = if (oAuthUserInfo.isStudent) UserRole.STUDENT else UserRole.TEACHER,
+                    ),
+                ).also { userEventPublisherPort.publishCohortChanged(setOfNotNull(StudentCohort.of(it))) }
 }

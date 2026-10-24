@@ -1,0 +1,19 @@
+query MyAlerts($first: Int, $after: String) {
+  myAlertConnection(first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        alertId
+        scoreId
+        alertType
+        content
+        isRead
+        createdAt
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

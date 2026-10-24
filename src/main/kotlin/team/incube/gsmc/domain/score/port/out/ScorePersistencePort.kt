@@ -19,6 +19,18 @@ interface ScorePersistencePort {
     fun findById(scoreId: Long): Score?
 
     /**
+     * ID로 점수 요청을 조회하며, 조회한 행에 비관적 쓰기 락(`SELECT ... FOR UPDATE`)을 건다.
+     *
+     * 승인/거절처럼 "조회한 상태를 기준으로 판단해 갈아끼우는" 트랜잭션에서 동시 요청 간 lost update를
+     * 막는 데 사용한다. 락 대상은 `score_tb` 행 하나로 한정되며, 연관된 category/user/evidence까지
+     * 락이 번지지 않는다.
+     *
+     * @param scoreId 조회할 점수 요청 ID
+     * @return 해당 점수 요청, 없으면 null
+     */
+    fun findByIdForUpdate(scoreId: Long): Score?
+
+    /**
      * 특정 사용자의 모든 점수 요청을 조회한다.
      *
      * @param userId 조회할 사용자 ID
@@ -121,6 +133,19 @@ interface ScorePersistencePort {
     fun deleteById(scoreId: Long)
 
     fun unlinkEvidence(evidenceId: Long)
+
+    /**
+     * 증빙이 승인(`APPROVED`) 상태의 점수 요청에 연결되어 있는지 확인한다. 이미 심사가 끝난
+     * 점수 요청의 증빙이 임의로 수정·삭제되어 감사 추적이 깨지는 것을 막는 데 사용한다.
+     *
+     * 반드시 트랜잭션 안에서 호출해야 하며, 증빙에 연결된 점수 행에 비관적 쓰기 락을 건다. 승인/거절
+     * 트랜잭션과 같은 행을 잠그므로, 진행 중인 심사가 있으면 그 커밋 이후의 상태로 판단한다. 락은 호출한
+     * 트랜잭션이 끝날 때까지 유지되어 이후의 수정·삭제와 심사가 겹치지 않는다.
+     *
+     * @param evidenceId 확인할 증빙 ID
+     * @return 승인된 점수 요청에 연결되어 있으면 true
+     */
+    fun isEvidenceLinkedToApprovedScore(evidenceId: Long): Boolean
 
     /** Project 삭제 전에 점수의 Project 연결만 해제한다. */
     fun unlinkProject(projectId: Long)

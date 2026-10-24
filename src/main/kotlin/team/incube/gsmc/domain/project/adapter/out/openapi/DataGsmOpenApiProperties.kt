@@ -11,4 +11,6 @@ data class DataGsmOpenApiProperties(
     val apiKey: String,
     val connectTimeout: Duration = Duration.ofSeconds(3),
     val readTimeout: Duration = Duration.ofSeconds(5),
+    /** 전체 ACTIVE 프로젝트 목록을 여러 페이지에 걸쳐 조회할 때 허용하는 전체 시간 상한입니다. */
+    val totalTimeout: Duration = Duration.ofSeconds(10),
 )

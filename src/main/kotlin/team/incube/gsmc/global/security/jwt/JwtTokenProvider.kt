@@ -7,6 +7,7 @@ import team.incube.gsmc.domain.auth.port.out.AuthTokenPort
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+import team.incube.gsmc.global.exception.orThrow
 import java.util.Date
 import java.util.UUID
 import javax.crypto.SecretKey
@@ -49,14 +50,14 @@ class JwtTokenProvider(
 
     override fun getUserIdFromToken(token: String): Long =
         runCatching { parseClaims(token).subject.toLong() }
-            .getOrElse { throw GsmcException(ErrorCode.INVALID_TOKEN) }
+            .orThrow(ErrorCode.INVALID_TOKEN)
 
     override fun getRoleFromToken(token: String): UserRole {
         val roleStr =
             parseClaims(token).get("role", String::class.java)
                 ?: throw GsmcException(ErrorCode.INVALID_TOKEN)
         return runCatching { UserRole.valueOf(roleStr) }
-            .getOrElse { throw GsmcException(ErrorCode.INVALID_TOKEN) }
+            .orThrow(ErrorCode.INVALID_TOKEN)
     }
 
     override fun parseTokenClaims(token: String): TokenClaims? =

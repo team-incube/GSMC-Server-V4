@@ -36,14 +36,64 @@ class ConfirmFileUploadServiceTest :
                 memberUtil,
             )
 
+        val currentUserId = 10L
+        val fileKey = "file/$currentUserId/uuid_original.png"
+
         beforeEach {
             clearAllMocks()
             every { fileStorageDeletionTaskPersistencePort.existsByFileKey(any()) } returns false
+            every { memberUtil.getCurrentUserId() } returns currentUserId
         }
 
-        val fileKey = "file/uuid_original.png"
-
         Given("파일 업로드를 확인할 때") {
+            When("다른 사용자의 key를 confirm하면") {
+                Then("FORBIDDEN 예외를 던지고 조회·저장을 하지 않는다") {
+                    val othersKey = "file/${currentUserId + 1}/uuid_original.png"
+
+                    val exception = shouldThrow<GsmcException> { service.execute(othersKey, "original.png") }
+
+                    exception.errorCode shouldBe ErrorCode.FORBIDDEN
+                    verify(exactly = 0) { filePersistencePort.findByFileKey(any()) }
+                    verify(exactly = 0) { fileStoragePort.getObjectSize(any()) }
+                    verify(exactly = 0) { filePersistencePort.save(any()) }
+                }
+            }
+
+            When("이미 확정된 다른 사용자의 key를 confirm하면") {
+                Then("FILE_ALREADY_CONFIRMED가 아니라 FORBIDDEN 예외를 던진다") {
+                    val othersKey = "file/${currentUserId + 1}/uuid_original.png"
+                    every { filePersistencePort.findByFileKey(othersKey) } returns
+                        File(
+                            fileId = 1L,
+                            userId = currentUserId + 1,
+                            fileKey = othersKey,
+                            fileOriginalName = "original.png",
+                            fileStoredName = "uuid_original.png",
+                        )
+
+                    val exception = shouldThrow<GsmcException> { service.execute(othersKey, "original.png") }
+
+                    exception.errorCode shouldBe ErrorCode.FORBIDDEN
+                    verify(exactly = 0) { filePersistencePort.findByFileKey(any()) }
+                }
+            }
+
+            When("file/ 밖의 경로이거나 userId 없는 구 형식 key이면") {
+                Then("FORBIDDEN 예외를 던지고 저장하지 않는다") {
+                    listOf(
+                        "profile/$currentUserId/x.png",
+                        "file/uuid_original.png",
+                        "file/${currentUserId}x/uuid_original.png",
+                        "other/file/$currentUserId/x.png",
+                    ).forEach { invalidKey ->
+                        val exception = shouldThrow<GsmcException> { service.execute(invalidKey, "original.png") }
+
+                        exception.errorCode shouldBe ErrorCode.FORBIDDEN
+                    }
+                    verify(exactly = 0) { filePersistencePort.save(any()) }
+                }
+            }
+
             When("동일 key로 이미 confirm된 파일이 있으면") {
                 Then("FILE_ALREADY_CONFIRMED 예외를 던진다") {
                     every { filePersistencePort.findByFileKey(fileKey) } returns
@@ -117,7 +167,6 @@ class ConfirmFileUploadServiceTest :
                 Then("현재 사용자를 소유자로 하여 미연결 상태의 파일 메타데이터를 저장한다") {
                     every { filePersistencePort.findByFileKey(fileKey) } returns null
                     every { fileStoragePort.getObjectSize(fileKey) } returns 1024L
-                    every { memberUtil.getCurrentUserId() } returns 10L
                     val savedFileSlot = slot<File>()
                     every { filePersistencePort.save(capture(savedFileSlot)) } answers
                         { savedFileSlot.captured.copy(fileId = 100L) }
@@ -125,7 +174,7 @@ class ConfirmFileUploadServiceTest :
                     val result = service.execute(fileKey, "original.png")
 
                     result.fileId shouldBe 100L
-                    savedFileSlot.captured.userId shouldBe 10L
+                    savedFileSlot.captured.userId shouldBe currentUserId
                     savedFileSlot.captured.fileKey shouldBe fileKey
                     savedFileSlot.captured.fileOriginalName shouldBe "original.png"
                     savedFileSlot.captured.fileStoredName shouldBe "uuid_original.png"

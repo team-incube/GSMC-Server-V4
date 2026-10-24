@@ -1,0 +1,102 @@
+# 교과성적(ACADEMIC_GRADE) 입력 대상 과목 목록
+#
+# 출처: 2026학년도 교수학습 및 평가운영 계획(1학기 HWP, 2학기 PDF), 과목별 성적 산출 방식 자료
+# - 1·2학년은 석차등급이 있는 과목만 넣는다. 성취도 3단계 과목(스포츠·음악·미술 등)은 뺀다.
+# - 3학년 전공과목은 석차등급이 없어 성취도(A~E)로 입력받는다(achievement-grades). 임시 기준이며 #233에서 확정한다.
+# - 과목명은 계획서 원문 표기를 그대로 쓴다(예: "빅데이터분석" / "빅 데이터 분석").
+#
+# 과목 필드
+# - departments: 수강 학과 (SOFTWARE: 1·2반, SMART_IOT: 3반, AI: 4반)
+# - elective-group: 택1 선택 그룹. 같은 그룹 과목 중 정확히 1개를 입력해야 한다
+# - optional: 선택자만 수강하는 과목. 입력했을 때만 평균에 들어간다
+#
+# 학년도가 바뀌면 새 계획서에 맞춰 이 파일을 갱신한다. 운영에서 재배포 없이 바꾸려면
+# ACADEMIC_CURRICULUM_PATH=file:/경로/academic-curriculum.yml 로 외부 파일을 지정한다.
+academic:
+  achievement-grades: [3]
+  curriculum:
+    - grade: 1
+      semester: 1
+      subjects:
+        - { name: 공통국어1, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 공통수학1, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 공통영어1, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 통합과학1, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 컴퓨터 시스템 일반, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 성공적인 직업 생활, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 파이썬 프로그래밍, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 웹프로그래밍기초, departments: [SOFTWARE, AI] }
+        - { name: 전기전자일반, departments: [SMART_IOT] }
+        - { name: 디지털논리회로, departments: [SMART_IOT] }
+    - grade: 1
+      semester: 2
+      subjects:
+        - { name: 공통국어2, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 공통수학2, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 공통영어2, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 통합과학2, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 자료 구조, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 자바 프로그래밍, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 운영체제, departments: [SOFTWARE, AI] }
+        - { name: 사물 인터넷과 센서 제어, departments: [SMART_IOT] }
+        - { name: 가전 기기 시스템 소프트웨어 개발, departments: [SMART_IOT] }
+    - grade: 2
+      semester: 1
+      subjects:
+        - { name: 대수, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 영어Ⅰ, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 한국사1, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 통합사회1, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 데이터베이스 프로그래밍, departments: [SOFTWARE, AI] }
+        - { name: 응용 프로그래밍 개발, departments: [SOFTWARE] }
+        - { name: 네트워크 프로그래밍, departments: [SOFTWARE] }
+        - { name: 사물 인터넷과 센서 제어, departments: [SMART_IOT] }
+        - { name: 산업용 전자기기 소프트웨어 개발, departments: [SMART_IOT] }
+        - { name: 가전 기기 하드웨어 개발, departments: [SMART_IOT] }
+        - { name: 빅데이터분석, departments: [AI] }
+        - { name: 인공지능 서비스 구현, departments: [AI] }
+    - grade: 2
+      semester: 2
+      subjects:
+        - { name: 미적분Ⅰ, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 영어Ⅱ, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 한국사2, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 통합사회2, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 노동 인권과 산업 안전 보건, departments: [SOFTWARE, SMART_IOT, AI] }
+        - { name: 응용 프로그래밍 개발, departments: [SOFTWARE] }
+        - { name: 네트워크 프로그래밍, departments: [SOFTWARE] }
+        - { name: 가전 기기 시스템 소프트웨어 개발, departments: [SMART_IOT] }
+        - { name: 산업용 전자 기기 소프트웨어 개발, departments: [SMART_IOT] }
+        - { name: 산업용 전자 기기 하드웨어 개발, departments: [SMART_IOT] }
+        - { name: 빅 데이터 분석, departments: [AI] }
+        - { name: 인공지능 서비스 구현, departments: [AI] }
+        - { name: 웹프로그래밍, departments: [SOFTWARE, SMART_IOT, AI], elective-group: 2학년 2학기 선택 }
+        - { name: 인공지능 일반, departments: [SOFTWARE, AI], elective-group: 2학년 2학기 선택 }
+    - grade: 3
+      semester: 1
+      subjects:
+        - { name: 소프트웨어공학실무, departments: [SOFTWARE] }
+        - { name: 알고리즘, departments: [SOFTWARE, AI] }
+        - { name: IT 프로젝트 관리, departments: [SOFTWARE, AI] }
+        - { name: 산업용 전자기기 소프트웨어 개발, departments: [SMART_IOT] }
+        - { name: 로봇 지능 개발, departments: [SMART_IOT] }
+        - { name: 착용형 스마트기기 개발, departments: [SMART_IOT] }
+        - { name: 인공지능모델링, departments: [AI] }
+        - { name: 인공지능 서비스 구현, departments: [AI] }
+        - { name: 웹 프로그래밍 실무, departments: [SOFTWARE, SMART_IOT, AI], optional: true }
+        - { name: 일본어Ⅰ, departments: [SOFTWARE, SMART_IOT, AI], elective-group: 제2외국어 }
+        - { name: 중국어Ⅰ, departments: [SOFTWARE, SMART_IOT, AI], elective-group: 제2외국어 }
+    - grade: 3
+      semester: 2
+      subjects:
+        - { name: 소프트웨어공학실무, departments: [SOFTWARE] }
+        - { name: 알고리즘, departments: [SOFTWARE, AI] }
+        - { name: IT 프로젝트 관리, departments: [SOFTWARE, AI] }
+        - { name: 산업용 전자기기 소프트웨어개발, departments: [SMART_IOT] }
+        - { name: 로봇 지능 개발, departments: [SMART_IOT] }
+        - { name: 착용형 스마트기기 개발, departments: [SMART_IOT] }
+        - { name: 인공지능 모델링, departments: [AI] }
+        - { name: 인공지능 서비스 구현, departments: [AI] }
+        - { name: 웹 프로그래밍 실무, departments: [SOFTWARE, SMART_IOT, AI], optional: true }
+        - { name: 일본어I, departments: [SOFTWARE, SMART_IOT, AI], elective-group: 제2외국어 }
+        - { name: 중국어Ⅰ, departments: [SOFTWARE, SMART_IOT, AI], elective-group: 제2외국어 }

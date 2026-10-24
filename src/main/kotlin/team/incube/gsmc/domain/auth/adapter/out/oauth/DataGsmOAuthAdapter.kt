@@ -7,6 +7,7 @@ import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+import team.incube.gsmc.global.exception.orThrow
 import team.themoment.datagsm.sdk.oauth.DataGsmOAuthClient
 import team.themoment.datagsm.sdk.oauth.model.AccountObjectType
 
@@ -61,7 +62,7 @@ class DataGsmOAuthAdapter(
         val response =
             runCatching {
                 client.exchangeCodeForToken(code, redirectUri, codeVerifier)
-            }.getOrElse { throw GsmcException(ErrorCode.OAUTH_TOKEN_EXCHANGE_FAILED) }
+            }.orThrow(ErrorCode.OAUTH_TOKEN_EXCHANGE_FAILED)
 
         return OAuthTokenResult(
             accessToken = response.accessToken,
@@ -81,7 +82,7 @@ class DataGsmOAuthAdapter(
         val userInfo =
             runCatching {
                 client.getUserInfo(accessToken)
-            }.getOrElse { throw GsmcException(ErrorCode.OAUTH_USER_INFO_FETCH_FAILED) }
+            }.orThrow(ErrorCode.OAUTH_USER_INFO_FETCH_FAILED)
 
         val isStudent = userInfo.objectType == AccountObjectType.STUDENT
         val student = if (isStudent) userInfo.student else null
