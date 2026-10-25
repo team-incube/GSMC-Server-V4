@@ -27,6 +27,7 @@ import team.incube.gsmc.domain.project.DataGsmProject
 import team.incube.gsmc.domain.project.DataGsmProjectParticipant
 import team.incube.gsmc.domain.project.DataGsmProjectStatus
 import team.incube.gsmc.domain.project.port.out.DataGsmProjectApiPort
+import team.incube.gsmc.domain.score.ActivityPeriodPolicy
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
@@ -36,6 +37,7 @@ import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 private class TestTransactionManager : PlatformTransactionManager {
@@ -79,6 +81,7 @@ class SubmitProjectParticipationServiceTest :
                 filePersistencePort = filePersistencePort,
                 memberPersistencePort = memberPersistencePort,
                 scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
+                activityPeriodValidator = ActivityPeriodValidator(memberPersistencePort),
                 memberUtil = memberUtil,
                 transactionManager = transactionManager,
             )
@@ -94,6 +97,9 @@ class SubmitProjectParticipationServiceTest :
         val userId = 1L
         val dgProjectId = 100L
         val user = User(userId, "학생", "student@gsm.hs.kr", 2, 3, 4, UserRole.STUDENT)
+
+        // 2학년 인정 기간(2026-01-06 ~ 2026-12-31) 안의 활동일
+        val validActivityDate = LocalDate.of(2026, 5, 1)
         val category =
             Category(
                 categoryId = 1,
@@ -164,10 +170,12 @@ class SubmitProjectParticipationServiceTest :
                     every { filePersistencePort.linkToEvidence(10L, 500L) } just runs
                     every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 900L) }
 
-                    val result = service.execute(dgProjectId, "내 기여 내용", listOf(10L))
+                    val result = service.execute(dgProjectId, "내 기여 내용", listOf(10L), validActivityDate)
 
                     result.scoreId shouldBe 900L
                     result.scoreStatus shouldBe ScoreStatus.PENDING
+                    result.activityDate shouldBe validActivityDate
+                    result.activityPeriodPolicyVersion shouldBe ActivityPeriodPolicy.VERSION
                     result.activityName shouldBe "DataGSM 프로젝트"
                     result.dgProjectId shouldBe dgProjectId
                     verify(exactly = 1) { filePersistencePort.linkToEvidence(10L, 500L) }
@@ -183,7 +191,15 @@ class SubmitProjectParticipationServiceTest :
                 Then("FORBIDDEN 예외가 발생한다") {
                     every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
 
-                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                emptyList(),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.FORBIDDEN
                 }
@@ -196,7 +212,15 @@ class SubmitProjectParticipationServiceTest :
                     commonMocksForStudent()
                     every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns null
 
-                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                emptyList(),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.DATAGSM_PROJECT_NOT_FOUND
                     verify(exactly = 0) {
@@ -216,7 +240,15 @@ class SubmitProjectParticipationServiceTest :
                     every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns
                         dgProject(status = DataGsmProjectStatus.ENDED)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                emptyList(),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.DATAGSM_PROJECT_NOT_ACTIVE
                 }
@@ -230,7 +262,15 @@ class SubmitProjectParticipationServiceTest :
                     every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns
                         dgProject(participantEmails = listOf("a@gsm.hs.kr", "b@gsm.hs.kr"))
 
-                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                emptyList(),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.NOT_A_DATAGSM_PROJECT_PARTICIPANT
                 }
@@ -244,7 +284,15 @@ class SubmitProjectParticipationServiceTest :
                     every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns
                         dgProject(participantEmails = listOf(user.userEmail))
 
-                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                emptyList(),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_PROJECT_PARTICIPANT_COUNT
                 }
@@ -276,7 +324,15 @@ class SubmitProjectParticipationServiceTest :
                     every { filePersistencePort.findAllByIdIn(emptyList()) } returns emptyList()
                     every { scorePersistencePort.findByUserIdAndDgProjectId(userId, dgProjectId) } returns pending
 
-                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                emptyList(),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.PROJECT_PARTICIPATION_ALREADY_SUBMITTED
                 }
@@ -323,11 +379,13 @@ class SubmitProjectParticipationServiceTest :
                     every { filePersistencePort.linkToEvidence(20L, 50L) } just runs
                     every { scorePersistencePort.save(any()) } answers { firstArg() }
 
-                    val result = service.execute(dgProjectId, "수정된 내용", listOf(20L))
+                    val result = service.execute(dgProjectId, "수정된 내용", listOf(20L), LocalDate.of(2026, 1, 6))
 
                     result.scoreId shouldBe 3L
                     result.scoreStatus shouldBe ScoreStatus.PENDING
                     result.rejectionReason shouldBe null
+                    result.activityDate shouldBe LocalDate.of(2026, 1, 6)
+                    result.activityPeriodPolicyVersion shouldBe ActivityPeriodPolicy.VERSION
                     verify(exactly = 1) { filePersistencePort.unlinkFromEvidence(15L) }
                     verify(exactly = 1) { filePersistencePort.linkToEvidence(20L, 50L) }
                     verify(exactly = 1) { evidencePersistencePort.save(match { it.evidenceContent == "수정된 내용" }) }
@@ -344,7 +402,15 @@ class SubmitProjectParticipationServiceTest :
                         category
                     every { filePersistencePort.findAllByIdIn(listOf(30L)) } returns listOf(file(30L, ownerId = 999L))
 
-                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", listOf(30L)) }
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                listOf(30L),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.FORBIDDEN
                 }
@@ -361,7 +427,14 @@ class SubmitProjectParticipationServiceTest :
                     every { filePersistencePort.findAllByIdIn(listOf(40L, 41L)) } returns listOf(file(40L))
 
                     val exception =
-                        shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", listOf(40L, 41L)) }
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                listOf(40L, 41L),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.FILE_NOT_FOUND
                 }
@@ -384,7 +457,7 @@ class SubmitProjectParticipationServiceTest :
                         GsmcException(ErrorCode.FILE_ALREADY_LINKED)
 
                     shouldThrow<GsmcException> {
-                        service.execute(dgProjectId, "내용", listOf(10L))
+                        service.execute(dgProjectId, "내용", listOf(10L), validActivityDate)
                     }.errorCode shouldBe ErrorCode.FILE_ALREADY_LINKED
 
                     transactionManager.commitCount shouldBe 0
@@ -407,7 +480,7 @@ class SubmitProjectParticipationServiceTest :
                     }
                     every { scorePersistencePort.save(any()) } throws GsmcException(ErrorCode.INTERNAL_SERVER_ERROR)
 
-                    shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+                    shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList(), validActivityDate) }
 
                     transactionManager.commitCount shouldBe 0
                     transactionManager.rollbackCount shouldBe 1
@@ -427,9 +500,67 @@ class SubmitProjectParticipationServiceTest :
                         listOf(file(40L, ownerId = 999L))
 
                     val exception =
-                        shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", listOf(40L, 41L)) }
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                dgProjectId,
+                                "내용",
+                                listOf(40L, 41L),
+                                validActivityDate,
+                            )
+                        }
 
                     exception.errorCode shouldBe ErrorCode.FORBIDDEN
+                }
+            }
+        }
+
+        Given("2학년 학생이 학년별 인정 기간을 벗어난 활동일로 제출할 때") {
+            When("시작일 하루 전(2026-01-05)을 입력하면") {
+                Then("ACTIVITY_DATE_OUT_OF_PERIOD 예외가 발생하고 트랜잭션을 열지 않는다") {
+                    commonMocksForStudent()
+                    every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns dgProject()
+
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(dgProjectId, "내용", emptyList(), LocalDate.of(2026, 1, 5))
+                        }
+
+                    exception.errorCode shouldBe ErrorCode.ACTIVITY_DATE_OUT_OF_PERIOD
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { evidencePersistencePort.save(any()) }
+                    transactionManager.commitCount shouldBe 0
+                    transactionManager.rollbackCount shouldBe 0
+                }
+            }
+
+            When("활동일을 입력하지 않으면") {
+                Then("ACTIVITY_DATE_REQUIRED 예외가 발생하고 저장하지 않는다") {
+                    commonMocksForStudent()
+                    every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns dgProject()
+
+                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+
+                    exception.errorCode shouldBe ErrorCode.ACTIVITY_DATE_REQUIRED
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                }
+            }
+        }
+
+        Given("REJECTED 상태의 기존 제출을 인정 기간 밖 활동일로 재제출할 때") {
+            When("2학년이 종료일 하루 후(2027-01-01)를 입력하면") {
+                Then("ACTIVITY_DATE_OUT_OF_PERIOD 예외가 발생하고 기존 제출을 변경하지 않는다") {
+                    commonMocksForStudent()
+                    every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns dgProject()
+
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(dgProjectId, "수정된 내용", listOf(20L), LocalDate.of(2027, 1, 1))
+                        }
+
+                    exception.errorCode shouldBe ErrorCode.ACTIVITY_DATE_OUT_OF_PERIOD
+                    verify(exactly = 0) { scorePersistencePort.findByUserIdAndDgProjectId(any(), any()) }
+                    verify(exactly = 0) { evidencePersistencePort.save(any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
                 }
             }
         }
