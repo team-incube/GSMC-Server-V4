@@ -1,5 +1,6 @@
 package team.incube.gsmc.domain.file.adapter.out.persistence
 
+import org.springframework.dao.DataAccessException
 import org.springframework.data.redis.core.RedisTemplate
 import team.incube.gsmc.domain.file.port.out.FileAccessUrlCachePort
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
@@ -15,7 +16,7 @@ import java.time.Duration
  * 캐시 TTL([CACHE_TTL])은 서명 TTL([FileStoragePort.DOWNLOAD_URL_TTL])에서 [EXPIRY_MARGIN]을 뺀 값이므로,
  * 캐시에서 꺼낸 URL은 최소 [EXPIRY_MARGIN] 동안 유효하다. 캐시는 순수 성능 최적화이므로 Redis 장애가 파일
  * 조회 실패로 이어지지 않도록, 조회 실패는 캐시 미스(null)로 처리해 서명으로 폴백하고 저장 실패는 로그만
- * 남기고 삼킨다.
+ * 남기고 삼킨다. 폴백 대상은 Redis 접근 예외([DataAccessException])로 한정하며, JVM 오류 등 그 밖의 예외는 전파한다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class FileAccessUrlCachePersistenceAdapter(
@@ -32,16 +33,22 @@ class FileAccessUrlCachePersistenceAdapter(
     }
 
     override fun find(fileKey: String): String? =
-        runCatching { redisTemplate.opsForValue().get(key(fileKey)) }
-            .onFailure { logger().warn("파일 접근 URL 캐시 조회 실패, 새로 서명해 폴백 (fileKey={})", fileKey, it) }
-            .getOrNull()
+        try {
+            redisTemplate.opsForValue().get(key(fileKey))
+        } catch (e: DataAccessException) {
+            logger().warn("파일 접근 URL 캐시 조회 실패, 새로 서명해 폴백 (fileKey={})", fileKey, e)
+            null
+        }
 
     override fun save(
         fileKey: String,
         url: String,
     ) {
-        runCatching { redisTemplate.opsForValue().set(key(fileKey), url, CACHE_TTL) }
-            .onFailure { logger().warn("파일 접근 URL 캐시 저장 실패 (fileKey={})", fileKey, it) }
+        try {
+            redisTemplate.opsForValue().set(key(fileKey), url, CACHE_TTL)
+        } catch (e: DataAccessException) {
+            logger().warn("파일 접근 URL 캐시 저장 실패 (fileKey={})", fileKey, e)
+        }
     }
 
     private fun key(fileKey: String) = "$KEY_PREFIX$fileKey"
