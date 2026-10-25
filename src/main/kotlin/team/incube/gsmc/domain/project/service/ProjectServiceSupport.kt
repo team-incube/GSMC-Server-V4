@@ -67,7 +67,8 @@ class ProjectServiceSupport(
         val ids = if (includeOwner) (participantIds + ownerId).distinct() else participantIds.distinct()
         val members = projectMemberPersistencePort.findAllByUserIds(ids)
         if (members.size != ids.size) throw GsmcException(ErrorCode.USER_NOT_FOUND)
-        return ids.map { id -> members.first { it.userId == id } }
+        val membersById = members.associateBy { it.userId }
+        return ids.map { id -> membersById.getValue(id) }
     }
 
     /** 파일 식별자의 존재 여부와 현재 소유자의 파일인지 검증합니다. */
@@ -79,7 +80,8 @@ class ProjectServiceSupport(
         val files = filePersistencePort.findAllByIdIn(ids)
         if (files.size != ids.size) throw GsmcException(ErrorCode.FILE_NOT_FOUND)
         if (files.any { it.userId != ownerId }) throw GsmcException(ErrorCode.FILE_NOT_FOUND)
-        return ids.map { id -> files.first { it.fileId == id } }
+        val filesById = files.associateBy { it.fileId }
+        return ids.map { id -> filesById.getValue(id) }
     }
 
     private fun invalidInput(): Nothing = throw GsmcException(ErrorCode.INVALID_PROJECT_INPUT)
