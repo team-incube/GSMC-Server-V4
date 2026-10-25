@@ -122,9 +122,23 @@ class FileWebAdapterTest :
             }
         }
 
-        Given("File.fileUrl 필드를 리졸브할 때") {
+        Given("File.uri 필드를 리졸브할 때") {
             When("File 도메인 객체를 전달하면") {
                 Then("fileKey로 GenerateFileAccessUrlUseCase를 호출해 접근 URL을 반환한다") {
+                    val target = file(11L)
+                    every { generateFileAccessUrlUseCase.execute("key-11") } returns "https://s3.example.com/uri"
+
+                    val result = webAdapter.uri(target)
+
+                    result shouldBe "https://s3.example.com/uri"
+                    verify(exactly = 1) { generateFileAccessUrlUseCase.execute("key-11") }
+                }
+            }
+        }
+
+        Given("deprecated된 File.fileUrl 필드를 리졸브할 때") {
+            When("File 도메인 객체를 전달하면") {
+                Then("uri와 동일하게 fileKey로 GenerateFileAccessUrlUseCase를 호출해 접근 URL을 반환한다") {
                     val target = file(10L)
                     every { generateFileAccessUrlUseCase.execute("key-10") } returns "https://s3.example.com/access"
 

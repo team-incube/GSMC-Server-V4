@@ -4,9 +4,10 @@ type File {
     userId: ID!
     id: ID!
     originalName: String!
+    """파일을 조회할 수 있는 presigned URL입니다. 만료 전까지는 같은 URL이 재사용될 수 있습니다."""
     uri: String!
-    """파일을 조회할 수 있는 일회성 URL입니다."""
-    fileUrl: String
+    """`uri`와 동일한 presigned URL입니다."""
+    fileUrl: String @deprecated(reason: "uri 를 사용하세요. 동일한 presigned URL 입니다.")
     fileOriginalName: String
     fileStoredName: String
 }

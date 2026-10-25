@@ -1,11 +1,20 @@
 package team.incube.gsmc.domain.file.port.out
 
 import team.incube.gsmc.domain.file.PresignedUpload
+import java.time.Duration
 
 /**
  * 오브젝트 스토리지(S3) 연동을 추상화하는 아웃바운드 포트 인터페이스입니다.
  */
 interface FileStoragePort {
+    companion object {
+        /**
+         * 다운로드용 presigned URL의 서명 유효 기간. 이 URL을 캐싱하는 쪽([FileAccessUrlCachePort] 구현체)은
+         * 캐시 TTL을 반드시 이 값보다 짧게 잡아, 캐시에서 꺼낸 URL이 이미 만료된 상태가 되지 않도록 한다.
+         */
+        val DOWNLOAD_URL_TTL: Duration = Duration.ofHours(1)
+    }
+
     /**
      * 업로드용 presigned URL을 발급한다. 클라이언트는 이 URL로 오브젝트 스토리지에 직접 PUT한다.
      * [fileSize]가 서명에 포함되어, 클라이언트는 반드시 이 값과 일치하는 Content-Length로만
@@ -23,7 +32,7 @@ interface FileStoragePort {
     ): PresignedUpload
 
     /**
-     * 다운로드(조회)용 presigned URL을 발급한다. 호출할 때마다 새로 발급된다.
+     * 다운로드(조회)용 presigned URL을 발급한다. 호출할 때마다 새로 발급되며 [DOWNLOAD_URL_TTL] 동안 유효하다.
      *
      * @param key 조회할 객체의 key
      * @return presigned URL
