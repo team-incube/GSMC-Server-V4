@@ -318,14 +318,15 @@ class AppendMyScoreWithFileServiceTest :
             }
 
             When("활동일을 입력하지 않으면") {
-                Then("ACTIVITY_DATE_REQUIRED 예외가 발생하고 저장하지 않는다") {
+                Then("프론트 대응 전까지는 거절하지 않고 활동일·정책 버전 없이 저장한 뒤 파일을 연결한다") {
                     stubAwardSubmission(grade = 2)
 
-                    val exception =
-                        shouldThrow<GsmcException> { service.execute(CategoryType.AWARD, "교내 해커톤 대상", 50L) }
+                    val result = service.execute(CategoryType.AWARD, "교내 해커톤 대상", 50L)
 
-                    exception.errorCode shouldBe ErrorCode.ACTIVITY_DATE_REQUIRED
-                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    result.activityDate shouldBe null
+                    result.activityPeriodPolicyVersion shouldBe null
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    verify(exactly = 1) { filePersistencePort.linkToScore(50L, 500L) }
                 }
             }
 

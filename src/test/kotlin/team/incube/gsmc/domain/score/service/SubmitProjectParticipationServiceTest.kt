@@ -534,14 +534,24 @@ class SubmitProjectParticipationServiceTest :
             }
 
             When("활동일을 입력하지 않으면") {
-                Then("ACTIVITY_DATE_REQUIRED 예외가 발생하고 저장하지 않는다") {
+                Then("프론트 대응 전까지는 거절하지 않고 활동일·정책 버전 없이 저장한다") {
                     commonMocksForStudent()
                     every { dataGsmProjectApiPort.findProjectById(dgProjectId) } returns dgProject()
+                    every { categoryPersistencePort.findByCategoryType(CategoryType.PROJECT_PARTICIPATION) } returns
+                        category
+                    every { filePersistencePort.findAllByIdIn(emptyList()) } returns emptyList()
+                    every { scorePersistencePort.findByUserIdAndDgProjectId(userId, dgProjectId) } returns null
+                    every { evidencePersistencePort.save(any()) } answers {
+                        firstArg<Evidence>().copy(evidenceId = 501L)
+                    }
+                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 901L) }
 
-                    val exception = shouldThrow<GsmcException> { service.execute(dgProjectId, "내용", emptyList()) }
+                    val result = service.execute(dgProjectId, "내용", emptyList())
 
-                    exception.errorCode shouldBe ErrorCode.ACTIVITY_DATE_REQUIRED
-                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    result.activityDate shouldBe null
+                    result.activityPeriodPolicyVersion shouldBe null
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    transactionManager.commitCount shouldBe 1
                 }
             }
         }
