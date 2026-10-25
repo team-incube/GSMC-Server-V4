@@ -38,8 +38,8 @@ input CreateEvidenceInput {
 
 """제출한 증빙자료의 부분 수정 입력입니다. null인 필드는 기존 값을 유지합니다."""
 input PatchEvidenceInput {
-    """현재 수정 동작에서는 사용하지 않는 호환 필드입니다."""
-    scoreId: ID
+    """사용하지 않는 필드입니다. 값을 보내도 증빙자료의 점수 연결은 바뀌지 않습니다."""
+    scoreId: ID @deprecated(reason: "증빙자료 수정으로는 점수 연결을 변경할 수 없습니다. 이 필드는 무시되며 다음 버전에서 제거됩니다.")
     """변경할 제목입니다."""
     title: String
     """변경할 본문입니다."""
