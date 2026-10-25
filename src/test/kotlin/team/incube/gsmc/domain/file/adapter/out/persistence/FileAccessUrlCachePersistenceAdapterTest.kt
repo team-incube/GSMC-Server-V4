@@ -1,6 +1,7 @@
 package team.incube.gsmc.domain.file.adapter.out.persistence
 
 import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldBeNull
@@ -11,6 +12,7 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
+import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import team.incube.gsmc.domain.file.port.out.FileStoragePort
@@ -67,7 +69,7 @@ class FileAccessUrlCachePersistenceAdapterTest :
         Given("Redis 조회 중 장애가 발생할 때") {
             When("find를 호출하면") {
                 Then("예외를 던지지 않고 캐시 미스(null)로 처리한다") {
-                    every { valueOperations.get(any()) } throws RuntimeException("redis timeout")
+                    every { valueOperations.get(any()) } throws RedisConnectionFailureException("redis timeout")
 
                     val result = shouldNotThrowAny { adapter.find("key-1") }
 
@@ -80,9 +82,28 @@ class FileAccessUrlCachePersistenceAdapterTest :
             When("save를 호출하면") {
                 Then("예외를 밖으로 던지지 않고 삼킨다") {
                     every { valueOperations.set(any(), any(), any<Duration>()) } throws
-                        RuntimeException("redis timeout")
+                        RedisConnectionFailureException("redis timeout")
 
                     shouldNotThrowAny { adapter.save("key-1", "https://s3.example.com/download") }
+                }
+            }
+        }
+
+        Given("Redis 접근 예외가 아닌 오류가 발생할 때") {
+            When("find를 호출하면") {
+                Then("캐시 미스로 삼키지 않고 그대로 전파한다") {
+                    every { valueOperations.get(any()) } throws IllegalStateException("unexpected")
+
+                    shouldThrow<IllegalStateException> { adapter.find("key-1") }
+                }
+            }
+
+            When("save를 호출하면") {
+                Then("삼키지 않고 그대로 전파한다") {
+                    every { valueOperations.set(any(), any(), any<Duration>()) } throws
+                        IllegalStateException("unexpected")
+
+                    shouldThrow<IllegalStateException> { adapter.save("key-1", "https://s3.example.com/download") }
                 }
             }
         }
