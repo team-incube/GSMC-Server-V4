@@ -1,4 +1,4 @@
-FROM gradle:9.4-jdk25 AS builder
+FROM gradle:9.8-jdk25 AS builder
 
 WORKDIR /app
 COPY . .
