@@ -1,0 +1,11 @@
+-- 사용자별 점수를 상태로 거르는 조회용 복합 인덱스
+--  - ScorePersistenceAdapter.findUnapprovedByUserIdAndCategoryType / findApprovedByUserIdAndCategoryType
+--    (user_id = ? AND score_status <> / = 'APPROVED', 점수 신청·승인 경로)
+--  - SheetScorePersistenceAdapter.findApprovedScoresByUserIds
+--    (user_id IN (...) AND score_status = 'APPROVED', 성적표 다운로드)
+--
+-- 기존 fk_score_user 인덱스는 명시적으로 삭제하지 않는다.
+-- 이 복합 인덱스는 user_id가 선두 컬럼이라 FK 제약을 그대로 지원할 수 있으므로,
+-- FK 생성 시 MySQL이 자동으로 만든 인덱스는 MySQL이 필요에 따라 스스로 정리한다.
+-- DROP INDEX를 직접 실행하면 환경에 따라 FK가 요구하는 인덱스를 지우려다 실패할 수 있어 건드리지 않는다.
+CREATE INDEX idx_score_user_id_score_status ON score_tb (user_id, score_status);
