@@ -63,5 +63,19 @@ class EvidenceWebAdapterTest :
                     verify(exactly = 1) { modifyEvidence.execute(1L, "new", null, null) }
                 }
             }
+
+            When("patchEvidence 입력에 deprecated된 scoreId가 포함되면") {
+                Then("scoreId는 무시하고 나머지 필드만 UseCase에 전달한다") {
+                    every { modifyEvidence.execute(1L, "new", "body", listOf(10L)) } returns evidence
+
+                    @Suppress("DEPRECATION")
+                    val input =
+                        PatchEvidenceInput(scoreId = 99L, title = "new", content = "body", fileIds = listOf(10L))
+
+                    adapter.patchEvidence(1L, input) shouldBe evidence
+
+                    verify(exactly = 1) { modifyEvidence.execute(1L, "new", "body", listOf(10L)) }
+                }
+            }
         }
     })
