@@ -4,6 +4,7 @@ import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.evidence.Evidence
 import team.incube.gsmc.domain.file.File
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
@@ -30,6 +31,9 @@ import java.time.LocalDateTime
  * @param submittedCategoryType 제출 시점의 원본 카테고리 유형 — JLPT/JPT처럼 TOEIC과 저장 행을
  * 공유하는 카테고리에서, 실제로 제출된 시험 종류를 감사(audit) 목적으로 보존한다. `category.categoryType`과
  * 같은 경우(TOEIC을 직접 제출한 경우 등)는 중복이라 항상 null로 둔다.
+ * @param activityDate 학생이 입력한 실제 활동일 — 당해연도 카테고리([ActivityPeriodPolicy.ANNUAL_CATEGORY_TYPES])는
+ * 필수이며, 이 필드가 생기기 전에 저장된 점수는 null이다
+ * @param activityPeriodPolicyVersion 활동 기간 검증에 적용된 [ActivityPeriodPolicy.VERSION], 검증 대상이 아니면 null
  * @see ScoreStatus
  */
 data class Score(
@@ -47,4 +51,6 @@ data class Score(
     override val updatedAt: LocalDateTime,
     val projectId: Long? = null,
     val submittedCategoryType: CategoryType? = null,
+    val activityDate: LocalDate? = null,
+    val activityPeriodPolicyVersion: String? = null,
 ) : ScoreCalculationSource

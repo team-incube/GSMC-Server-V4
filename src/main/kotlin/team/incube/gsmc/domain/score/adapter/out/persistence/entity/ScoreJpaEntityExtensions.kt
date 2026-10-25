@@ -37,6 +37,8 @@ fun ScoreJpaEntity.toDomain(
         createdAt = createdAt,
         updatedAt = updatedAt,
         submittedCategoryType = submittedCategoryType,
+        activityDate = activityDate,
+        activityPeriodPolicyVersion = activityPeriodPolicyVersion,
     )
 
 /**
@@ -67,6 +69,8 @@ fun Score.toEntity(
         dgProjectId = dgProjectId,
         project = project,
         submittedCategoryType = submittedCategoryType,
+        activityDate = activityDate,
+        activityPeriodPolicyVersion = activityPeriodPolicyVersion,
     ).apply {
         this.createdAt = this@toEntity.createdAt
         this.updatedAt = this@toEntity.updatedAt

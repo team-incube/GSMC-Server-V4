@@ -22,6 +22,7 @@ import team.incube.gsmc.domain.evidence.adapter.out.persistence.entity.EvidenceJ
 import team.incube.gsmc.domain.project.adapter.out.persistence.entity.ProjectJpaEntity
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
@@ -81,6 +82,12 @@ class ScoreJpaEntity(
     @Enumerated(EnumType.STRING)
     @Column(name = "submitted_category_type", nullable = true, length = 30)
     val submittedCategoryType: CategoryType? = null,
+    /** 학생이 입력한 실제 활동일 — 당해연도 카테고리는 필수, 컬럼 추가 이전 점수는 null */
+    @Column(name = "activity_date", nullable = true)
+    val activityDate: LocalDate? = null,
+    /** 활동 기간 검증에 적용된 정책 버전 — 검증 대상이 아니거나 컬럼 추가 이전 점수는 null */
+    @Column(name = "activity_period_policy_version", nullable = true, length = 20)
+    val activityPeriodPolicyVersion: String? = null,
 ) {
     /** 최초 등록 일시 */
     @CreatedDate
