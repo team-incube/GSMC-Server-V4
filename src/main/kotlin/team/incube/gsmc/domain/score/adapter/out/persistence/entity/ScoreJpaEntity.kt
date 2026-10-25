@@ -37,7 +37,10 @@ import java.time.LocalDateTime
 @Entity
 @Table(
     name = "score_tb",
-    indexes = [Index(name = "idx_score_dg_project_id", columnList = "dg_project_id")],
+    indexes = [
+        Index(name = "idx_score_dg_project_id", columnList = "dg_project_id"),
+        Index(name = "idx_score_user_id_score_status", columnList = "user_id, score_status"),
+    ],
 )
 @EntityListeners(AuditingEntityListener::class)
 class ScoreJpaEntity(
