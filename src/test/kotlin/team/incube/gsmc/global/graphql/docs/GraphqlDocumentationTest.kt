@@ -90,6 +90,7 @@ class GraphqlDocumentationTest {
                 .newRuntimeWiring()
                 .scalar(DateTimeScalar.DateTime)
                 .scalar(ExtendedScalars.GraphQLLong)
+                .scalar(ExtendedScalars.Date)
                 .build()
         return SchemaGenerator().makeExecutableSchema(registry, wiring)
     }
