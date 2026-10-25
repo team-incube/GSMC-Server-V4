@@ -34,8 +34,13 @@ class ActivityPeriodValidator(
     }
 
     /**
-     * @return 적용된 정책 버전, 검증 대상이 아닌 카테고리면 null
-     * @throws GsmcException 활동일이 없으면 [ErrorCode.ACTIVITY_DATE_REQUIRED]
+     * 당해연도 카테고리라도 활동일이 없으면 현재는 거절하지 않고 통과시키며, 활동일·정책 버전 모두 NULL로 저장된다.
+     * 활동일이 주어지면 학년별 인정 기간을 검증한다.
+     *
+     * TODO: 프론트엔드 activityDate 대응 후 필수화 — [ActivityPeriodCheck.MissingActivityDate]에서
+     *  [ErrorCode.ACTIVITY_DATE_REQUIRED] 예외를 던지도록 되돌린다.
+     *
+     * @return 적용된 정책 버전, 검증 대상이 아닌 카테고리이거나 활동일이 없으면 null
      * @throws GsmcException 학년별 기간이 정의되지 않았으면 [ErrorCode.ACTIVITY_PERIOD_UNDEFINED_GRADE]
      * @throws GsmcException 기간 밖이면 [ErrorCode.ACTIVITY_DATE_OUT_OF_PERIOD]
      */
@@ -47,7 +52,7 @@ class ActivityPeriodValidator(
         when (val result = ActivityPeriodPolicy.check(categoryType, userGrade, activityDate)) {
             ActivityPeriodCheck.NotApplicable -> null
             is ActivityPeriodCheck.Accepted -> result.policyVersion
-            ActivityPeriodCheck.MissingActivityDate -> throw GsmcException(ErrorCode.ACTIVITY_DATE_REQUIRED)
+            ActivityPeriodCheck.MissingActivityDate -> null
             ActivityPeriodCheck.UndefinedGrade -> throw GsmcException(ErrorCode.ACTIVITY_PERIOD_UNDEFINED_GRADE)
             ActivityPeriodCheck.OutOfPeriod -> throw GsmcException(ErrorCode.ACTIVITY_DATE_OUT_OF_PERIOD)
         }
