@@ -102,13 +102,13 @@ class ScoreWebAdapter(
     fun addScoreWithFile(
         @Argument categoryType: CategoryType,
         @Argument input: ScoreWithValueAndFileInput,
-    ): Score = appendMyScoreWithFileUseCase.execute(categoryType, input.value, input.fileId)
+    ): Score = appendMyScoreWithFileUseCase.execute(categoryType, input.value, input.fileId, input.activityDate)
 
     @MutationMapping
     fun addScoreWithValue(
         @Argument categoryType: CategoryType,
         @Argument input: ScoreWithValueInput,
-    ): Score = appendMyScoreWithValueUseCase.execute(categoryType, input.value)
+    ): Score = appendMyScoreWithValueUseCase.execute(categoryType, input.value, input.activityDate)
 
     @MutationMapping
     fun addScoreOnly(
@@ -119,7 +119,7 @@ class ScoreWebAdapter(
     fun submitProjectParticipation(
         @Argument dgProjectId: Long,
         @Argument input: SubmitProjectParticipationInput,
-    ): Score = submitProjectParticipationUseCase.execute(dgProjectId, input.content, input.fileIds)
+    ): Score = submitProjectParticipationUseCase.execute(dgProjectId, input.content, input.fileIds, input.activityDate)
 
     @MutationMapping
     fun approveScore(

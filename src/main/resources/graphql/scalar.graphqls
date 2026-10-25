@@ -1,4 +1,6 @@
 """ISO-8601 형식의 날짜와 시각입니다."""
 scalar DateTime
+"""ISO-8601 형식(yyyy-MM-dd)의 날짜입니다."""
+scalar Date
 """64비트 정수입니다."""
 scalar Long

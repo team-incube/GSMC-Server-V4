@@ -14,6 +14,7 @@ import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import java.time.LocalDate
 
 /**
  * 파일 기반 점수 추가 유스케이스 구현 클래스입니다.
@@ -21,7 +22,7 @@ import team.incube.gsmc.global.util.MemberUtil
  * 첨부해 점수를 신청한다. 값은 [team.incube.gsmc.domain.category.ScoreCalculationType]에 따라
  * scoreValue 또는 activityName에 저장된다. JLPT/JPT처럼 TOEIC과 카테고리 행을 공유하는 제출은
  * 실제 제출된 시험 종류를 [team.incube.gsmc.domain.score.Score.submittedCategoryType]에 감사
- * 추적용으로 남긴다. PENDING 상태로 새로 생성되므로 해당 학생의 반/학년 백분위 캐시
+ * 추적용으로 남긴다. 당해연도 카테고리는 활동일을 학년별 인정 기간([ActivityPeriodValidator])으로 검증한다. PENDING 상태로 새로 생성되므로 해당 학생의 반/학년 백분위 캐시
  * ([ScoreTotalCacheInvalidator])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
@@ -30,6 +31,7 @@ class AppendMyScoreWithFileService(
     private val scorePersistencePort: ScorePersistencePort,
     private val filePersistencePort: FilePersistencePort,
     private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val activityPeriodValidator: ActivityPeriodValidator,
     private val memberUtil: MemberUtil,
 ) : AppendMyScoreWithFileUseCase {
     @Transactional
@@ -37,6 +39,7 @@ class AppendMyScoreWithFileService(
         categoryType: CategoryType,
         value: String?,
         fileId: Long,
+        activityDate: LocalDate?,
     ): Score {
         val userId = memberUtil.getCurrentUserId()
         val category = appendScoreSupport.resolveCategory(categoryType, EvidenceType.FILE)
@@ -57,6 +60,8 @@ class AppendMyScoreWithFileService(
         // 실제 제출된 시험 종류를 감사 추적용으로 별도 보존한다. 직접 TOEIC을 제출한 경우는 중복이라 null.
         val submittedCategoryType = if (categoryType != category.categoryType) categoryType else null
 
+        val policyVersion = activityPeriodValidator.validateForUser(userId, category.categoryType, activityDate)
+
         val target = appendScoreSupport.findOrCreateScore(userId, category)
         val oldFile = target.file
         if (oldFile != null && oldFile.fileId != fileId) {
@@ -71,6 +76,8 @@ class AppendMyScoreWithFileService(
                     scoreValue = scoreValue,
                     rejectionReason = null,
                     submittedCategoryType = submittedCategoryType,
+                    activityDate = activityDate,
+                    activityPeriodPolicyVersion = policyVersion,
                 ),
             )
         if (oldFile?.fileId != fileId) {

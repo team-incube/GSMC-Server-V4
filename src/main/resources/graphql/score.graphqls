@@ -24,6 +24,8 @@ type Score {
     updatedAt: DateTime!
     """신청할 때 사용한 카테고리 유형입니다. 저장된 값이 없으면 null입니다."""
     submittedCategoryType: CategoryType
+    """실제 활동일입니다. 활동일이 저장되기 전에 신청한 점수이거나 입력하지 않은 경우 null입니다."""
+    activityDate: Date
 }
 
 """카테고리별 점수 목록과 인정 점수입니다."""
@@ -84,11 +86,15 @@ type Query {
 input ScoreWithValueAndFileInput {
     value: String
     fileId: ID!
+    """실제 활동일입니다. 현재는 모든 카테고리에서 선택이며, 추후 당해연도 카테고리(봉사활동·수상경력·외부활동·프로젝트 참여)는 필수가 됩니다. 당해연도 카테고리에 입력하면 제출 시점 학년의 인정 기간 안이어야 하고, 생략하면 활동일 없이 저장됩니다."""
+    activityDate: Date
 }
 
 """값만 필요한 점수 신청 입력입니다."""
 input ScoreWithValueInput {
     value: String
+    """실제 활동일입니다. 현재는 모든 카테고리에서 선택이며, 추후 당해연도 카테고리(봉사활동·수상경력·외부활동·프로젝트 참여)는 필수가 됩니다. 당해연도 카테고리에 입력하면 제출 시점 학년의 인정 기간 안이어야 하고, 생략하면 활동일 없이 저장됩니다."""
+    activityDate: Date
 }
 
 """점수 반려 입력입니다."""
@@ -101,6 +107,8 @@ input RejectScoreInput {
 input SubmitProjectParticipationInput {
     content: String!
     fileIds: [ID!]!
+    """실제 활동일입니다. 현재는 모든 카테고리에서 선택이며, 추후 당해연도 카테고리(봉사활동·수상경력·외부활동·프로젝트 참여)는 필수가 됩니다. 당해연도 카테고리에 입력하면 제출 시점 학년의 인정 기간 안이어야 하고, 생략하면 활동일 없이 저장됩니다."""
+    activityDate: Date
 }
 
 type Mutation {
