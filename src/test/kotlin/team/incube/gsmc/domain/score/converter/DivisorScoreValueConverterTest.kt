@@ -46,14 +46,8 @@ class DivisorScoreValueConverterTest :
                     val cat = category(CategoryType.TOEIC, categoryMaximumValue = 10, conversionDivisor = 100)
 
                     converter.toScoreValue(cat, 990.0) shouldBe 10
-                }
-            }
-
-            When("뉴로우스쿨 카테고리에 회고온도가 주어지면") {
-                Then("conversionDivisor로 나눈 뒤 반올림한다") {
-                    val cat = category(CategoryType.NEWRROW_SCHOOL, categoryMaximumValue = 5, conversionDivisor = 20)
-
-                    converter.toScoreValue(cat, 90.0) shouldBe 5
+                    converter.toScoreValue(cat, 850.0) shouldBe 9
+                    converter.toScoreValue(cat, 849.0) shouldBe 8
                 }
             }
         }
