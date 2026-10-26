@@ -57,6 +57,7 @@ enum class ErrorCode(
     ACTIVITY_DATE_REQUIRED(HttpStatus.BAD_REQUEST, "당해연도 항목은 활동일을 입력해야 합니다.", "BAD_REQUEST"),
     ACTIVITY_DATE_OUT_OF_PERIOD(HttpStatus.BAD_REQUEST, "활동일이 학년별 인정 기간에 포함되지 않습니다.", "BAD_REQUEST"),
     ACTIVITY_PERIOD_UNDEFINED_GRADE(HttpStatus.BAD_REQUEST, "활동 인정 기간이 정의되지 않은 학년입니다.", "BAD_REQUEST"),
+    COMPETITION_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "대회 종류는 수상경력 항목에만 입력할 수 있습니다.", "BAD_REQUEST"),
 
     // 프로젝트 참여
     DATAGSM_PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "DataGSM 프로젝트를 찾을 수 없습니다.", "NOT_FOUND"),
