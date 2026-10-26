@@ -5,6 +5,7 @@ import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
+import team.incube.gsmc.domain.score.AwardCompetitionType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreWithFileUseCase
@@ -22,7 +23,8 @@ import java.time.LocalDate
  * 첨부해 점수를 신청한다. 값은 [team.incube.gsmc.domain.category.ScoreCalculationType]에 따라
  * scoreValue 또는 activityName에 저장된다. JLPT/JPT처럼 TOEIC과 카테고리 행을 공유하는 제출은
  * 실제 제출된 시험 종류를 [team.incube.gsmc.domain.score.Score.submittedCategoryType]에 감사
- * 추적용으로 남긴다. 당해연도 카테고리는 활동일을 학년별 인정 기간([ActivityPeriodValidator])으로 검증한다. PENDING 상태로 새로 생성되므로 해당 학생의 반/학년 백분위 캐시
+ * 추적용으로 남긴다. 당해연도 카테고리는 활동일을 학년별 인정 기간([ActivityPeriodValidator])으로 검증한다.
+ * 대회 종류([AwardCompetitionType])는 수상경력에서만 받으며, 다른 카테고리에 입력하면 거부한다. PENDING 상태로 새로 생성되므로 해당 학생의 반/학년 백분위 캐시
  * ([ScoreTotalCacheInvalidator])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
@@ -40,9 +42,13 @@ class AppendMyScoreWithFileService(
         value: String?,
         fileId: Long,
         activityDate: LocalDate?,
+        competitionType: AwardCompetitionType?,
     ): Score {
         val userId = memberUtil.getCurrentUserId()
         val category = appendScoreSupport.resolveCategory(categoryType, EvidenceType.FILE)
+        if (competitionType != null && categoryType != CategoryType.AWARD) {
+            throw GsmcException(ErrorCode.COMPETITION_TYPE_NOT_ALLOWED)
+        }
 
         val file = filePersistencePort.findById(fileId) ?: throw GsmcException(ErrorCode.FILE_NOT_FOUND)
         if (file.userId != userId) throw GsmcException(ErrorCode.FORBIDDEN)
@@ -78,6 +84,7 @@ class AppendMyScoreWithFileService(
                     submittedCategoryType = submittedCategoryType,
                     activityDate = activityDate,
                     activityPeriodPolicyVersion = policyVersion,
+                    competitionType = competitionType,
                 ),
             )
         if (oldFile?.fileId != fileId) {

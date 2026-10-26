@@ -3,6 +3,7 @@
 package team.incube.gsmc.domain.score.port.`in`
 
 import team.incube.gsmc.domain.category.CategoryType
+import team.incube.gsmc.domain.score.AwardCompetitionType
 import team.incube.gsmc.domain.score.Score
 import java.time.LocalDate
 
@@ -16,6 +17,7 @@ interface AppendMyScoreWithFileUseCase {
      * @param value 카테고리 집계 방식에 따라 점수 값 또는 활동명으로 저장될 문자열, 없을 수 있음
      * @param fileId 첨부할 파일 ID
      * @param activityDate 실제 활동일 — 당해연도 카테고리는 필수, 그 외는 선택
+     * @param competitionType 대회 종류 — 수상경력([CategoryType.AWARD])에서만 입력할 수 있고 현재는 선택
      * @return 생성 또는 재사용된 점수 요청
      */
     fun execute(
@@ -23,5 +25,6 @@ interface AppendMyScoreWithFileUseCase {
         value: String?,
         fileId: Long,
         activityDate: LocalDate? = null,
+        competitionType: AwardCompetitionType? = null,
     ): Score
 }
