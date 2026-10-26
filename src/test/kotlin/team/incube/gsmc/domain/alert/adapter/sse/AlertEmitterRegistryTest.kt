@@ -6,6 +6,9 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class AlertEmitterRegistryTest :
     BehaviorSpec({
@@ -69,4 +72,69 @@ class AlertEmitterRegistryTest :
                 }
             }
         }
-    })
+
+        Given("같은 사용자의 연결 해제와 새 연결 등록이 동시에 일어나면") {
+            When("마지막 연결을 지우는 순간 새 연결이 들어와도") {
+                Then("새 연결은 레지스트리에 남는다") {
+                    val raceRegistry = AlertEmitterRegistry(AlertSseProperties(maxConnectionsPerUser = 5))
+                    val executor = Executors.newFixedThreadPool(2)
+                    try {
+                        val lostUserIds =
+                            (1L..RACE_ITERATIONS).filter { userId ->
+                                val old = raceRegistry.createAndRegister(userId)
+                                val barrier = CyclicBarrier(2)
+                                val removal =
+                                    executor.submit {
+                                        barrier.await()
+                                        raceRegistry.remove(userId, old)
+                                    }
+                                val registration =
+                                    executor.submit<SseEmitter> {
+                                        barrier.await()
+                                        raceRegistry.createAndRegister(userId)
+                                    }
+                                removal.get(5, TimeUnit.SECONDS)
+                                val fresh = registration.get(5, TimeUnit.SECONDS)
+                                fresh !in raceRegistry.findAllByUserId(userId)
+                            }
+
+                        lostUserIds.shouldBeEmpty()
+                    } finally {
+                        executor.shutdownNow()
+                    }
+                }
+            }
+        }
+
+        Given("같은 사용자가 동시에 여러 연결을 등록하면") {
+            When("동시 등록 수가 최대 연결 수(2)를 넘어도") {
+                Then("등록된 연결 수는 최대 연결 수를 넘지 않는다") {
+                    val concurrency = 8
+                    val raceRegistry = AlertEmitterRegistry(AlertSseProperties(maxConnectionsPerUser = 2))
+                    val executor = Executors.newFixedThreadPool(concurrency)
+                    try {
+                        val overflowSizes =
+                            (1L..RACE_ITERATIONS / 4).mapNotNull { userId ->
+                                val barrier = CyclicBarrier(concurrency)
+                                (1..concurrency)
+                                    .map {
+                                        executor.submit<SseEmitter> {
+                                            barrier.await()
+                                            raceRegistry.createAndRegister(userId)
+                                        }
+                                    }.forEach { it.get(5, TimeUnit.SECONDS) }
+                                raceRegistry.findAllByUserId(userId).size.takeIf { it > 2 }
+                            }
+
+                        overflowSizes.shouldBeEmpty()
+                    } finally {
+                        executor.shutdownNow()
+                    }
+                }
+            }
+        }
+    }) {
+    companion object {
+        private const val RACE_ITERATIONS = 2_000L
+    }
+}
