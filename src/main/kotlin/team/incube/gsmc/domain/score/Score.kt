@@ -34,6 +34,8 @@ import java.time.LocalDateTime
  * @param activityDate 학생이 입력한 실제 활동일 — 당해연도 카테고리([ActivityPeriodPolicy.ANNUAL_CATEGORY_TYPES])는
  * 필수이며, 이 필드가 생기기 전에 저장된 점수는 null이다
  * @param activityPeriodPolicyVersion 활동 기간 검증에 적용된 [ActivityPeriodPolicy.VERSION], 검증 대상이 아니면 null
+ * @param competitionType 수상경력([team.incube.gsmc.domain.category.CategoryType.AWARD]) 점수의 대회 종류 —
+ * 그 외 카테고리이거나 입력하지 않은 경우, 이 필드가 생기기 전에 저장된 점수는 null
  * @see ScoreStatus
  */
 data class Score(
@@ -53,4 +55,5 @@ data class Score(
     val submittedCategoryType: CategoryType? = null,
     val activityDate: LocalDate? = null,
     val activityPeriodPolicyVersion: String? = null,
+    val competitionType: AwardCompetitionType? = null,
 ) : ScoreCalculationSource
