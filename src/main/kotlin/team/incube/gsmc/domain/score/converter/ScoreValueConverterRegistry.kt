@@ -5,6 +5,7 @@ import team.incube.gsmc.domain.category.CategoryType
 object ScoreValueConverterRegistry {
     private val default = DefaultScoreValueConverter()
     private val divisor = DivisorScoreValueConverter()
+    private val floorDivisor = FloorDivisorScoreValueConverter()
     private val academicGrade = AcademicGradeScoreValueConverter()
 
     fun resolve(categoryType: CategoryType): ScoreValueConverter =
@@ -13,8 +14,9 @@ object ScoreValueConverterRegistry {
             CategoryType.TOEIC,
             CategoryType.JLPT,
             CategoryType.JPT,
-            CategoryType.NEWRROW_SCHOOL,
             -> divisor
+
+            CategoryType.NEWRROW_SCHOOL -> floorDivisor
 
             CategoryType.ACADEMIC_GRADE, CategoryType.NCS -> academicGrade
 
