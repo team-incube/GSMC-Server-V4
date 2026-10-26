@@ -20,6 +20,7 @@ import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.adapter.out.persistence.entity.CategoryJpaEntity
 import team.incube.gsmc.domain.evidence.adapter.out.persistence.entity.EvidenceJpaEntity
 import team.incube.gsmc.domain.project.adapter.out.persistence.entity.ProjectJpaEntity
+import team.incube.gsmc.domain.score.AwardCompetitionType
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
 import java.time.LocalDate
@@ -91,6 +92,10 @@ class ScoreJpaEntity(
     /** 활동 기간 검증에 적용된 정책 버전 — 검증 대상이 아니거나 컬럼 추가 이전 점수는 null */
     @Column(name = "activity_period_policy_version", nullable = true, length = 20)
     val activityPeriodPolicyVersion: String? = null,
+    /** 수상경력 점수의 대회 종류 — 수상경력 외 카테고리, 미입력, 컬럼 추가 이전 점수는 null */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "competition_type", nullable = true, length = 40)
+    val competitionType: AwardCompetitionType? = null,
 ) {
     /** 최초 등록 일시 */
     @CreatedDate
