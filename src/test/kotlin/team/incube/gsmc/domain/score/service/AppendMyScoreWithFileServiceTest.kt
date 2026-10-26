@@ -17,6 +17,7 @@ import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
 import team.incube.gsmc.domain.score.ActivityPeriodPolicy
+import team.incube.gsmc.domain.score.AwardCompetitionType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
@@ -330,6 +331,38 @@ class AppendMyScoreWithFileServiceTest :
                 }
             }
 
+            When("대회 종류를 함께 입력하면") {
+                Then("대회 종류를 저장한다") {
+                    stubAwardSubmission(grade = 2)
+
+                    val result =
+                        service.execute(
+                            CategoryType.AWARD,
+                            "교내 해커톤 대상",
+                            50L,
+                            LocalDate.of(2026, 5, 1),
+                            AwardCompetitionType.SCHOOL_HACKATHON,
+                        )
+
+                    result.competitionType shouldBe AwardCompetitionType.SCHOOL_HACKATHON
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    verify(exactly = 1) {
+                        scorePersistencePort.save(match { it.competitionType == AwardCompetitionType.SCHOOL_HACKATHON })
+                    }
+                }
+            }
+
+            When("대회 종류를 입력하지 않으면") {
+                Then("프론트 대응 전까지는 거절하지 않고 대회 종류 없이 저장한다") {
+                    stubAwardSubmission(grade = 2)
+
+                    val result = service.execute(CategoryType.AWARD, "교내 해커톤 대상", 50L, LocalDate.of(2026, 5, 1))
+
+                    result.competitionType shouldBe null
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                }
+            }
+
             When("학년 정보가 없는 사용자가 제출하면") {
                 Then("ACTIVITY_PERIOD_UNDEFINED_GRADE 예외가 발생하고 저장하지 않는다") {
                     stubAwardSubmission(grade = null)
@@ -341,6 +374,33 @@ class AppendMyScoreWithFileServiceTest :
 
                     exception.errorCode shouldBe ErrorCode.ACTIVITY_PERIOD_UNDEFINED_GRADE
                     verify(exactly = 0) { scorePersistencePort.save(any()) }
+                }
+            }
+        }
+
+        Given("수상경력이 아닌 카테고리에 대회 종류를 입력할 때") {
+            When("제출하면") {
+                Then("COMPETITION_TYPE_NOT_ALLOWED 예외가 발생하고 파일 조회·저장·파일 연결을 하지 않는다") {
+                    val cat = category(ScoreCalculationType.COUNT_BASED)
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.CERTIFICATE, EvidenceType.FILE) } returns
+                        cat
+
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                CategoryType.CERTIFICATE,
+                                "정보처리기능사",
+                                10L,
+                                null,
+                                AwardCompetitionType.OFFICIAL_MAJOR_COMPETITION,
+                            )
+                        }
+
+                    exception.errorCode shouldBe ErrorCode.COMPETITION_TYPE_NOT_ALLOWED
+                    verify(exactly = 0) { filePersistencePort.findById(any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { filePersistencePort.linkToScore(any(), any()) }
                 }
             }
         }
