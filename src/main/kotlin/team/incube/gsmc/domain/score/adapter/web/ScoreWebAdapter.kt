@@ -102,7 +102,14 @@ class ScoreWebAdapter(
     fun addScoreWithFile(
         @Argument categoryType: CategoryType,
         @Argument input: ScoreWithValueAndFileInput,
-    ): Score = appendMyScoreWithFileUseCase.execute(categoryType, input.value, input.fileId, input.activityDate)
+    ): Score =
+        appendMyScoreWithFileUseCase.execute(
+            categoryType,
+            input.value,
+            input.fileId,
+            input.activityDate,
+            input.competitionType,
+        )
 
     @MutationMapping
     fun addScoreWithValue(
