@@ -8,7 +8,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import team.incube.gsmc.domain.alert.port.out.AlertEmitterRegistryPort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
-import team.incube.gsmc.global.config.AsyncConfig
+import team.incube.gsmc.global.config.AlertSseExecutorConfig
 import team.themoment.sdk.logging.logger.logger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.RejectedExecutionException
@@ -33,7 +33,7 @@ import java.util.concurrent.RejectedExecutionException
 @Adapter(direction = PortDirection.OUTBOUND)
 class AlertEmitterRegistry(
     private val alertSseProperties: AlertSseProperties,
-    @param:Qualifier(AsyncConfig.ALERT_SSE_HEARTBEAT_EXECUTOR) private val heartbeatExecutor: TaskExecutor,
+    @param:Qualifier(AlertSseExecutorConfig.ALERT_SSE_HEARTBEAT_EXECUTOR) private val heartbeatExecutor: TaskExecutor,
 ) : AlertEmitterRegistryPort {
     private val emittersByUserId = ConcurrentHashMap<Long, List<SseEmitter>>()
 

@@ -9,7 +9,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import team.incube.gsmc.domain.alert.Alert
 import team.incube.gsmc.domain.alert.AlertCreatedEvent
 import team.incube.gsmc.domain.alert.port.out.AlertEmitterRegistryPort
-import team.incube.gsmc.global.config.AsyncConfig
+import team.incube.gsmc.global.config.AlertSseExecutorConfig
 import team.themoment.sdk.logging.logger.logger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.RejectedExecutionException
@@ -39,7 +39,7 @@ import java.util.concurrent.RejectedExecutionException
 @Component
 class AlertSseNotifier(
     private val alertEmitterRegistryPort: AlertEmitterRegistryPort,
-    @param:Qualifier(AsyncConfig.ALERT_SSE_NOTIFY_EXECUTOR) private val notifyExecutor: TaskExecutor,
+    @param:Qualifier(AlertSseExecutorConfig.ALERT_SSE_NOTIFY_EXECUTOR) private val notifyExecutor: TaskExecutor,
 ) {
     private val pendingByUserId = ConcurrentHashMap<Long, UserQueue>()
 
