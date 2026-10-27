@@ -21,6 +21,9 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
+      # 기본값 10에 의존하지 않도록 명시한다. DB 조회 GraphQL을 섞어 동시 200명으로 측정했을 때 풀 10은 오류율 0.54%,
+      # 30은 0.01%였고 50은 더 나아지지 않았다. 서버 수 x 풀 크기가 DB의 max_connections(기본 151)를 넘지 않게 맞춘다.
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:30}
       connection-timeout: 1000
       validation-timeout: 1000
   jpa:
@@ -37,9 +40,10 @@ spring:
   task:
     scheduling:
       pool:
-        # 알림 Heartbeat와 스토리지 객체 삭제 워커가 같은 스레드를 기다리지 않도록 분리한다.
-        # 스토리지 장애 중 삭제 호출이 타임아웃까지 걸리면 Heartbeat가 밀려 SSE 연결이 끊길 수 있다.
-        size: 2
+        # 스케줄러 스레드를 쓰는 작업: 알림 Heartbeat 디스패치, 스토리지 객체 삭제 워커, 점수 캐시 무효화 디바운스.
+        # 한 작업이 지연돼도(예: 스토리지 장애 중 삭제 호출이 타임아웃까지 걸림) 나머지가 같은 스레드를 기다리지
+        # 않도록 이 스케줄러를 쓰는 작업 수(3개)보다 넉넉하게 둔다. Heartbeat의 실제 소켓 전송은 sse.heartbeat-executor 풀에서 처리한다.
+        size: 4
   data:
     redis:
       host: ${REDIS_HOST}
@@ -68,6 +72,21 @@ sse:
   heartbeat-interval: 30000
   emitter-timeout: 1800000
   max-connections-per-user: 5
+  # SSE 소켓 전송 전용 스레드 풀. 유휴 스레드는 keep-alive 뒤 회수한다(Heartbeat 주기보다 길게 둔다).
+  # Heartbeat: 연결 하나당 전송 작업 하나. pool-size개의 스레드가 모두 느린 전송에 묶이면 queue-capacity까지 대기하고,
+  # 그마저 차면 이번 주기 전송을 건너뛴다.
+  heartbeat-executor:
+    pool-size: ${SSE_HEARTBEAT_EXECUTOR_POOL_SIZE:32}
+    queue-capacity: ${SSE_HEARTBEAT_EXECUTOR_QUEUE_CAPACITY:2000}
+    keep-alive: ${SSE_HEARTBEAT_EXECUTOR_KEEP_ALIVE:60s}
+  # 알림: 큐에는 알림이 아니라 사용자별 대기열을 비우는 작업이 들어가므로, queue-capacity는 전송을 기다리는 사용자 수의
+  # 상한이다. 그마저 차면 그 사용자의 대기 알림 실시간 전송을 건너뛴다(알림은 DB에 저장돼 있다).
+  notify-executor:
+    pool-size: ${SSE_NOTIFY_EXECUTOR_POOL_SIZE:16}
+    queue-capacity: ${SSE_NOTIFY_EXECUTOR_QUEUE_CAPACITY:500}
+    keep-alive: ${SSE_NOTIFY_EXECUTOR_KEEP_ALIVE:60s}
+  # 사용자 1인당 전송을 기다릴 수 있는 최대 알림 수. 소켓이 막힌 사용자에게 계속 쌓이면 가장 오래된 대기 알림부터 버린다.
+  max-pending-alerts-per-user: ${SSE_MAX_PENDING_ALERTS_PER_USER:100}
 
 springdoc:
   api-docs:

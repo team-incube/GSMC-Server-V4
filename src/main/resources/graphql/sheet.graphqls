@@ -1,7 +1,7 @@
 extend type Query {
-    # 지정 학급의 점수 현황 XLSX 다운로드 URL을 반환합니다.
+    """교사 이상 권한이 지정 학급의 점수 현황 XLSX 다운로드 URL을 조회합니다."""
     classScoreSheetUrl(grade: Int!, classNumber: Int!): String!
 
-    # 지정 학년의 점수 현황 XLSX 다운로드 URL을 반환합니다.
+    """교사 이상 권한이 지정 학년의 점수 현황 XLSX 다운로드 URL을 조회합니다."""
     gradeScoreSheetUrl(grade: Int!): String!
 }

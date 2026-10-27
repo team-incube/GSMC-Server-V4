@@ -11,18 +11,22 @@ import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
 
 /**
  * [ScoreJpaEntity]를 도메인 모델 [Score]로 변환한다.
- * [file]은 [ScoreJpaEntity]가 직접 참조를 갖고 있지 않아(역방향 연관관계) 호출부에서 별도로 조회해 전달한다.
+ * [file]과 [evidenceFiles]는 각 엔티티가 파일 참조를 갖고 있지 않아(역방향 연관관계) 호출부에서 별도로 조회해 전달한다.
  *
  * @receiver 변환할 JPA 엔티티
  * @param file 이 점수 요청에 직접 첨부된 파일, 없으면 null
+ * @param evidenceFiles 연결된 근거 자료에 첨부된 파일 목록, 근거 자료가 없거나 첨부가 없으면 빈 목록
  * @return 변환된 [Score] 도메인 객체
  */
-fun ScoreJpaEntity.toDomain(file: File?): Score =
+fun ScoreJpaEntity.toDomain(
+    file: File?,
+    evidenceFiles: List<File> = emptyList(),
+): Score =
     Score(
         scoreId = scoreId,
         userId = user.userId,
         category = category.toDomain(),
-        evidence = evidence?.toDomain(),
+        evidence = evidence?.toDomain(evidenceFiles),
         file = file,
         scoreStatus = scoreStatus,
         activityName = activityName,
@@ -33,6 +37,9 @@ fun ScoreJpaEntity.toDomain(file: File?): Score =
         createdAt = createdAt,
         updatedAt = updatedAt,
         submittedCategoryType = submittedCategoryType,
+        activityDate = activityDate,
+        activityPeriodPolicyVersion = activityPeriodPolicyVersion,
+        competitionType = competitionType,
     )
 
 /**
@@ -63,6 +70,9 @@ fun Score.toEntity(
         dgProjectId = dgProjectId,
         project = project,
         submittedCategoryType = submittedCategoryType,
+        activityDate = activityDate,
+        activityPeriodPolicyVersion = activityPeriodPolicyVersion,
+        competitionType = competitionType,
     ).apply {
         this.createdAt = this@toEntity.createdAt
         this.updatedAt = this@toEntity.updatedAt

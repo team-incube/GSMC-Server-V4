@@ -1,15 +1,18 @@
 package team.incube.gsmc.domain.evidence.adapter.out.persistence.entity
 
 import team.incube.gsmc.domain.evidence.Evidence
+import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.user.adapter.out.persistence.entity.UserJpaEntity
 
 /**
  * [EvidenceJpaEntity]를 도메인 모델 [Evidence]로 변환한다.
+ * [files]는 [EvidenceJpaEntity]가 직접 참조를 갖고 있지 않아(역방향 연관관계) 호출부에서 별도로 조회해 전달한다.
  *
  * @receiver 변환할 JPA 엔티티
+ * @param files 이 근거 자료에 첨부된 파일 목록, 조회하지 않았으면 빈 목록
  * @return 변환된 [Evidence] 도메인 객체
  */
-fun EvidenceJpaEntity.toDomain(): Evidence =
+fun EvidenceJpaEntity.toDomain(files: List<File> = emptyList()): Evidence =
     Evidence(
         evidenceId = evidenceId,
         userId = user.userId,
@@ -18,6 +21,7 @@ fun EvidenceJpaEntity.toDomain(): Evidence =
         evidenceCreatedAt = evidenceCreatedAt,
         evidenceUpdatedAt = evidenceUpdatedAt,
         isDraft = isDraft,
+        files = files,
     )
 
 /**

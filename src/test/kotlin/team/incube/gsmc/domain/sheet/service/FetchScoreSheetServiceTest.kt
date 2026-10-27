@@ -155,12 +155,46 @@ class FetchScoreSheetServiceTest :
             }
         }
 
-        Given("인증 사용자가 ROOT가 아니면") {
-            When("학생 또는 교사가 Sheet를 요청하면") {
-                Then("FORBIDDEN 오류를 반환한다") {
-                    every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
+        Given("교사 이상 권한이 Sheet를 요청하면") {
+            listOf(UserRole.TEACHER, UserRole.HOMEROOM_TEACHER, UserRole.ROOT).forEach { role ->
+                When("${role}가 학급 Sheet를 요청하면") {
+                    Then("다운로드 URL을 반환한다") {
+                        every { memberUtil.getCurrentUserRole() } returns role
+                        every { memberPort.findAllStudentsByGradeAndClass(2, 3) } returns students
 
-                    shouldThrow<GsmcException> { service.execute(2) }.errorCode shouldBe ErrorCode.FORBIDDEN
+                        service.execute(2, 3) shouldBe "https://download.example/sheet"
+                    }
+                }
+
+                When("${role}가 학년 Sheet를 요청하면") {
+                    Then("다운로드 URL을 반환한다") {
+                        every { memberUtil.getCurrentUserRole() } returns role
+                        every { memberPort.findAllStudentsByGrade(2) } returns students
+
+                        service.execute(2) shouldBe "https://download.example/sheet"
+                    }
+                }
+            }
+        }
+
+        Given("인증 사용자가 교사 이상 권한이 아니면") {
+            listOf(UserRole.STUDENT, UserRole.UNAUTHORIZED).forEach { role ->
+                When("${role}가 학급 Sheet를 요청하면") {
+                    Then("FORBIDDEN 오류를 반환하고 학생을 조회하지 않는다") {
+                        every { memberUtil.getCurrentUserRole() } returns role
+
+                        shouldThrow<GsmcException> { service.execute(2, 3) }.errorCode shouldBe ErrorCode.FORBIDDEN
+                        verify(exactly = 0) { memberPort.findAllStudentsByGradeAndClass(any(), any()) }
+                    }
+                }
+
+                When("${role}가 학년 Sheet를 요청하면") {
+                    Then("FORBIDDEN 오류를 반환하고 학생을 조회하지 않는다") {
+                        every { memberUtil.getCurrentUserRole() } returns role
+
+                        shouldThrow<GsmcException> { service.execute(2) }.errorCode shouldBe ErrorCode.FORBIDDEN
+                        verify(exactly = 0) { memberPort.findAllStudentsByGrade(any()) }
+                    }
                 }
             }
 

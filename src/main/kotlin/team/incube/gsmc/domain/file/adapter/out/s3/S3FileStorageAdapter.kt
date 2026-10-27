@@ -17,7 +17,6 @@ import java.time.Duration
 import java.time.Instant
 
 private val UPLOAD_URL_TTL: Duration = Duration.ofMinutes(10)
-private val DOWNLOAD_URL_TTL: Duration = Duration.ofHours(1)
 
 /**
  * AWS S3 연동을 담당하는 아웃바운드 어댑터 클래스입니다. [FileStoragePort]를 구현합니다.
@@ -66,7 +65,7 @@ class S3FileStorageAdapter(
         val presignRequest =
             GetObjectPresignRequest
                 .builder()
-                .signatureDuration(DOWNLOAD_URL_TTL)
+                .signatureDuration(FileStoragePort.DOWNLOAD_URL_TTL)
                 .getObjectRequest(getObjectRequest)
                 .build()
 

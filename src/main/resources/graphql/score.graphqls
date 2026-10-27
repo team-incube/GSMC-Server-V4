@@ -24,6 +24,10 @@ type Score {
     updatedAt: DateTime!
     """신청할 때 사용한 카테고리 유형입니다. 저장된 값이 없으면 null입니다."""
     submittedCategoryType: CategoryType
+    """실제 활동일입니다. 활동일이 저장되기 전에 신청한 점수이거나 입력하지 않은 경우 null입니다."""
+    activityDate: Date
+    """수상경력(AWARD) 점수의 대회 종류입니다. 수상경력이 아니거나 입력하지 않았거나 대회 종류가 저장되기 전에 신청한 점수이면 null입니다."""
+    competitionType: AwardCompetitionType
 }
 
 """카테고리별 점수 목록과 인정 점수입니다."""
@@ -80,15 +84,39 @@ type Query {
     scoresByDgProjectId(dgProjectId: ID!): [Score!]!
 }
 
+"""수상경력(AWARD) 점수의 대회 종류입니다. 심사 참고용이며 점수 계산(수상 1건당 1점)에는 영향을 주지 않습니다."""
+enum AwardCompetitionType {
+    """공문을 통한 전공분야 대회입니다."""
+    OFFICIAL_MAJOR_COMPETITION
+    """전공 분야 대회 개별 참여입니다."""
+    INDIVIDUAL_MAJOR_COMPETITION
+    """연합 해커톤입니다."""
+    UNION_HACKATHON
+    """GSM Festival입니다."""
+    GSM_FESTIVAL
+    """교내해커톤입니다."""
+    SCHOOL_HACKATHON
+    """전공동아리 발표대회입니다."""
+    MAJOR_CLUB_PRESENTATION
+    """교내외 인성관련 대회입니다."""
+    CHARACTER_RELATED
+}
+
 """값과 파일이 모두 필요한 점수 신청 입력입니다."""
 input ScoreWithValueAndFileInput {
     value: String
     fileId: ID!
+    """실제 활동일입니다. 현재는 모든 카테고리에서 선택이며, 추후 당해연도 카테고리(봉사활동·수상경력·외부활동·프로젝트 참여)는 필수가 됩니다. 당해연도 카테고리에 입력하면 제출 시점 학년의 인정 기간 안이어야 하고, 생략하면 활동일 없이 저장됩니다."""
+    activityDate: Date
+    """대회 종류입니다. 수상경력(AWARD) 카테고리에서만 입력할 수 있으며, 다른 카테고리에 입력하면 BAD_REQUEST 오류로 거부됩니다. 현재는 수상경력에서도 선택이며, 생략하면 대회 종류 없이 저장됩니다."""
+    competitionType: AwardCompetitionType
 }
 
 """값만 필요한 점수 신청 입력입니다."""
 input ScoreWithValueInput {
     value: String
+    """실제 활동일입니다. 현재는 모든 카테고리에서 선택이며, 추후 당해연도 카테고리(봉사활동·수상경력·외부활동·프로젝트 참여)는 필수가 됩니다. 당해연도 카테고리에 입력하면 제출 시점 학년의 인정 기간 안이어야 하고, 생략하면 활동일 없이 저장됩니다."""
+    activityDate: Date
 }
 
 """점수 반려 입력입니다."""
@@ -101,6 +129,8 @@ input RejectScoreInput {
 input SubmitProjectParticipationInput {
     content: String!
     fileIds: [ID!]!
+    """실제 활동일입니다. 현재는 모든 카테고리에서 선택이며, 추후 당해연도 카테고리(봉사활동·수상경력·외부활동·프로젝트 참여)는 필수가 됩니다. 당해연도 카테고리에 입력하면 제출 시점 학년의 인정 기간 안이어야 하고, 생략하면 활동일 없이 저장됩니다."""
+    activityDate: Date
 }
 
 type Mutation {

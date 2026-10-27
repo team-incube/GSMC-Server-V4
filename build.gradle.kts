@@ -1,13 +1,13 @@
 plugins {
-    kotlin("jvm") version "2.4.10"
-    kotlin("plugin.spring") version "2.4.10"
-    kotlin("plugin.jpa") version "2.4.10"
-    kotlin("kapt") version "2.4.10"
-    id("org.springframework.boot") version "4.1.0"
+    kotlin("jvm") version "2.4.21"
+    kotlin("plugin.spring") version "2.4.21"
+    kotlin("plugin.jpa") version "2.4.21"
+    kotlin("kapt") version "2.4.21"
+    id("org.springframework.boot") version "4.1.2"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("jacoco")
-    id("org.sonarqube") version "7.4.0.8496"
+    id("org.sonarqube") version "7.5.0.8588"
 }
 
 group = "team.incube"
@@ -75,6 +75,17 @@ kotlin {
 
 ktlint {
     version.set("1.8.0")
+}
+
+// ktlint 1.8.0은 kotlin-compiler-embeddable 2.2.21 기준으로 빌드되어, Kotlin 플러그인이 정렬한 상위 컴파일러(2.4.21)로는
+// "Extensions storage is not registered" 오류로 실행되지 않는다. ktlint 실행 클래스패스만 원래 버전으로 고정한다.
+configurations.matching { it.name.startsWith("ktlint") }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") {
+            useVersion("2.2.21")
+            because("ktlint 1.8.0이 빌드된 Kotlin 컴파일러 버전")
+        }
+    }
 }
 
 kapt {

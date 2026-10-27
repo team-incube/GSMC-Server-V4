@@ -11,5 +11,6 @@ class GraphqlScalarConfig : RuntimeWiringConfigurer {
     override fun configure(builder: RuntimeWiring.Builder) {
         builder.scalar(DateTimeScalar.DateTime)
         builder.scalar(ExtendedScalars.GraphQLLong)
+        builder.scalar(ExtendedScalars.Date)
     }
 }

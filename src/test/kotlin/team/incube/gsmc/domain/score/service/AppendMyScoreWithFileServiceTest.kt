@@ -16,12 +16,18 @@ import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
+import team.incube.gsmc.domain.score.ActivityPeriodPolicy
+import team.incube.gsmc.domain.score.AwardCompetitionType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
+import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.user.User
+import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 class AppendMyScoreWithFileServiceTest :
@@ -30,6 +36,7 @@ class AppendMyScoreWithFileServiceTest :
         val scorePersistencePort = mockk<ScorePersistencePort>()
         val filePersistencePort = mockk<FilePersistencePort>()
         val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val memberPersistencePort = mockk<MemberPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
             AppendMyScoreWithFileService(
@@ -37,6 +44,7 @@ class AppendMyScoreWithFileServiceTest :
                 scorePersistencePort = scorePersistencePort,
                 filePersistencePort = filePersistencePort,
                 scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
+                activityPeriodValidator = ActivityPeriodValidator(memberPersistencePort),
                 memberUtil = memberUtil,
             )
 
@@ -46,6 +54,17 @@ class AppendMyScoreWithFileServiceTest :
         }
 
         val userId = 1L
+
+        fun student(grade: Int?) =
+            User(
+                userId = userId,
+                userName = "학생",
+                userEmail = "s@gsm.hs.kr",
+                userGrade = grade,
+                userClassNumber = 1,
+                userNumber = 1,
+                userRole = UserRole.STUDENT,
+            )
 
         fun category(calculationType: ScoreCalculationType) =
             Category(
@@ -235,11 +254,175 @@ class AppendMyScoreWithFileServiceTest :
                     } returns freshScore(volunteerCategory)
                     every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 203L) }
                     every { filePersistencePort.linkToScore(40L, 203L) } just runs
+                    every { memberPersistencePort.findByUserId(userId) } returns student(2)
 
-                    val result = service.execute(CategoryType.VOLUNTEER, "3", 40L)
+                    val result = service.execute(CategoryType.VOLUNTEER, "3", 40L, LocalDate.of(2026, 5, 1))
 
                     result.scoreValue shouldBe 3
                     result.submittedCategoryType shouldBe null
+                }
+            }
+        }
+
+        Given("당해연도 카테고리(수상경력)를 파일과 함께 제출할 때") {
+            val awardCategory =
+                Category(
+                    categoryId = 8,
+                    weight = 1,
+                    categoryEnglishName = "Award",
+                    categoryKoreanName = "수상경력",
+                    categoryMaximumValue = 10,
+                    isAccumulated = true,
+                    evidenceType = EvidenceType.FILE,
+                    categoryType = CategoryType.AWARD,
+                    calculationType = ScoreCalculationType.COUNT_BASED,
+                )
+
+            fun stubAwardSubmission(grade: Int?) {
+                every { memberUtil.getCurrentUserId() } returns userId
+                every { appendScoreSupport.resolveCategory(CategoryType.AWARD, EvidenceType.FILE) } returns
+                    awardCategory
+                every { filePersistencePort.findById(50L) } returns file(50L)
+                every { appendScoreSupport.findOrCreateScore(userId, awardCategory) } returns freshScore(awardCategory)
+                every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 500L) }
+                every { filePersistencePort.linkToScore(50L, 500L) } just runs
+                every { memberPersistencePort.findByUserId(userId) } returns student(grade)
+            }
+
+            When("2학년이 인정 기간 종료일의 활동일을 입력하면") {
+                Then("활동일과 정책 버전을 함께 저장하고 파일을 연결한다") {
+                    stubAwardSubmission(grade = 2)
+
+                    val result = service.execute(CategoryType.AWARD, "교내 해커톤 대상", 50L, LocalDate.of(2026, 12, 31))
+
+                    result.activityDate shouldBe LocalDate.of(2026, 12, 31)
+                    result.activityPeriodPolicyVersion shouldBe ActivityPeriodPolicy.VERSION
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    verify(exactly = 1) { filePersistencePort.linkToScore(50L, 500L) }
+                }
+            }
+
+            When("2학년이 인정 기간 시작일 하루 전(2025년 활동)의 활동일을 입력하면") {
+                Then("ACTIVITY_DATE_OUT_OF_PERIOD 예외가 발생하고 저장·파일 연결을 하지 않는다") {
+                    stubAwardSubmission(grade = 2)
+
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(CategoryType.AWARD, "교내 해커톤 대상", 50L, LocalDate.of(2026, 1, 5))
+                        }
+
+                    exception.errorCode shouldBe ErrorCode.ACTIVITY_DATE_OUT_OF_PERIOD
+                    verify(exactly = 0) { appendScoreSupport.findOrCreateScore(any(), any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { filePersistencePort.linkToScore(any(), any()) }
+                }
+            }
+
+            When("활동일을 입력하지 않으면") {
+                Then("프론트 대응 전까지는 거절하지 않고 활동일·정책 버전 없이 저장한 뒤 파일을 연결한다") {
+                    stubAwardSubmission(grade = 2)
+
+                    val result = service.execute(CategoryType.AWARD, "교내 해커톤 대상", 50L)
+
+                    result.activityDate shouldBe null
+                    result.activityPeriodPolicyVersion shouldBe null
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    verify(exactly = 1) { filePersistencePort.linkToScore(50L, 500L) }
+                }
+            }
+
+            When("대회 종류를 함께 입력하면") {
+                Then("대회 종류를 저장한다") {
+                    stubAwardSubmission(grade = 2)
+
+                    val result =
+                        service.execute(
+                            CategoryType.AWARD,
+                            "교내 해커톤 대상",
+                            50L,
+                            LocalDate.of(2026, 5, 1),
+                            AwardCompetitionType.SCHOOL_HACKATHON,
+                        )
+
+                    result.competitionType shouldBe AwardCompetitionType.SCHOOL_HACKATHON
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    verify(exactly = 1) {
+                        scorePersistencePort.save(match { it.competitionType == AwardCompetitionType.SCHOOL_HACKATHON })
+                    }
+                }
+            }
+
+            When("대회 종류를 입력하지 않으면") {
+                Then("프론트 대응 전까지는 거절하지 않고 대회 종류 없이 저장한다") {
+                    stubAwardSubmission(grade = 2)
+
+                    val result = service.execute(CategoryType.AWARD, "교내 해커톤 대상", 50L, LocalDate.of(2026, 5, 1))
+
+                    result.competitionType shouldBe null
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                }
+            }
+
+            When("학년 정보가 없는 사용자가 제출하면") {
+                Then("ACTIVITY_PERIOD_UNDEFINED_GRADE 예외가 발생하고 저장하지 않는다") {
+                    stubAwardSubmission(grade = null)
+
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(CategoryType.AWARD, "교내 해커톤 대상", 50L, LocalDate.of(2026, 5, 1))
+                        }
+
+                    exception.errorCode shouldBe ErrorCode.ACTIVITY_PERIOD_UNDEFINED_GRADE
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                }
+            }
+        }
+
+        Given("수상경력이 아닌 카테고리에 대회 종류를 입력할 때") {
+            When("제출하면") {
+                Then("COMPETITION_TYPE_NOT_ALLOWED 예외가 발생하고 파일 조회·저장·파일 연결을 하지 않는다") {
+                    val cat = category(ScoreCalculationType.COUNT_BASED)
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.CERTIFICATE, EvidenceType.FILE) } returns
+                        cat
+
+                    val exception =
+                        shouldThrow<GsmcException> {
+                            service.execute(
+                                CategoryType.CERTIFICATE,
+                                "정보처리기능사",
+                                10L,
+                                null,
+                                AwardCompetitionType.OFFICIAL_MAJOR_COMPETITION,
+                            )
+                        }
+
+                    exception.errorCode shouldBe ErrorCode.COMPETITION_TYPE_NOT_ALLOWED
+                    verify(exactly = 0) { filePersistencePort.findById(any()) }
+                    verify(exactly = 0) { scorePersistencePort.save(any()) }
+                    verify(exactly = 0) { filePersistencePort.linkToScore(any(), any()) }
+                }
+            }
+        }
+
+        Given("당해연도가 아닌 누적 카테고리(자격증)를 제출할 때") {
+            When("학년별 인정 기간 밖의 활동일을 입력해도") {
+                Then("기간 검증 없이 저장하고 활동일만 보존하며 정책 버전은 비워 둔다") {
+                    val cat = category(ScoreCalculationType.COUNT_BASED)
+                    every { memberUtil.getCurrentUserId() } returns userId
+                    every { appendScoreSupport.resolveCategory(CategoryType.CERTIFICATE, EvidenceType.FILE) } returns
+                        cat
+                    every { filePersistencePort.findById(10L) } returns file(10L)
+                    every { appendScoreSupport.findOrCreateScore(userId, cat) } returns freshScore(cat)
+                    every { scorePersistencePort.save(any()) } answers { firstArg<Score>().copy(scoreId = 102L) }
+                    every { filePersistencePort.linkToScore(10L, 102L) } just runs
+
+                    val result = service.execute(CategoryType.CERTIFICATE, "정보처리기능사", 10L, LocalDate.of(2023, 7, 1))
+
+                    result.scoreStatus shouldBe ScoreStatus.PENDING
+                    result.activityDate shouldBe LocalDate.of(2023, 7, 1)
+                    result.activityPeriodPolicyVersion shouldBe null
+                    verify(exactly = 0) { memberPersistencePort.findByUserId(any()) }
                 }
             }
         }
