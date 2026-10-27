@@ -8,7 +8,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import team.incube.gsmc.domain.alert.port.out.AlertEmitterRegistryPort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
-import team.incube.gsmc.global.config.AlertSseExecutorConfig
 import team.themoment.sdk.logging.logger.logger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.RejectedExecutionException

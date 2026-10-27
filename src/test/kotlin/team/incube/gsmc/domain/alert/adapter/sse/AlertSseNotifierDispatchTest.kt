@@ -18,7 +18,6 @@ import team.incube.gsmc.domain.alert.Alert
 import team.incube.gsmc.domain.alert.AlertCreatedEvent
 import team.incube.gsmc.domain.alert.AlertType
 import team.incube.gsmc.domain.alert.port.out.AlertEmitterRegistryPort
-import team.incube.gsmc.global.config.AlertSseExecutorConfig
 import java.io.IOException
 import java.time.LocalDateTime
 import java.util.Collections
