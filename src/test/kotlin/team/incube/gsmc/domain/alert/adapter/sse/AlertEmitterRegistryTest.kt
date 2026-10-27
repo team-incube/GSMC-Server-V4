@@ -5,6 +5,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import org.springframework.core.task.SyncTaskExecutor
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
@@ -12,7 +13,7 @@ import java.util.concurrent.TimeUnit
 
 class AlertEmitterRegistryTest :
     BehaviorSpec({
-        val registry = AlertEmitterRegistry(AlertSseProperties(maxConnectionsPerUser = 2))
+        val registry = AlertEmitterRegistry(AlertSseProperties(maxConnectionsPerUser = 2), SyncTaskExecutor())
 
         Given("사용자가 SSE 연결을 요청하면") {
             When("연결을 생성하면") {
@@ -76,7 +77,8 @@ class AlertEmitterRegistryTest :
         Given("같은 사용자의 연결 해제와 새 연결 등록이 동시에 일어나면") {
             When("마지막 연결을 지우는 순간 새 연결이 들어와도") {
                 Then("새 연결은 레지스트리에 남는다") {
-                    val raceRegistry = AlertEmitterRegistry(AlertSseProperties(maxConnectionsPerUser = 5))
+                    val raceRegistry =
+                        AlertEmitterRegistry(AlertSseProperties(maxConnectionsPerUser = 5), SyncTaskExecutor())
                     val executor = Executors.newFixedThreadPool(2)
                     try {
                         val lostUserIds =
@@ -110,7 +112,8 @@ class AlertEmitterRegistryTest :
             When("동시 등록 수가 최대 연결 수(2)를 넘어도") {
                 Then("등록된 연결 수는 최대 연결 수를 넘지 않는다") {
                     val concurrency = 8
-                    val raceRegistry = AlertEmitterRegistry(AlertSseProperties(maxConnectionsPerUser = 2))
+                    val raceRegistry =
+                        AlertEmitterRegistry(AlertSseProperties(maxConnectionsPerUser = 2), SyncTaskExecutor())
                     val executor = Executors.newFixedThreadPool(concurrency)
                     try {
                         val overflowSizes =
