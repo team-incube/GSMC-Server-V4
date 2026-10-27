@@ -7,6 +7,7 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
+import org.springframework.core.task.SyncTaskExecutor
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import team.incube.gsmc.domain.alert.Alert
 import team.incube.gsmc.domain.alert.AlertCreatedEvent
@@ -18,7 +19,7 @@ import java.time.LocalDateTime
 class AlertSseNotifierTest :
     BehaviorSpec({
         val alertEmitterRegistryPort = mockk<AlertEmitterRegistryPort>()
-        val notifier = AlertSseNotifier(alertEmitterRegistryPort)
+        val notifier = AlertSseNotifier(alertEmitterRegistryPort, SyncTaskExecutor())
 
         beforeEach { clearAllMocks() }
 
