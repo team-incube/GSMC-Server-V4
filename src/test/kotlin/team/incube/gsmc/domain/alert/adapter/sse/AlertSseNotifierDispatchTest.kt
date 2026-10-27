@@ -161,6 +161,57 @@ class AlertSseNotifierDispatchTest :
             }
         }
 
+        Given("소켓이 막힌 사용자에게 대기 상한(3)보다 많은 알림이 쌓일 때") {
+            When("막힘이 풀리면") {
+                Then("전송 중이던 알림과 최신 알림 3개만 순서대로 전송되고, 다른 사용자는 영향을 받지 않는다") {
+                    val pool = Executors.newFixedThreadPool(4)
+                    val release = CountDownLatch(1)
+                    val firstStarted = CountDownLatch(1)
+                    try {
+                        val port = mockk<AlertEmitterRegistryPort>()
+                        val log = Collections.synchronizedList(mutableListOf<String>())
+                        val otherLog = Collections.synchronizedList(mutableListOf<String>())
+                        every { port.findAllByUserId(10L) } returns
+                            listOf(
+                                emitter(log) { alertId ->
+                                    if (alertId == 1L) {
+                                        firstStarted.countDown()
+                                        release.await(10, TimeUnit.SECONDS)
+                                    }
+                                },
+                            )
+                        every { port.findAllByUserId(20L) } returns listOf(emitter(otherLog))
+                        val notifier =
+                            AlertSseNotifier(
+                                port,
+                                AlertSseProperties(maxPendingAlertsPerUser = 3),
+                                TaskExecutor { pool.execute(it) },
+                            )
+
+                        notifier.onAlertCreated(event(alertId = 1L, userId = 10L))
+                        firstStarted.await(5, TimeUnit.SECONDS).shouldBeTrue()
+                        // 1번이 전송 중인 동안 2~8번 7개가 쌓이면 오래된 2~5번은 버려지고 6~8번만 남는다.
+                        (2L..8L).forEach { notifier.onAlertCreated(event(alertId = it, userId = 10L)) }
+                        notifier.onAlertCreated(event(alertId = 100L, userId = 20L))
+
+                        awaitUntil { otherLog.size == 2 }.shouldBeTrue()
+                        otherLog.toList() shouldContainExactly listOf("start-100", "end-100")
+                        log.toList() shouldContainExactly listOf("start-1")
+
+                        release.countDown()
+
+                        awaitUntil { log.size == 8 }.shouldBeTrue()
+                        log.toList() shouldContainExactly
+                            listOf("start-1", "end-1", "start-6", "end-6", "start-7", "end-7", "start-8", "end-8")
+                        awaitUntil { notifier.pendingUserCount() == 0 }.shouldBeTrue()
+                    } finally {
+                        release.countDown()
+                        pool.shutdownNow()
+                    }
+                }
+            }
+        }
+
         Given("알림 전송 풀과 큐가 가득 차 작업이 거부될 때") {
             When("알림 이벤트를 처리하면") {
                 Then("요청으로 예외를 던지지 않고 대기열을 비우며, 이후 같은 사용자의 알림은 정상 전송된다") {
