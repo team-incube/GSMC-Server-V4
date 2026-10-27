@@ -32,9 +32,13 @@ class AlertSseExecutorConfig(
         threadNamePrefix: String,
     ): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = executor.corePoolSize
-            maxPoolSize = executor.maxPoolSize
+            // 큐가 가득 차기 전에는 core 수를 넘어 스레드를 늘리지 않으므로, core와 max를 같게 두어
+            // 설정한 스레드 수만큼 느린 전송을 동시에 견디게 하고 유휴 스레드는 keepAlive 뒤 회수한다.
+            corePoolSize = executor.poolSize
+            maxPoolSize = executor.poolSize
             queueCapacity = executor.queueCapacity
+            keepAliveSeconds = executor.keepAlive.toSeconds().toInt()
+            setAllowCoreThreadTimeOut(true)
             setThreadNamePrefix(threadNamePrefix)
             // 종료 시 남은 전송은 의미가 없고(연결도 함께 정리된다), 느린 소켓 때문에 종료가 지연되지 않게 한다.
             setWaitForTasksToCompleteOnShutdown(false)
