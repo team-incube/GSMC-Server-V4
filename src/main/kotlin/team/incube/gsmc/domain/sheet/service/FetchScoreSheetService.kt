@@ -10,6 +10,7 @@ import team.incube.gsmc.domain.sheet.port.out.SheetMemberPersistencePort
 import team.incube.gsmc.domain.sheet.port.out.SheetScorePersistencePort
 import team.incube.gsmc.domain.sheet.port.out.SheetStoragePort
 import team.incube.gsmc.domain.user.UserRole
+import team.incube.gsmc.domain.user.isTeacherOrAbove
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
@@ -32,7 +33,7 @@ class FetchScoreSheetService(
         grade: Int,
         classNumber: Int,
     ): String {
-        requireRoot()
+        requireTeacherOrAbove()
         validateGrade(grade)
         validateClassNumber(classNumber)
 
@@ -44,7 +45,7 @@ class FetchScoreSheetService(
     }
 
     override fun execute(grade: Int): String {
-        requireRoot()
+        requireTeacherOrAbove()
         validateGrade(grade)
 
         return generateSheet(
@@ -87,8 +88,8 @@ class FetchScoreSheetService(
         return sheetStoragePort.createPresignedDownloadUrl(key)
     }
 
-    private fun requireRoot() {
-        if (memberUtil.getCurrentUserRole() != UserRole.ROOT) {
+    private fun requireTeacherOrAbove() {
+        if (!memberUtil.getCurrentUserRole().isTeacherOrAbove()) {
             throw GsmcException(ErrorCode.FORBIDDEN)
         }
     }
