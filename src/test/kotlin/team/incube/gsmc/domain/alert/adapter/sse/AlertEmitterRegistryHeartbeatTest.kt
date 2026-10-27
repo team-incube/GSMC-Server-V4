@@ -10,6 +10,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.springframework.core.task.SyncTaskExecutor
 import org.springframework.core.task.TaskExecutor
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
@@ -183,6 +184,51 @@ class AlertEmitterRegistryHeartbeatTest :
                     registry.sendHeartbeat()
 
                     registry.findAllByUserId(2L).shouldBeEmpty()
+                }
+            }
+        }
+
+        Given("실제 Heartbeat 실행기 설정에서 이전 core 수(8)보다 많은 20개 연결이 느린 소켓에 막혀 있을 때") {
+            When("Heartbeat 주기가 실행되면") {
+                Then("큐가 차지 않아도 풀 크기만큼 스레드가 늘어나, 나머지 사용자는 바로 Heartbeat를 받는다") {
+                    val defaults = AlertSseProperties()
+                    val executor =
+                        AlertSseExecutorConfig(defaults).alertSseHeartbeatExecutor() as ThreadPoolTaskExecutor
+                    executor.initialize()
+                    val release = CountDownLatch(1)
+                    try {
+                        executor.corePoolSize shouldBe defaults.heartbeatExecutor.poolSize
+                        executor.maxPoolSize shouldBe defaults.heartbeatExecutor.poolSize
+
+                        val registry = AlertEmitterRegistry(defaults, executor)
+                        val slowCount = 20
+                        val fastCount = 50
+                        val slowStarted = CountDownLatch(slowCount)
+                        val fastDone = CountDownLatch(fastCount)
+                        // 느린 연결을 먼저 등록해 앞선 스레드를 모두 점유하게 한다.
+                        (1L..slowCount).forEach { userId ->
+                            registry.register(
+                                userId,
+                                emitter {
+                                    slowStarted.countDown()
+                                    release.await(10, TimeUnit.SECONDS)
+                                },
+                            )
+                        }
+                        (1L..fastCount).forEach { index ->
+                            registry.register(slowCount + index, emitter { fastDone.countDown() })
+                        }
+
+                        registry.sendHeartbeat()
+
+                        // 이전 설정(core 8, 큐 2000)이었다면 8개 스레드가 모두 막혀 나머지 작업이 큐에서 기다렸다.
+                        slowStarted.await(5, TimeUnit.SECONDS).shouldBeTrue()
+                        fastDone.await(5, TimeUnit.SECONDS).shouldBeTrue()
+                        release.count shouldBe 1L
+                    } finally {
+                        release.countDown()
+                        executor.shutdown()
+                    }
                 }
             }
         }
