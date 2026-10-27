@@ -10,7 +10,10 @@ import java.time.Duration
  * @param emitterTimeout 개별 SSE 연결의 최대 유지 시간(ms)
  * @param maxConnectionsPerUser 사용자 1인당 허용하는 최대 동시 연결 수
  * @param heartbeatExecutor Heartbeat 소켓 전송을 처리하는 전용 스레드 풀 설정
- * @param notifyExecutor 알림 이벤트 소켓 전송을 처리하는 전용 스레드 풀 설정
+ * @param notifyExecutor 알림 이벤트 소켓 전송을 처리하는 전용 스레드 풀 설정. 이 풀의 큐에는 알림 하나가
+ *   아니라 사용자별 대기열을 비우는 작업이 들어가므로, queueCapacity는 전송을 기다리는 사용자 수의 상한이다.
+ * @param maxPendingAlertsPerUser 사용자 1인당 전송을 기다릴 수 있는 최대 알림 수. 소켓이 막힌 사용자에게
+ *   알림이 계속 쌓이면 가장 오래된 대기 알림부터 버린다(전송 중인 알림은 제외).
  */
 @ConfigurationProperties(prefix = "sse")
 data class AlertSseProperties(
@@ -19,6 +22,7 @@ data class AlertSseProperties(
     val maxConnectionsPerUser: Int = 5,
     val heartbeatExecutor: Executor = Executor(poolSize = 32, queueCapacity = 2_000),
     val notifyExecutor: Executor = Executor(poolSize = 16, queueCapacity = 500),
+    val maxPendingAlertsPerUser: Int = 100,
 ) {
     /**
      * SSE 전송 전용 스레드 풀 설정입니다. `ThreadPoolTaskExecutor`는 큐가 가득 찬 뒤에야 core 수를 넘어

@@ -72,16 +72,21 @@ sse:
   heartbeat-interval: 30000
   emitter-timeout: 1800000
   max-connections-per-user: 5
-  # SSE 소켓 전송 전용 스레드 풀. pool-size개의 스레드가 모두 느린 전송에 묶이면 queue-capacity까지 대기하고,
-  # 그마저 차면 이번 전송을 건너뛴다. 유휴 스레드는 keep-alive 뒤 회수한다(Heartbeat 주기보다 길게 둔다).
+  # SSE 소켓 전송 전용 스레드 풀. 유휴 스레드는 keep-alive 뒤 회수한다(Heartbeat 주기보다 길게 둔다).
+  # Heartbeat: 연결 하나당 전송 작업 하나. pool-size개의 스레드가 모두 느린 전송에 묶이면 queue-capacity까지 대기하고,
+  # 그마저 차면 이번 주기 전송을 건너뛴다.
   heartbeat-executor:
     pool-size: ${SSE_HEARTBEAT_EXECUTOR_POOL_SIZE:32}
     queue-capacity: ${SSE_HEARTBEAT_EXECUTOR_QUEUE_CAPACITY:2000}
     keep-alive: ${SSE_HEARTBEAT_EXECUTOR_KEEP_ALIVE:60s}
+  # 알림: 큐에는 알림이 아니라 사용자별 대기열을 비우는 작업이 들어가므로, queue-capacity는 전송을 기다리는 사용자 수의
+  # 상한이다. 그마저 차면 그 사용자의 대기 알림 실시간 전송을 건너뛴다(알림은 DB에 저장돼 있다).
   notify-executor:
     pool-size: ${SSE_NOTIFY_EXECUTOR_POOL_SIZE:16}
     queue-capacity: ${SSE_NOTIFY_EXECUTOR_QUEUE_CAPACITY:500}
     keep-alive: ${SSE_NOTIFY_EXECUTOR_KEEP_ALIVE:60s}
+  # 사용자 1인당 전송을 기다릴 수 있는 최대 알림 수. 소켓이 막힌 사용자에게 계속 쌓이면 가장 오래된 대기 알림부터 버린다.
+  max-pending-alerts-per-user: ${SSE_MAX_PENDING_ALERTS_PER_USER:100}
 
 springdoc:
   api-docs:

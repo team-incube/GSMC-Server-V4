@@ -100,7 +100,7 @@ class AlertSseNotifierDispatchTest :
                                     }
                                 },
                             )
-                        val notifier = AlertSseNotifier(port, TaskExecutor { pool.execute(it) })
+                        val notifier = AlertSseNotifier(port, AlertSseProperties(), TaskExecutor { pool.execute(it) })
 
                         val startedAt = System.nanoTime()
                         notifier.onAlertCreated(event(alertId = 1L, userId = 10L))
@@ -144,7 +144,7 @@ class AlertSseNotifierDispatchTest :
                                 },
                             )
                         every { port.findAllByUserId(20L) } returns listOf(emitter(otherLog))
-                        val notifier = AlertSseNotifier(port, TaskExecutor { pool.execute(it) })
+                        val notifier = AlertSseNotifier(port, AlertSseProperties(), TaskExecutor { pool.execute(it) })
 
                         notifier.onAlertCreated(event(alertId = 1L, userId = 10L))
                         slowStarted.await(5, TimeUnit.SECONDS).shouldBeTrue()
@@ -173,7 +173,7 @@ class AlertSseNotifierDispatchTest :
                     val port = mockk<AlertEmitterRegistryPort>()
                     val log = Collections.synchronizedList(mutableListOf<String>())
                     every { port.findAllByUserId(10L) } returns listOf(emitter(log))
-                    val notifier = AlertSseNotifier(port, executor)
+                    val notifier = AlertSseNotifier(port, AlertSseProperties(), executor)
 
                     notifier.onAlertCreated(event(alertId = 1L, userId = 10L))
 

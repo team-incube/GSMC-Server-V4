@@ -19,7 +19,7 @@ import java.time.LocalDateTime
 class AlertSseNotifierTest :
     BehaviorSpec({
         val alertEmitterRegistryPort = mockk<AlertEmitterRegistryPort>()
-        val notifier = AlertSseNotifier(alertEmitterRegistryPort, SyncTaskExecutor())
+        val notifier = AlertSseNotifier(alertEmitterRegistryPort, AlertSseProperties(), SyncTaskExecutor())
 
         beforeEach { clearAllMocks() }
 

@@ -31,6 +31,11 @@ import java.util.concurrent.RejectedExecutionException
  * 있어도 뒤의 알림이 먼저 전달되지 않고, 다른 사용자의 알림은 각자의 작업으로 병렬 전송된다.
  * 대기열이 비면 사용자 항목을 지워 메모리에 남지 않게 한다.
  *
+ * 소켓이 막힌 사용자에게 알림이 계속 쌓여 대기열이 끝없이 커지지 않도록, 사용자별 대기 알림 수를
+ * [AlertSseProperties.maxPendingAlertsPerUser]로 제한한다. 넘치면 가장 오래된 대기 알림부터 버리고
+ * 남은 알림은 순서대로 전송한다. 이미 전송 중인 알림은 대기열에 없으므로 버리지 않는다. 버린 알림도
+ * DB에는 저장돼 있다.
+ *
  * 풀과 큐가 모두 가득 차 작업이 거부되면 요청으로 예외를 던지지 않고, 그 사용자 대기열에 쌓인 알림의
  * 실시간 전송만 건너뛴 뒤 대기열을 비운다. 알림은 이미 DB에 저장돼 있어 클라이언트가 목록을 다시
  * 조회하면 확인할 수 있고, 이후 알림은 새 대기열로 정상 전송된다.
@@ -38,6 +43,7 @@ import java.util.concurrent.RejectedExecutionException
 @Component
 class AlertSseNotifier(
     private val alertEmitterRegistryPort: AlertEmitterRegistryPort,
+    private val alertSseProperties: AlertSseProperties,
     @param:Qualifier(AlertSseExecutorConfig.ALERT_SSE_NOTIFY_EXECUTOR) private val notifyExecutor: TaskExecutor,
 ) {
     private val pendingByUserId = ConcurrentHashMap<Long, UserQueue>()
@@ -55,16 +61,26 @@ class AlertSseNotifier(
         userId: Long,
         task: Runnable,
     ) {
+        // 0 이하로 잘못 설정돼도 방금 들어온 알림 하나는 남긴다.
+        val maxPending = alertSseProperties.maxPendingAlertsPerUser.coerceAtLeast(1)
         var startDrain = false
+        var dropped = 0
         pendingByUserId.compute(userId) { _, current ->
             (current ?: UserQueue()).apply {
                 tasks.addLast(task)
+                while (tasks.size > maxPending) {
+                    tasks.removeFirst()
+                    dropped++
+                }
                 // 이미 이 사용자의 대기열을 비우는 작업이 있으면 그 작업이 순서대로 이어서 처리한다.
                 if (!draining) {
                     draining = true
                     startDrain = true
                 }
             }
+        }
+        if (dropped > 0) {
+            logger().warn("전송 대기 알림이 많아 오래된 실시간 전송을 건너뜁니다. userId={}, dropped={}", userId, dropped)
         }
         if (!startDrain) return
 
