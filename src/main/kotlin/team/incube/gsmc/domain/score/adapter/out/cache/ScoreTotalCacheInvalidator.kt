@@ -1,11 +1,13 @@
-package team.incube.gsmc.domain.score.service
+package team.incube.gsmc.domain.score.adapter.out.cache
 
 import org.springframework.scheduling.TaskScheduler
-import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
+import team.incube.gsmc.global.annotation.PortDirection
+import team.incube.gsmc.global.annotation.adapter.Adapter
 import team.themoment.sdk.logging.logger.logger
 import java.time.Duration
 import java.time.Instant
@@ -13,10 +15,10 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledFuture
 
 /**
- * 점수 상태가 바뀔 때 해당 학생이 속한 반/학년의 캐싱된 총점 맵을 무효화하는 헬퍼 클래스입니다.
- * 점수를 추가/승인/거절/삭제하는 모든 서비스에서 공통으로 사용된다. [MemberPersistencePort]에는
+ * [ScoreTotalCacheInvalidationPort]를 구현하는 아웃바운드 어댑터로, 점수 상태가 바뀔 때 해당 학생이 속한
+ * 반/학년의 캐싱된 총점 맵을 무효화합니다. 점수를 추가/승인/거절/삭제하는 모든 서비스가 포트를 통해 사용한다. [MemberPersistencePort]에는
  * grade/classNumber가 없는 [team.incube.gsmc.global.util.MemberUtil] 대신, 대상 학생을 다시
- * 조회해 학년/반을 알아낸다. 포트가 아닌 순수 협력 객체로, 여러 서비스에 그대로 주입된다.
+ * 조회해 학년/반을 알아낸다.
  *
  * 쓰기가 짧은 시간에 몰리면(예: 교사의 일괄 승인, 마감 직전 제출 폭주) 매번 즉시 무효화할 경우 같은
  * 반/학년 캐시가 계속 지워졌다 다시 채워지길 반복해 캐싱 효과가 사실상 사라진다. 이를 막기 위해
@@ -39,13 +41,13 @@ import java.util.concurrent.ScheduledFuture
  * 프로세스 재시작 전까지 영구히 멈추기 때문이다(Redis 순단 등으로 한 번 실행이 실패해도 다음 쓰기부터는
  * 다시 정상적으로 디바운스·무효화되어야 한다).
  */
-@Component
+@Adapter(direction = PortDirection.OUTBOUND)
 class ScoreTotalCacheInvalidator(
     private val memberPersistencePort: MemberPersistencePort,
     private val scoreTotalCachePort: ScoreTotalCachePort,
     private val taskScheduler: TaskScheduler,
     private val scoreTotalCacheSingleFlight: ScoreTotalCacheSingleFlight,
-) {
+) : ScoreTotalCacheInvalidationPort {
     companion object {
         private val DEBOUNCE_DELAY: Duration = Duration.ofSeconds(5)
     }
@@ -53,7 +55,7 @@ class ScoreTotalCacheInvalidator(
     private val pendingGradeEvictions = ConcurrentHashMap<Int, ScheduledFuture<*>>()
     private val pendingClassEvictions = ConcurrentHashMap<String, ScheduledFuture<*>>()
 
-    fun invalidate(userId: Long) {
+    override fun invalidate(userId: Long) {
         runCatching {
             val member = memberPersistencePort.findByUserId(userId) ?: return@runCatching
             val userGrade = member.userGrade ?: return@runCatching
@@ -84,7 +86,7 @@ class ScoreTotalCacheInvalidator(
      * 지정한 학년(과 반)의 백분위 캐시를 무효화한다. 회원 조회 없이 호출자가 넘긴 범위를 그대로 사용하므로,
      * 반 이동처럼 변경 전 집단을 DB에서 더 이상 알 수 없는 경우에 쓴다. 반이 없으면 학년 캐시만 무효화한다.
      */
-    fun invalidateCohort(
+    override fun invalidateCohort(
         userGrade: Int,
         userClassNumber: Int?,
     ) {

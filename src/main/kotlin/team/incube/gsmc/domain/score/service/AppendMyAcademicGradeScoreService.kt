@@ -7,6 +7,9 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.AppendMyAcademicGradeScoreUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.AcademicGradeSheetSupport
+import team.incube.gsmc.domain.score.service.support.AppendScoreSupport
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.util.MemberUtil
@@ -18,14 +21,14 @@ import team.incube.gsmc.global.util.MemberUtil
  * 승인된 점수만 있으면 새 행을 만든다([AppendScoreSupport.findOrCreateScore]). 이번 학년도에 이미 승인된
  * 교과성적이 있으면 입력표 수정과 마찬가지로 신청도 막는다([AcademicGradeSheetSupport.ensureEditable]). 그러지 않으면
  * 재신청으로 심사 중인 점수를 만들어 수정 잠금을 우회할 수 있다. 해당 학생의 반/학년
- * 백분위 캐시([ScoreTotalCacheInvalidator])를 무효화한다.
+ * 백분위 캐시([ScoreTotalCacheInvalidationPort])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
 class AppendMyAcademicGradeScoreService(
     private val appendScoreSupport: AppendScoreSupport,
     private val academicGradeSheetSupport: AcademicGradeSheetSupport,
     private val scorePersistencePort: ScorePersistencePort,
-    private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val scoreTotalCacheInvalidationPort: ScoreTotalCacheInvalidationPort,
     private val memberUtil: MemberUtil,
 ) : AppendMyAcademicGradeScoreUseCase {
     @Transactional
@@ -47,7 +50,7 @@ class AppendMyAcademicGradeScoreService(
                     rejectionReason = null,
                 ),
             )
-        scoreTotalCacheInvalidator.invalidate(userId)
+        scoreTotalCacheInvalidationPort.invalidate(userId)
         return saved
     }
 }

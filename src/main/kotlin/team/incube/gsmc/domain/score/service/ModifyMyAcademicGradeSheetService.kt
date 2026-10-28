@@ -9,6 +9,8 @@ import team.incube.gsmc.domain.score.academic.AcademicGradeValue
 import team.incube.gsmc.domain.score.port.`in`.ModifyMyAcademicGradeSheetUseCase
 import team.incube.gsmc.domain.score.port.out.AcademicGradeEntryPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.AcademicGradeSheetSupport
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
@@ -28,7 +30,7 @@ class ModifyMyAcademicGradeSheetService(
     private val academicGradeSheetSupport: AcademicGradeSheetSupport,
     private val academicGradeEntryPersistencePort: AcademicGradeEntryPersistencePort,
     private val scorePersistencePort: ScorePersistencePort,
-    private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val scoreTotalCacheInvalidationPort: ScoreTotalCacheInvalidationPort,
     private val memberUtil: MemberUtil,
 ) : ModifyMyAcademicGradeSheetUseCase {
     @Transactional
@@ -46,7 +48,7 @@ class ModifyMyAcademicGradeSheetService(
             val scoreValue = academicGradeSheetSupport.toScoreValue(sheet, pending.category)
             if (pending.scoreValue != scoreValue) {
                 scorePersistencePort.save(pending.copy(scoreValue = scoreValue))
-                scoreTotalCacheInvalidator.invalidate(userId)
+                scoreTotalCacheInvalidationPort.invalidate(userId)
             }
         }
         return sheet

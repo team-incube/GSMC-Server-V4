@@ -1,6 +1,9 @@
-package team.incube.gsmc.domain.score.service
+package team.incube.gsmc.domain.score.adapter.out.cache
 
-import org.springframework.stereotype.Component
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheLoadPort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
+import team.incube.gsmc.global.annotation.PortDirection
+import team.incube.gsmc.global.annotation.adapter.Adapter
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -12,15 +15,17 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /**
- * 반/학년 총점 캐시 미스의 동시 재계산을 키별로 하나로 합치는 협력 객체입니다.
+ * [ScoreTotalCacheLoadPort]를 구현하는 아웃바운드 어댑터로, 반/학년 총점 캐시 미스의 동시 재계산을
+ * 키별로 하나로 합치고 결과를 [ScoreTotalCachePort]에 저장합니다.
  * 대표 요청은 현재 호출 스레드에서 계산하고, 후발 요청은 대표 요청의 결과를 기다립니다.
  *
  * 이 객체는 프로세스 내부에서만 동작하므로 여러 애플리케이션 인스턴스 사이의 재계산은 합치지 않습니다.
  */
-@Component
+@Adapter(direction = PortDirection.OUTBOUND)
 class ScoreTotalCacheSingleFlight(
+    private val scoreTotalCachePort: ScoreTotalCachePort,
     private val waitTimeout: Duration = DEFAULT_WAIT_TIMEOUT,
-) {
+) : ScoreTotalCacheLoadPort {
     enum class Scope {
         CLASS,
         GRADE,
@@ -53,6 +58,25 @@ class ScoreTotalCacheSingleFlight(
 
     private val inFlight = ConcurrentHashMap<CacheKey, CompletableFuture<Map<Long, Int>>>()
     private val states = ConcurrentHashMap<CacheKey, KeyState>()
+
+    override fun loadClassTotals(
+        userGrade: Int,
+        userClassNumber: Int,
+        includeApprovedOnly: Boolean,
+        compute: () -> Map<Long, Int>,
+    ): Map<Long, Int> =
+        load(CacheKey.classTotals(userGrade, userClassNumber, includeApprovedOnly), compute) { computed ->
+            scoreTotalCachePort.saveClassTotals(userGrade, userClassNumber, includeApprovedOnly, computed)
+        }
+
+    override fun loadGradeTotals(
+        userGrade: Int,
+        includeApprovedOnly: Boolean,
+        compute: () -> Map<Long, Int>,
+    ): Map<Long, Int> =
+        load(CacheKey.gradeTotals(userGrade, includeApprovedOnly), compute) { computed ->
+            scoreTotalCachePort.saveGradeTotals(userGrade, includeApprovedOnly, computed)
+        }
 
     /**
      * 캐시 미스 재계산을 실행하거나 이미 진행 중인 같은 키의 재계산 결과에 합류합니다.

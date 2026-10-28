@@ -18,6 +18,9 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.ActivityPeriodValidator
+import team.incube.gsmc.domain.score.service.support.AppendScoreSupport
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -31,14 +34,14 @@ class AppendMyScoreWithValueServiceTest :
         val userId = 1L
         val appendScoreSupport = mockk<AppendScoreSupport>()
         val scorePersistencePort = mockk<ScorePersistencePort>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberPersistencePort = mockk<MemberPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
             AppendMyScoreWithValueService(
                 appendScoreSupport = appendScoreSupport,
                 scorePersistencePort = scorePersistencePort,
-                scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort = scoreTotalCacheInvalidationPort,
                 activityPeriodValidator = ActivityPeriodValidator(memberPersistencePort),
                 memberUtil = memberUtil,
             )
@@ -56,7 +59,7 @@ class AppendMyScoreWithValueServiceTest :
 
         beforeEach {
             clearAllMocks()
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
             every { memberUtil.getCurrentUserId() } returns userId
         }
 
@@ -131,7 +134,7 @@ class AppendMyScoreWithValueServiceTest :
                     result.rejectionReason shouldBe null
                     result.activityDate shouldBe null
                     result.activityPeriodPolicyVersion shouldBe null
-                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(userId) }
+                    verify(exactly = 1) { scoreTotalCacheInvalidationPort.invalidate(userId) }
                     verify(exactly = 0) { memberPersistencePort.findByUserId(any()) }
                 }
             }

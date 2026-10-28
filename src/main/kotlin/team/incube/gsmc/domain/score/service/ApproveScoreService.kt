@@ -9,12 +9,13 @@ import team.incube.gsmc.domain.file.port.`in`.RemoveSupersededFileUseCase
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.ApproveScoreUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
-import team.incube.gsmc.domain.user.isTeacherOrAbove
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireTeacherOrAbove
 
 /**
  * 점수 승인 유스케이스 구현 클래스입니다.
@@ -32,14 +33,12 @@ class ApproveScoreService(
     private val alertPersistencePort: AlertPersistencePort,
     private val alertEventPublisherPort: AlertEventPublisherPort,
     private val removeSupersededFileUseCase: RemoveSupersededFileUseCase,
-    private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val scoreTotalCacheInvalidationPort: ScoreTotalCacheInvalidationPort,
     private val memberUtil: MemberUtil,
 ) : ApproveScoreUseCase {
     @Transactional
     override fun execute(scoreId: Long): Boolean {
-        if (!memberUtil.getCurrentUserRole().isTeacherOrAbove()) {
-            throw GsmcException(ErrorCode.FORBIDDEN)
-        }
+        memberUtil.requireTeacherOrAbove()
 
         val score = scorePersistencePort.findByIdForUpdate(scoreId) ?: throw GsmcException(ErrorCode.SCORE_NOT_FOUND)
         if (score.scoreStatus == ScoreStatus.APPROVED) return true
@@ -49,7 +48,7 @@ class ApproveScoreService(
         }
         scorePersistencePort.save(score.copy(scoreStatus = ScoreStatus.APPROVED, rejectionReason = null))
 
-        scoreTotalCacheInvalidator.invalidate(score.userId)
+        scoreTotalCacheInvalidationPort.invalidate(score.userId)
         val savedAlert =
             alertPersistencePort.save(
                 Alert.approved(

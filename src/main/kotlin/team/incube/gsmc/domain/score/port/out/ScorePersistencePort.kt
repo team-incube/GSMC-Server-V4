@@ -62,7 +62,7 @@ interface ScorePersistencePort {
      *
      * 비누적 카테고리는 승인 대기 중인 건이 사용자당 1건뿐이라 결과가 유일하다. 누적 카테고리는
      * 여러 건이 존재할 수 있어 결과가 임의의 1건이 되므로 호출하지 않는다
-     * ([team.incube.gsmc.domain.score.service.AppendScoreSupport] 참고).
+     * ([team.incube.gsmc.domain.score.service.support.AppendScoreSupport] 참고).
      *
      * @param userId 조회할 사용자 ID
      * @param categoryType 조회할 카테고리 유형
