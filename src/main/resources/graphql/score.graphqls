@@ -119,6 +119,18 @@ input ScoreWithValueInput {
     activityDate: Date
 }
 
+"""심사중인 본인 점수의 부분 수정 입력입니다. 생략하거나 null로 보낸 필드는 기존 값을 유지합니다."""
+input PatchMyScoreInput {
+    """카테고리 집계 방식에 따라 점수 값 또는 활동명으로 저장될 값입니다. 점수 기반 카테고리는 점수가 다시 계산되고, 횟수 기반 카테고리는 활동명만 바뀝니다."""
+    value: String
+    """교체할 본인 소유 파일입니다. 증빙 방식이 파일인 카테고리에서만 입력할 수 있으며, 다른 점수나 증빙자료에 이미 연결된 파일은 CONFLICT 오류로 거부됩니다. 기존 파일은 연결만 해제되고 삭제되지 않습니다."""
+    fileId: ID
+    """실제 활동일입니다. 입력하면 제출 시점 학년의 인정 기간을 다시 검증합니다."""
+    activityDate: Date
+    """대회 종류입니다. 수상경력(AWARD) 카테고리에서만 입력할 수 있으며, 다른 카테고리에 입력하면 BAD_REQUEST 오류로 거부됩니다."""
+    competitionType: AwardCompetitionType
+}
+
 """점수 반려 입력입니다."""
 input RejectScoreInput {
     """1자 이상 500자 이하의 반려 사유입니다."""
@@ -142,6 +154,8 @@ type Mutation {
     addScoreOnly(categoryType: CategoryType!): Score!
     """학생인 현재 사용자가 참여 중인 활성 DataGSM 프로젝트의 점수를 신청합니다."""
     submitProjectParticipation(dgProjectId: ID!, input: SubmitProjectParticipationInput!): Score!
+    """현재 사용자가 심사중인 본인 점수를 부분 수정합니다. 심사중이 아닌 점수는 CONFLICT 오류로 거부됩니다."""
+    patchMyScore(scoreId: ID!, input: PatchMyScoreInput!): Score!
     """교사 이상 권한이 점수를 승인합니다."""
     approveScore(scoreId: ID!): Boolean!
     """교사 이상 권한이 사유와 함께 점수를 반려합니다."""
