@@ -50,44 +50,72 @@ class ModifyMyScoreService(
         val userId = memberUtil.getCurrentUserId()
 
         val score = validateModifiable(scorePersistencePort.findByIdForUpdate(scoreId), userId)
-        val category = score.category
-        validateInputAllowed(category, command)
+        validateInputAllowed(score.category, command)
 
-        // 사전 검사는 명확한 에러 응답을 위한 것이다. 동시 요청으로 같은 파일을 연결하려는 경쟁은
-        // linkToScore의 조건부 UPDATE가 막아, 뒤늦은 요청은 FILE_ALREADY_LINKED로 롤백된다.
         val newFile = command.fileId?.let { resolveReplacementFile(it, userId, score.file) }
 
-        var modified = score
-        if (command.value != null) {
-            modified =
-                when (category.calculationType) {
-                    ScoreCalculationType.SCORE_BASED -> {
-                        modified.copy(scoreValue = appendScoreSupport.parseScoreValue(command.value, category))
-                    }
+        val saved = scorePersistencePort.save(applyChanges(score, command, userId))
 
-                    ScoreCalculationType.COUNT_BASED -> {
-                        modified.copy(activityName = command.value)
-                    }
-                }
-        }
-        if (command.activityDate != null) {
-            val policyVersion =
-                activityPeriodValidator.validateForUser(userId, category.categoryType, command.activityDate)
-            modified = modified.copy(activityDate = command.activityDate, activityPeriodPolicyVersion = policyVersion)
-        }
-        if (command.competitionType != null) {
-            modified = modified.copy(competitionType = command.competitionType)
-        }
-
-        val saved = scorePersistencePort.save(modified.copy(updatedAt = LocalDateTime.now()))
-
-        if (newFile != null) {
-            score.file?.let { filePersistencePort.unlinkFromScore(it.fileId) }
-            filePersistencePort.linkToScore(newFile.fileId, saved.scoreId)
-        }
+        newFile?.let { relinkFile(score, it) }
         scoreTotalCacheInvalidator.invalidate(userId)
 
         return if (newFile != null) saved.copy(file = newFile) else saved
+    }
+
+    /**
+     * 입력된 값(value, 활동일, 대회 종류)을 점수에 반영하고 수정 일시를 갱신한 새 점수를 반환한다.
+     * null로 전달된 값은 기존 값을 유지하며, 활동일이 있을 때만 활동 기간을 재검증해 정책 버전을 갱신한다.
+     */
+    private fun applyChanges(
+        score: Score,
+        command: ModifyMyScoreCommand,
+        userId: Long,
+    ): Score {
+        val category = score.category
+
+        val scoreValue =
+            if (command.value != null && category.calculationType == ScoreCalculationType.SCORE_BASED) {
+                appendScoreSupport.parseScoreValue(command.value, category)
+            } else {
+                score.scoreValue
+            }
+        val activityName =
+            if (command.value != null && category.calculationType == ScoreCalculationType.COUNT_BASED) {
+                command.value
+            } else {
+                score.activityName
+            }
+        val activityDate = command.activityDate ?: score.activityDate
+        val activityPeriodPolicyVersion =
+            if (command.activityDate != null) {
+                activityPeriodValidator.validateForUser(userId, category.categoryType, command.activityDate)
+            } else {
+                score.activityPeriodPolicyVersion
+            }
+        val competitionType = command.competitionType ?: score.competitionType
+
+        return score.copy(
+            scoreValue = scoreValue,
+            activityName = activityName,
+            activityDate = activityDate,
+            activityPeriodPolicyVersion = activityPeriodPolicyVersion,
+            competitionType = competitionType,
+            updatedAt = LocalDateTime.now(),
+        )
+    }
+
+    /**
+     * 기존 파일의 연결을 해제하고 새 파일을 점수에 연결한다. 이전 파일은 삭제하지 않는다.
+     *
+     * 사전 검사([resolveReplacementFile])는 명확한 에러 응답을 위한 것이다. 동시 요청으로 같은 파일을
+     * 연결하려는 경쟁은 linkToScore의 조건부 UPDATE가 막아, 뒤늦은 요청은 FILE_ALREADY_LINKED로 롤백된다.
+     */
+    private fun relinkFile(
+        score: Score,
+        newFile: File,
+    ) {
+        score.file?.let { filePersistencePort.unlinkFromScore(it.fileId) }
+        filePersistencePort.linkToScore(newFile.fileId, score.scoreId)
     }
 
     /**
