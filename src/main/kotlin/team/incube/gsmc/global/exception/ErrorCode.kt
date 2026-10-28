@@ -33,6 +33,7 @@ enum class ErrorCode(
     INVALID_CATEGORY_TYPE(HttpStatus.BAD_REQUEST, "해당 요청에 사용할 수 없는 카테고리입니다.", "BAD_REQUEST"),
     INVALID_SCORE_VALUE(HttpStatus.BAD_REQUEST, "점수 값이 올바르지 않습니다.", "BAD_REQUEST"),
     SCORE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 신청한 카테고리입니다.", "CONFLICT"),
+    SCORE_NOT_MODIFIABLE(HttpStatus.CONFLICT, "심사중인 점수만 수정할 수 있습니다.", "CONFLICT"),
     INVALID_ACADEMIC_SUBJECT(HttpStatus.BAD_REQUEST, "해당 학년·학기·학과에서 입력할 수 없는 과목입니다.", "BAD_REQUEST"),
     ACADEMIC_GRADE_INCOMPLETE(HttpStatus.BAD_REQUEST, "교과성적 입력이 완료되지 않았습니다.", "BAD_REQUEST"),
     ACADEMIC_GRADE_LOCKED(HttpStatus.CONFLICT, "승인된 교과성적은 수정할 수 없습니다.", "CONFLICT"),

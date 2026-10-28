@@ -23,12 +23,13 @@ import team.incube.gsmc.domain.score.port.`in`.FetchScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByCategoryUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByDgProjectIdUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchTotalScoreUseCase
+import team.incube.gsmc.domain.score.port.`in`.ModifyMyScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.RejectScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.RemoveScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.SubmitProjectParticipationUseCase
 
 /**
- * 점수 조회/추가/승인/거절/삭제 GraphQL Query·Mutation 리졸버입니다.
+ * 점수 조회/추가/수정/승인/거절/삭제 GraphQL Query·Mutation 리졸버입니다.
  * 각 Query/Mutation을 대응하는 UseCase에 위임하는 것 외의 비즈니스 로직은 갖지 않습니다.
  */
 @Controller
@@ -46,6 +47,7 @@ class ScoreWebAdapter(
     private val appendMyScoreWithValueUseCase: AppendMyScoreWithValueUseCase,
     private val appendMyScoreOnlyUseCase: AppendMyScoreOnlyUseCase,
     private val submitProjectParticipationUseCase: SubmitProjectParticipationUseCase,
+    private val modifyMyScoreUseCase: ModifyMyScoreUseCase,
     private val approveScoreUseCase: ApproveScoreUseCase,
     private val rejectScoreUseCase: RejectScoreUseCase,
     private val removeScoreUseCase: RemoveScoreUseCase,
@@ -127,6 +129,12 @@ class ScoreWebAdapter(
         @Argument dgProjectId: Long,
         @Argument input: SubmitProjectParticipationInput,
     ): Score = submitProjectParticipationUseCase.execute(dgProjectId, input.content, input.fileIds, input.activityDate)
+
+    @MutationMapping
+    fun patchMyScore(
+        @Argument scoreId: Long,
+        @Argument input: PatchMyScoreInput,
+    ): Score = modifyMyScoreUseCase.execute(scoreId, input.toCommand())
 
     @MutationMapping
     fun approveScore(
