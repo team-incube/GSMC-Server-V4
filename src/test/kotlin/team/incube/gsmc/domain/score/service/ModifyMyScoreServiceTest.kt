@@ -24,6 +24,9 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.ActivityPeriodValidator
+import team.incube.gsmc.domain.score.service.support.AppendScoreSupport
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -37,7 +40,7 @@ class ModifyMyScoreServiceTest :
         val appendScoreSupport = mockk<AppendScoreSupport>()
         val scorePersistencePort = mockk<ScorePersistencePort>()
         val filePersistencePort = mockk<FilePersistencePort>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberPersistencePort = mockk<MemberPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
@@ -45,7 +48,7 @@ class ModifyMyScoreServiceTest :
                 appendScoreSupport = appendScoreSupport,
                 scorePersistencePort = scorePersistencePort,
                 filePersistencePort = filePersistencePort,
-                scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort = scoreTotalCacheInvalidationPort,
                 activityPeriodValidator = ActivityPeriodValidator(memberPersistencePort),
                 memberUtil = memberUtil,
             )
@@ -53,7 +56,7 @@ class ModifyMyScoreServiceTest :
         beforeEach {
             clearAllMocks()
             every { memberUtil.getCurrentUserId() } returns 1L
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
         }
 
         val userId = 1L
@@ -134,7 +137,7 @@ class ModifyMyScoreServiceTest :
             verify(exactly = 0) { scorePersistencePort.save(any()) }
             verify(exactly = 0) { filePersistencePort.unlinkFromScore(any()) }
             verify(exactly = 0) { filePersistencePort.linkToScore(any(), any()) }
-            verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+            verify(exactly = 0) { scoreTotalCacheInvalidationPort.invalidate(any()) }
         }
 
         Given("다른 사용자의 점수를 수정할 때") {
@@ -260,7 +263,7 @@ class ModifyMyScoreServiceTest :
                     savedSlot.captured.scoreStatus shouldBe ScoreStatus.PENDING
                     result.scoreValue shouldBe 900
                     verify(exactly = 1) { appendScoreSupport.parseScoreValue("900", cat) }
-                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(userId) }
+                    verify(exactly = 1) { scoreTotalCacheInvalidationPort.invalidate(userId) }
                 }
             }
 
@@ -294,7 +297,7 @@ class ModifyMyScoreServiceTest :
                     savedSlot.captured.activityDate shouldBe LocalDate.of(2026, 3, 1)
                     savedSlot.captured.competitionType shouldBe null
                     verify(exactly = 0) { appendScoreSupport.parseScoreValue(any(), any()) }
-                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(userId) }
+                    verify(exactly = 1) { scoreTotalCacheInvalidationPort.invalidate(userId) }
                 }
             }
         }
@@ -357,7 +360,7 @@ class ModifyMyScoreServiceTest :
                     verify(exactly = 1) { filePersistencePort.unlinkFromScore(15L) }
                     verify(exactly = 1) { filePersistencePort.linkToScore(20L, scoreId) }
                     verify(exactly = 0) { filePersistencePort.deleteById(any()) }
-                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(userId) }
+                    verify(exactly = 1) { scoreTotalCacheInvalidationPort.invalidate(userId) }
                     savedSlot.captured.activityName shouldBe "기존 활동명"
                     savedSlot.captured.scoreValue shouldBe 500
                     (savedSlot.captured.updatedAt.isAfter(originalUpdatedAt)) shouldBe true

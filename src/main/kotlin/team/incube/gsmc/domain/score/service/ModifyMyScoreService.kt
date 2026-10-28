@@ -13,11 +13,15 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.ModifyMyScoreUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.ActivityPeriodValidator
+import team.incube.gsmc.domain.score.service.support.AppendScoreSupport
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireSelf
 import java.time.LocalDateTime
 
 /**
@@ -31,14 +35,14 @@ import java.time.LocalDateTime
  * 재계산 또는 activityName 변경으로 반영된다. 활동일은 입력됐을 때만 [ActivityPeriodValidator]로 재검증하고
  * 정책 버전을 갱신한다. 파일을 교체하면 이전 파일은 연결만 해제하고 삭제하지 않는다.
  * 파일만 바꾼 경우에도 수정 일시가 갱신되도록 updatedAt을 직접 지정하며, 저장 후 해당 학생의 반/학년
- * 백분위 캐시([ScoreTotalCacheInvalidator])를 무효화한다.
+ * 백분위 캐시([ScoreTotalCacheInvalidationPort])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
 class ModifyMyScoreService(
     private val appendScoreSupport: AppendScoreSupport,
     private val scorePersistencePort: ScorePersistencePort,
     private val filePersistencePort: FilePersistencePort,
-    private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val scoreTotalCacheInvalidationPort: ScoreTotalCacheInvalidationPort,
     private val activityPeriodValidator: ActivityPeriodValidator,
     private val memberUtil: MemberUtil,
 ) : ModifyMyScoreUseCase {
@@ -57,7 +61,7 @@ class ModifyMyScoreService(
         val saved = scorePersistencePort.save(applyChanges(score, command, userId))
 
         newFile?.let { relinkFile(score, it) }
-        scoreTotalCacheInvalidator.invalidate(userId)
+        scoreTotalCacheInvalidationPort.invalidate(userId)
 
         return if (newFile != null) saved.copy(file = newFile) else saved
     }
@@ -166,7 +170,7 @@ class ModifyMyScoreService(
         currentFile: File?,
     ): File? {
         val file = filePersistencePort.findById(fileId) ?: throw GsmcException(ErrorCode.FILE_NOT_FOUND)
-        if (file.userId != userId) throw GsmcException(ErrorCode.FORBIDDEN)
+        memberUtil.requireSelf(file.userId)
         if (currentFile?.fileId == fileId) return null
         if (file.scoreId != null || file.evidenceId != null) throw GsmcException(ErrorCode.FILE_ALREADY_LINKED)
         return file
