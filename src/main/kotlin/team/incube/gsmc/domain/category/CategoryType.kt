@@ -26,7 +26,7 @@ package team.incube.gsmc.domain.category
  * `category_tb`의 `evidence_type` 값도 이에 맞게 갱신되어야 한다.
  *
  * `JLPT`/`JPT`는 별도 `category_tb` 행을 갖지 않고 `TOEIC`과 같은 행을 공유한다 — 제출 시 카테고리 조회가
- * TOEIC으로 캐노니컬 매핑되며([team.incube.gsmc.domain.score.service.AppendScoreSupport]), 인정점수도 TOEIC과
+ * TOEIC으로 캐노니컬 매핑되며([team.incube.gsmc.domain.score.service.support.AppendScoreSupport]), 인정점수도 TOEIC과
  * 동일한 캡 안에서 계산된다. 실제로 제출된 시험 종류(TOEIC/JLPT/JPT)는 감사 추적을 위해
  * [team.incube.gsmc.domain.score.Score.submittedCategoryType]에 별도로 보존된다. `TOEIC_ACADEMY`는
  * 참여 승인 시 TOEIC 인정점수에 가산되는 보너스로만 반영되며 총점에 독립적으로 집계되지 않는다

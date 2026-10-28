@@ -15,6 +15,7 @@ import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.academicG
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.curriculum
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.score
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.student
+import team.incube.gsmc.domain.score.service.support.AcademicGradeSheetSupport
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 

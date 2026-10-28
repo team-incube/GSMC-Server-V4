@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference
  * 수행하고 나머지는 그 결과에 합류시킵니다.
  *
  * 이 객체는 프로세스 내부에서만 동작하므로 여러 애플리케이션 인스턴스 사이의 조회는 합치지 않습니다.
- * 같은 이유로 [team.incube.gsmc.domain.score.service.ScoreTotalCacheSingleFlight]와 구조가
+ * 같은 이유로 [team.incube.gsmc.domain.score.adapter.out.cache.ScoreTotalCacheSingleFlight]와 구조가
  * 비슷하나, 이쪽은 무효화 없이 TTL로만 만료되고 키가 하나뿐이라 세대(generation) 관리가 없습니다.
  */
 @Component

@@ -22,6 +22,9 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.ActivityPeriodValidator
+import team.incube.gsmc.domain.score.service.support.AppendScoreSupport
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -35,7 +38,7 @@ class AppendMyScoreWithFileServiceTest :
         val appendScoreSupport = mockk<AppendScoreSupport>()
         val scorePersistencePort = mockk<ScorePersistencePort>()
         val filePersistencePort = mockk<FilePersistencePort>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberPersistencePort = mockk<MemberPersistencePort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
@@ -43,14 +46,14 @@ class AppendMyScoreWithFileServiceTest :
                 appendScoreSupport = appendScoreSupport,
                 scorePersistencePort = scorePersistencePort,
                 filePersistencePort = filePersistencePort,
-                scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort = scoreTotalCacheInvalidationPort,
                 activityPeriodValidator = ActivityPeriodValidator(memberPersistencePort),
                 memberUtil = memberUtil,
             )
 
         beforeEach {
             clearAllMocks()
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
         }
 
         val userId = 1L
@@ -499,7 +502,7 @@ class AppendMyScoreWithFileServiceTest :
                         service.execute(CategoryType.CERTIFICATE, "850", 10L)
                     }.errorCode shouldBe ErrorCode.FILE_ALREADY_LINKED
 
-                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                    verify(exactly = 0) { scoreTotalCacheInvalidationPort.invalidate(any()) }
                 }
             }
         }

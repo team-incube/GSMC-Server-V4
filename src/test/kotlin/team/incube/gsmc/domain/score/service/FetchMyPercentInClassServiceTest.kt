@@ -17,6 +17,7 @@ import team.incube.gsmc.domain.score.MemberSchoolInfo
 import team.incube.gsmc.domain.score.Percentile
 import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
+import team.incube.gsmc.domain.score.adapter.out.cache.ScoreTotalCacheSingleFlight
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.MemberSchoolInfoCachePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
@@ -34,7 +35,7 @@ class FetchMyPercentInClassServiceTest :
         val memberPersistencePort = mockk<MemberPersistencePort>()
         val scoreTotalCachePort = mockk<ScoreTotalCachePort>()
         val memberUtil = mockk<MemberUtil>()
-        val scoreTotalCacheSingleFlight = ScoreTotalCacheSingleFlight()
+        val scoreTotalCacheSingleFlight = ScoreTotalCacheSingleFlight(scoreTotalCachePort)
         val service =
             FetchMyPercentInClassService(
                 scorePersistencePort,

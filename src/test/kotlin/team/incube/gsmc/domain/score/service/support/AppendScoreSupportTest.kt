@@ -1,4 +1,4 @@
-package team.incube.gsmc.domain.score.service
+package team.incube.gsmc.domain.score.service.support
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec

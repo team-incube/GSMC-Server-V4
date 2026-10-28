@@ -14,6 +14,8 @@ import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.AppendScoreSupport
 import team.incube.gsmc.global.util.MemberUtil
 import java.time.LocalDateTime
 
@@ -21,19 +23,19 @@ class AppendMyScoreOnlyServiceTest :
     BehaviorSpec({
         val appendScoreSupport = mockk<AppendScoreSupport>()
         val scorePersistencePort = mockk<ScorePersistencePort>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
             AppendMyScoreOnlyService(
                 appendScoreSupport = appendScoreSupport,
                 scorePersistencePort = scorePersistencePort,
-                scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort = scoreTotalCacheInvalidationPort,
                 memberUtil = memberUtil,
             )
 
         beforeEach {
             clearAllMocks()
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
         }
 
         val userId = 1L
