@@ -134,14 +134,7 @@ class ScoreWebAdapter(
     fun patchMyScore(
         @Argument scoreId: Long,
         @Argument input: PatchMyScoreInput,
-    ): Score =
-        modifyMyScoreUseCase.execute(
-            scoreId,
-            input.value,
-            input.fileId,
-            input.activityDate,
-            input.competitionType,
-        )
+    ): Score = modifyMyScoreUseCase.execute(scoreId, input.toCommand())
 
     @MutationMapping
     fun approveScore(

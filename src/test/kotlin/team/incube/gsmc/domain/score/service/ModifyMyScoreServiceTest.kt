@@ -19,6 +19,7 @@ import team.incube.gsmc.domain.file.File
 import team.incube.gsmc.domain.file.port.out.FilePersistencePort
 import team.incube.gsmc.domain.score.ActivityPeriodPolicy
 import team.incube.gsmc.domain.score.AwardCompetitionType
+import team.incube.gsmc.domain.score.ModifyMyScoreCommand
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
@@ -142,7 +143,8 @@ class ModifyMyScoreServiceTest :
                     val cat = category(ScoreCalculationType.SCORE_BASED)
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat, ownerId = 999L)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, "900", null, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(value = "900")) }
 
                     exception.errorCode shouldBe ErrorCode.SCORE_NOT_FOUND
                     verifyNothingChanged()
@@ -155,7 +157,8 @@ class ModifyMyScoreServiceTest :
                 Then("SCORE_NOT_FOUND 예외가 발생하고 저장하지 않는다") {
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns null
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, "900", null, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(value = "900")) }
 
                     exception.errorCode shouldBe ErrorCode.SCORE_NOT_FOUND
                     verifyNothingChanged()
@@ -171,7 +174,8 @@ class ModifyMyScoreServiceTest :
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns
                         score(cat, status = ScoreStatus.APPROVED)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, "900", null, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(value = "900")) }
 
                     exception.errorCode shouldBe ErrorCode.SCORE_NOT_MODIFIABLE
                     verifyNothingChanged()
@@ -183,7 +187,8 @@ class ModifyMyScoreServiceTest :
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns
                         score(cat, status = ScoreStatus.REJECTED)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, "900", null, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(value = "900")) }
 
                     exception.errorCode shouldBe ErrorCode.SCORE_NOT_MODIFIABLE
                     verifyNothingChanged()
@@ -197,7 +202,8 @@ class ModifyMyScoreServiceTest :
                     val cat = category(ScoreCalculationType.COUNT_BASED, evidenceType = EvidenceType.EVIDENCE)
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, "활동", null, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(value = "활동")) }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_CATEGORY_TYPE
                     verifyNothingChanged()
@@ -214,7 +220,8 @@ class ModifyMyScoreServiceTest :
                         )
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, "90", null, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(value = "90")) }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_CATEGORY_TYPE
                     verifyNothingChanged()
@@ -226,7 +233,8 @@ class ModifyMyScoreServiceTest :
                     val cat = category(ScoreCalculationType.COUNT_BASED, evidenceType = EvidenceType.UNREQUIRED)
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, null, 20L, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(fileId = 20L)) }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_CATEGORY_TYPE
                     verify(exactly = 0) { filePersistencePort.findById(any()) }
@@ -243,7 +251,7 @@ class ModifyMyScoreServiceTest :
                     every { appendScoreSupport.parseScoreValue("900", cat) } returns 900
                     val savedSlot = stubSave()
 
-                    val result = service.execute(scoreId, "900", null, null, null)
+                    val result = service.execute(scoreId, ModifyMyScoreCommand(value = "900"))
 
                     savedSlot.captured.scoreValue shouldBe 900
                     savedSlot.captured.activityName shouldBe "기존 활동명"
@@ -263,7 +271,8 @@ class ModifyMyScoreServiceTest :
                     every { appendScoreSupport.parseScoreValue("-1", cat) } throws
                         GsmcException(ErrorCode.INVALID_SCORE_VALUE)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, "-1", null, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(value = "-1")) }
 
                     exception.errorCode shouldBe ErrorCode.INVALID_SCORE_VALUE
                     verifyNothingChanged()
@@ -278,7 +287,7 @@ class ModifyMyScoreServiceTest :
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat)
                     val savedSlot = stubSave()
 
-                    service.execute(scoreId, "정보처리기사", null, null, null)
+                    service.execute(scoreId, ModifyMyScoreCommand(value = "정보처리기사"))
 
                     savedSlot.captured.activityName shouldBe "정보처리기사"
                     savedSlot.captured.scoreValue shouldBe 500
@@ -302,10 +311,10 @@ class ModifyMyScoreServiceTest :
 
                     service.execute(
                         scoreId,
-                        null,
-                        null,
-                        LocalDate.of(2026, 5, 1),
-                        AwardCompetitionType.SCHOOL_HACKATHON,
+                        ModifyMyScoreCommand(
+                            activityDate = LocalDate.of(2026, 5, 1),
+                            competitionType = AwardCompetitionType.SCHOOL_HACKATHON,
+                        ),
                     )
 
                     savedSlot.captured.activityDate shouldBe LocalDate.of(2026, 5, 1)
@@ -323,7 +332,7 @@ class ModifyMyScoreServiceTest :
 
                     val exception =
                         shouldThrow<GsmcException> {
-                            service.execute(scoreId, null, null, LocalDate.of(2026, 1, 5), null)
+                            service.execute(scoreId, ModifyMyScoreCommand(activityDate = LocalDate.of(2026, 1, 5)))
                         }
 
                     exception.errorCode shouldBe ErrorCode.ACTIVITY_DATE_OUT_OF_PERIOD
@@ -343,7 +352,7 @@ class ModifyMyScoreServiceTest :
                     every { filePersistencePort.linkToScore(20L, scoreId) } just runs
                     val savedSlot = stubSave()
 
-                    val result = service.execute(scoreId, null, 20L, null, null)
+                    val result = service.execute(scoreId, ModifyMyScoreCommand(fileId = 20L))
 
                     verify(exactly = 1) { filePersistencePort.unlinkFromScore(15L) }
                     verify(exactly = 1) { filePersistencePort.linkToScore(20L, scoreId) }
@@ -363,7 +372,7 @@ class ModifyMyScoreServiceTest :
                     every { filePersistencePort.linkToScore(20L, scoreId) } just runs
                     stubSave()
 
-                    service.execute(scoreId, null, 20L, null, null)
+                    service.execute(scoreId, ModifyMyScoreCommand(fileId = 20L))
 
                     verify(exactly = 0) { filePersistencePort.unlinkFromScore(any()) }
                     verify(exactly = 1) { filePersistencePort.linkToScore(20L, scoreId) }
@@ -380,7 +389,7 @@ class ModifyMyScoreServiceTest :
                     every { filePersistencePort.findById(15L) } returns file(15L, linkedScoreId = scoreId)
                     val savedSlot = stubSave()
 
-                    service.execute(scoreId, null, 15L, null, null)
+                    service.execute(scoreId, ModifyMyScoreCommand(fileId = 15L))
 
                     verify(exactly = 0) { filePersistencePort.unlinkFromScore(any()) }
                     verify(exactly = 0) { filePersistencePort.linkToScore(any(), any()) }
@@ -398,7 +407,8 @@ class ModifyMyScoreServiceTest :
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat, file = file(15L))
                     every { filePersistencePort.findById(999L) } returns null
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, null, 999L, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(fileId = 999L)) }
 
                     exception.errorCode shouldBe ErrorCode.FILE_NOT_FOUND
                     verifyNothingChanged()
@@ -410,7 +420,8 @@ class ModifyMyScoreServiceTest :
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat, file = file(15L))
                     every { filePersistencePort.findById(20L) } returns file(20L, ownerId = 999L)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, null, 20L, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(fileId = 20L)) }
 
                     exception.errorCode shouldBe ErrorCode.FORBIDDEN
                     verifyNothingChanged()
@@ -422,7 +433,8 @@ class ModifyMyScoreServiceTest :
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat, file = file(15L))
                     every { filePersistencePort.findById(20L) } returns file(20L, linkedScoreId = 777L)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, null, 20L, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(fileId = 20L)) }
 
                     exception.errorCode shouldBe ErrorCode.FILE_ALREADY_LINKED
                     verifyNothingChanged()
@@ -434,7 +446,8 @@ class ModifyMyScoreServiceTest :
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns score(cat, file = file(15L))
                     every { filePersistencePort.findById(20L) } returns file(20L, linkedEvidenceId = 888L)
 
-                    val exception = shouldThrow<GsmcException> { service.execute(scoreId, null, 20L, null, null) }
+                    val exception =
+                        shouldThrow<GsmcException> { service.execute(scoreId, ModifyMyScoreCommand(fileId = 20L)) }
 
                     exception.errorCode shouldBe ErrorCode.FILE_ALREADY_LINKED
                     verifyNothingChanged()
@@ -450,7 +463,10 @@ class ModifyMyScoreServiceTest :
 
                     val exception =
                         shouldThrow<GsmcException> {
-                            service.execute(scoreId, null, null, null, AwardCompetitionType.UNION_HACKATHON)
+                            service.execute(
+                                scoreId,
+                                ModifyMyScoreCommand(competitionType = AwardCompetitionType.UNION_HACKATHON),
+                            )
                         }
 
                     exception.errorCode shouldBe ErrorCode.COMPETITION_TYPE_NOT_ALLOWED
@@ -467,7 +483,7 @@ class ModifyMyScoreServiceTest :
                     every { scorePersistencePort.findByIdForUpdate(scoreId) } returns existing
                     val savedSlot = stubSave()
 
-                    service.execute(scoreId, null, null, null, null)
+                    service.execute(scoreId, ModifyMyScoreCommand())
 
                     savedSlot.captured.scoreValue shouldBe 500
                     savedSlot.captured.activityName shouldBe "기존 활동명"
