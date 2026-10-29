@@ -56,7 +56,7 @@ class ModifyMyScoreService(
         val score = validateModifiable(scorePersistencePort.findByIdForUpdate(scoreId), userId)
         validateInputAllowed(score.category, command)
 
-        val newFile = command.fileId?.let { resolveReplacementFile(it, userId, score.file) }
+        val newFile = command.fileId?.let { resolveReplacementFile(it, score.file) }
 
         val saved = scorePersistencePort.save(applyChanges(score, command, userId))
 
@@ -166,7 +166,6 @@ class ModifyMyScoreService(
      */
     private fun resolveReplacementFile(
         fileId: Long,
-        userId: Long,
         currentFile: File?,
     ): File? {
         val file = filePersistencePort.findById(fileId) ?: throw GsmcException(ErrorCode.FILE_NOT_FOUND)
