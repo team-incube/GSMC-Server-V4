@@ -1,7 +1,9 @@
 package team.incube.gsmc.domain.score.adapter.out.persistence
 
 import com.querydsl.core.Tuple
+import com.querydsl.core.types.EntityPath
 import com.querydsl.core.types.Expression
+import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.core.types.Predicate
 import com.querydsl.jpa.impl.JPADeleteClause
 import com.querydsl.jpa.impl.JPAQuery
@@ -30,6 +32,7 @@ import team.incube.gsmc.domain.file.adapter.out.persistence.entity.QFileJpaEntit
 import team.incube.gsmc.domain.file.adapter.out.persistence.repository.FileJpaRepository
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
+import team.incube.gsmc.domain.score.SearchPendingScoresQuery
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreJpaEntity.scoreJpaEntity
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreUniqueSlotJpaEntity.scoreUniqueSlotJpaEntity
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.ScoreJpaEntity
@@ -715,6 +718,77 @@ class ScorePersistenceAdapterTest :
                     adapter.unlinkProject(7L)
 
                     verify(exactly = 1) { scoreJpaRepository.unlinkProject(7L) }
+                }
+            }
+        }
+
+        Given("심사 대기 점수를 검색 조건으로 조회할 때") {
+            val pendingQuery =
+                SearchPendingScoresQuery(
+                    grade = 1,
+                    classNumber = 2,
+                    name = null,
+                    categoryType = CategoryType.JLPT,
+                    limit = 20,
+                    page = 0,
+                )
+
+            When("조건에 맞는 점수가 없으면") {
+                Then("파일 조회 없이 빈 리스트를 반환한다") {
+                    val query = mockk<JPAQuery<ScoreJpaEntity>>()
+                    every { queryFactory.selectFrom(scoreJpaEntity) } returns query
+                    every { query.join(scoreJpaEntity.user) } returns query
+                    every { query.join(scoreJpaEntity.category) } returns query
+                    every { query.leftJoin(scoreJpaEntity.evidence) } returns query
+                    every { query.fetchJoin() } returns query
+                    every { query.where(*anyVararg<Predicate>()) } returns query
+                    every { query.orderBy(*anyVararg<OrderSpecifier<*>>()) } returns query
+                    every { query.offset(any()) } returns query
+                    every { query.limit(any()) } returns query
+                    every { query.fetch() } returns emptyList()
+
+                    adapter.findAllPendingBySearchCondition(pendingQuery) shouldBe emptyList()
+
+                    verify(exactly = 0) { queryFactory.selectFrom(fileJpaEntity) }
+                    verify(exactly = 0) { fileJpaRepository.findAllByEvidenceEvidenceIdIn(any()) }
+                }
+            }
+        }
+
+        Given("심사 대기 점수 전체 개수를 조회할 때") {
+            val pendingQuery =
+                SearchPendingScoresQuery(
+                    grade = null,
+                    classNumber = null,
+                    name = null,
+                    categoryType = null,
+                    limit = 20,
+                    page = 0,
+                )
+
+            fun mockCountQuery(result: Long?) {
+                val countQuery = mockk<JPAQuery<Long>>()
+                every { queryFactory.select(any<Expression<Long>>()) } returns countQuery
+                every { countQuery.from(any<EntityPath<*>>()) } returns countQuery
+                every { countQuery.join(scoreJpaEntity.user) } returns countQuery
+                every { countQuery.join(scoreJpaEntity.category) } returns countQuery
+                every { countQuery.where(*anyVararg<Predicate>()) } returns countQuery
+                every { countQuery.fetchOne() } returns result
+            }
+
+            When("조회 결과가 있으면") {
+                Then("건수를 반환한다") {
+                    mockCountQuery(7L)
+
+                    adapter.countPendingBySearchCondition(pendingQuery) shouldBe 7L
+                }
+            }
+
+            When("count 결과가 null이면") {
+                Then("0을 반환한다") {
+                    mockCountQuery(null)
+
+                    adapter.countPendingBySearchCondition(pendingQuery) shouldBe 0L
                 }
             }
         }
