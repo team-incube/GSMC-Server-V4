@@ -19,6 +19,7 @@ import team.incube.gsmc.domain.score.port.`in`.FetchMyPercentInGradeUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchMyScoresByCategoryUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchMyScoresUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchMyTotalScoreUseCase
+import team.incube.gsmc.domain.score.port.`in`.FetchPendingScoresUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByCategoryUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByDgProjectIdUseCase
@@ -43,6 +44,7 @@ class ScoreWebAdapter(
     private val fetchMyPercentInClassUseCase: FetchMyPercentInClassUseCase,
     private val fetchMyPercentInGradeUseCase: FetchMyPercentInGradeUseCase,
     private val fetchScoresByDgProjectIdUseCase: FetchScoresByDgProjectIdUseCase,
+    private val fetchPendingScoresUseCase: FetchPendingScoresUseCase,
     private val appendMyScoreWithFileUseCase: AppendMyScoreWithFileUseCase,
     private val appendMyScoreWithValueUseCase: AppendMyScoreWithValueUseCase,
     private val appendMyScoreOnlyUseCase: AppendMyScoreOnlyUseCase,
@@ -73,6 +75,11 @@ class ScoreWebAdapter(
         @Argument memberId: Long,
         @Argument status: ScoreStatus?,
     ): List<ScoreCategoryGroup> = fetchScoresByCategoryUseCase.execute(memberId, status)
+
+    @QueryMapping
+    fun pendingScores(
+        @Argument input: SearchPendingScoreInput,
+    ): PendingScorePagePayload = fetchPendingScoresUseCase.execute(input.toQuery()).toPayload()
 
     @QueryMapping
     fun myTotalScore(

@@ -16,6 +16,14 @@ interface MemberPersistencePort {
     fun findByUserId(userId: Long): User?
 
     /**
+     * 여러 ID의 사용자를 한 번에 조회한다. 존재하지 않는 ID는 결과에서 빠진다.
+     *
+     * @param userIds 조회할 사용자 ID 목록
+     * @return 해당 사용자 목록, [userIds]가 비어 있으면 빈 목록
+     */
+    fun findAllByUserIdIn(userIds: List<Long>): List<User>
+
+    /**
      * 같은 학년의 학생(STUDENT) 전체를 조회한다.
      *
      * @param userGrade 학년
