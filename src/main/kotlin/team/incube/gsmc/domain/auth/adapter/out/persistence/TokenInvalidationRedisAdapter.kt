@@ -5,6 +5,7 @@ import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
 import team.incube.gsmc.global.security.jwt.JwtProperties
+import team.themoment.sdk.logging.logger.logger
 import java.util.concurrent.TimeUnit
 
 /**
@@ -12,6 +13,9 @@ import java.util.concurrent.TimeUnit
  * [TokenInvalidationPort]를 구현하며, 사용자별 무효화 기준 시각을 Redis에 기록합니다.
  * TTL은 [JwtProperties]의 accessTokenExpiry 설정값을 따르며, 이후 발급되는 토큰과 비교해
  * 무효화 시점 이전에 발급된 토큰만 만료된 것으로 판단합니다.
+ * 이 조회는 모든 인증 요청의 필터에서 호출되므로, Redis 장애가 전체 API 실패로 번지지 않도록
+ * 조회 실패는 무효화되지 않은 것으로 보고 통과시킨다. 이 경우 로그아웃된 토큰이 액세스 토큰
+ * 만료 시각까지 쓰일 수 있다는 점을 감수한 선택이다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class TokenInvalidationRedisAdapter(
@@ -41,13 +45,15 @@ class TokenInvalidationRedisAdapter(
      *
      * @param userId 확인할 사용자 ID
      * @param issuedAt 토큰의 발급 시각 (epoch millis)
-     * @return 무효화 기준 시각이 없으면 false, 있으면 발급 시각과 비교한 결과
+     * @return 무효화 기준 시각이 없거나 조회에 실패하면 false, 있으면 발급 시각과 비교한 결과
      */
     override fun isInvalidated(
         userId: Long,
         issuedAt: Long,
-    ): Boolean {
-        val invalidatedAt = redisTemplate.opsForValue().get(KEY_PREFIX + userId) ?: return false
-        return invalidatedAt.toLong() > issuedAt
-    }
+    ): Boolean =
+        runCatching {
+            val invalidatedAt = redisTemplate.opsForValue().get(KEY_PREFIX + userId)
+            invalidatedAt != null && invalidatedAt.toLong() > issuedAt
+        }.onFailure { logger().warn("토큰 무효화 조회 실패, 무효화되지 않은 것으로 처리 (userId={})", userId, it) }
+            .getOrDefault(false)
 }
