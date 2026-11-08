@@ -4,6 +4,8 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import java.time.Clock
 import java.time.Duration
@@ -80,6 +82,59 @@ class ScoreTotalCacheAdapterTest :
                     adapter.loadClassTotals(2, 1, true, 1L) { mapOf(1L to 1) } shouldBe mapOf(1L to 1)
                     adapter.loadGradeTotals(2, false, 1L) { mapOf(1L to 1) } shouldBe mapOf(1L to 1)
                     adapter.loadClassTotals(2, 2, true, 1L) { error("다른 반은 유지되어야 한다") } shouldBe totals
+                }
+            }
+        }
+
+        Given("트랜잭션 안에서 invalidateCohort를 호출할 때") {
+            fun inTransaction(block: () -> Unit) {
+                TransactionSynchronizationManager.initSynchronization()
+                try {
+                    block()
+                } finally {
+                    TransactionSynchronizationManager.clearSynchronization()
+                }
+            }
+
+            fun cachedAdapter() = newAdapter().also { it.loadClassTotals(2, 1, true, 1L) { totals } }
+
+            When("아직 커밋되지 않았으면") {
+                Then("캐시를 지우지 않는다") {
+                    inTransaction {
+                        val adapter = cachedAdapter()
+
+                        adapter.invalidateCohort(2, 1)
+
+                        adapter.loadClassTotals(2, 1, true, 1L) { error("커밋 전에는 캐시를 유지해야 한다") } shouldBe totals
+                    }
+                }
+            }
+
+            When("커밋되면") {
+                Then("커밋 후에 캐시를 지운다") {
+                    inTransaction {
+                        val adapter = cachedAdapter()
+
+                        adapter.invalidateCohort(2, 1)
+                        TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+
+                        adapter.loadClassTotals(2, 1, true, 1L) { mapOf(1L to 1) } shouldBe mapOf(1L to 1)
+                    }
+                }
+            }
+
+            When("롤백되면") {
+                Then("캐시를 지우지 않는다") {
+                    inTransaction {
+                        val adapter = cachedAdapter()
+
+                        adapter.invalidateCohort(2, 1)
+                        TransactionSynchronizationManager.getSynchronizations().forEach {
+                            it.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK)
+                        }
+
+                        adapter.loadClassTotals(2, 1, true, 1L) { error("롤백 시 캐시를 유지해야 한다") } shouldBe totals
+                    }
                 }
             }
         }
