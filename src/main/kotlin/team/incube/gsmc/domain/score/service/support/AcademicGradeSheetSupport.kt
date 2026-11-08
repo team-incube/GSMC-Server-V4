@@ -1,4 +1,4 @@
-package team.incube.gsmc.domain.score.service
+package team.incube.gsmc.domain.score.service.support
 
 import org.springframework.stereotype.Component
 import team.incube.gsmc.domain.category.Category

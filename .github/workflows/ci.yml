@@ -118,7 +118,7 @@ jobs:
               --add-label "$TYPE_LABEL"
 
             # 자동 리뷰어 등록 (작성자 제외)
-            ALL_REVIEWERS="jyx-07,exijn,snowykte0426,minwoo-3,s26059-maker"
+            ALL_REVIEWERS="jyx-07,exijn,minwoo-3,s26059-maker"
             REVIEWERS=$(echo "$ALL_REVIEWERS" \
               | tr ',' '\n' \
               | grep -v "^${PR_AUTHOR}$" \

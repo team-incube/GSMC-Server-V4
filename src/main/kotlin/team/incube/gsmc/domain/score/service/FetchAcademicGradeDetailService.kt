@@ -5,6 +5,7 @@ import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.academic.AcademicGradeSheet
 import team.incube.gsmc.domain.score.port.`in`.FetchAcademicGradeDetailUseCase
+import team.incube.gsmc.domain.score.service.support.AcademicGradeSheetSupport
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.GsmcException

@@ -1,7 +1,8 @@
-package team.incube.gsmc.domain.score.service
+package team.incube.gsmc.domain.score.adapter.out.cache
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import io.mockk.mockk
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import java.time.Duration
@@ -40,7 +41,7 @@ class ScoreTotalCacheSingleFlightTest :
                 // 이 테스트는 타임아웃 폴백이 아닌 중복 계산 방지 자체를 검증하므로, CI 러너가
                 // 느려 후발 요청이 대기 중 타임아웃으로 오탐(false positive) 재계산하지 않도록
                 // 넉넉한 대기 시간을 준다. 타임아웃 폴백 동작은 아래 별도 테스트에서 검증한다.
-                val singleFlight = ScoreTotalCacheSingleFlight(Duration.ofSeconds(30))
+                val singleFlight = ScoreTotalCacheSingleFlight(mockk(relaxed = true), Duration.ofSeconds(30))
                 val key = classKey()
                 val computeCount = AtomicInteger()
                 val started = CountDownLatch(1)
@@ -93,7 +94,7 @@ class ScoreTotalCacheSingleFlightTest :
                 leaderKey: ScoreTotalCacheSingleFlight.CacheKey,
                 followerKey: ScoreTotalCacheSingleFlight.CacheKey,
             ) {
-                val singleFlight = ScoreTotalCacheSingleFlight()
+                val singleFlight = ScoreTotalCacheSingleFlight(mockk(relaxed = true))
                 val leaderStarted = CountDownLatch(1)
                 val releaseLeader = CountDownLatch(1)
                 lateinit var leaderResult: Map<Long, Int>
@@ -141,7 +142,7 @@ class ScoreTotalCacheSingleFlightTest :
             Then("후발 요청이 대기에서 풀리고 원래 도메인 예외를 받으며 다음 요청은 재시도된다") {
                 // 후발 요청이 타임아웃으로 대기에서 풀리는 것이 아니라 leader의 예외 전파로
                 // 풀리는지를 검증하는 테스트이므로, 타임아웃 자체는 넉넉하게 잡는다.
-                val singleFlight = ScoreTotalCacheSingleFlight(Duration.ofSeconds(30))
+                val singleFlight = ScoreTotalCacheSingleFlight(mockk(relaxed = true), Duration.ofSeconds(30))
                 val key = gradeKey()
                 val failure = GsmcException(ErrorCode.USER_NOT_FOUND)
                 val started = CountDownLatch(1)
@@ -190,7 +191,7 @@ class ScoreTotalCacheSingleFlightTest :
 
         Given("후발 요청이 대기 시간 제한에 도달하면") {
             Then("공유 Future를 바꾸지 않고 직접 계산하며 대표 결과도 정상 완료된다") {
-                val singleFlight = ScoreTotalCacheSingleFlight(Duration.ofMillis(50))
+                val singleFlight = ScoreTotalCacheSingleFlight(mockk(relaxed = true), Duration.ofMillis(50))
                 val key = classKey()
                 val leaderStarted = CountDownLatch(1)
                 val releaseLeader = CountDownLatch(1)
@@ -236,7 +237,7 @@ class ScoreTotalCacheSingleFlightTest :
 
         Given("재계산 중 캐시 무효화가 발생하면") {
             Then("무효화 이후의 오래된 결과를 캐시에 다시 저장하지 않는다") {
-                val singleFlight = ScoreTotalCacheSingleFlight()
+                val singleFlight = ScoreTotalCacheSingleFlight(mockk(relaxed = true))
                 val key = gradeKey()
                 val started = CountDownLatch(1)
                 val release = CountDownLatch(1)

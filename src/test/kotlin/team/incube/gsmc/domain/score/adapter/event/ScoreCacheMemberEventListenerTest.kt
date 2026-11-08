@@ -8,15 +8,15 @@ import io.mockk.verify
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import team.incube.gsmc.domain.score.port.out.MemberSchoolInfoCachePort
-import team.incube.gsmc.domain.score.service.ScoreTotalCacheInvalidator
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
 import team.incube.gsmc.domain.user.MemberCohortChangedEvent
 import team.incube.gsmc.domain.user.StudentCohort
 
 class ScoreCacheMemberEventListenerTest :
     BehaviorSpec({
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>(relaxUnitFun = true)
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>(relaxUnitFun = true)
         val memberSchoolInfoCachePort = mockk<MemberSchoolInfoCachePort>(relaxUnitFun = true)
-        val listener = ScoreCacheMemberEventListener(scoreTotalCacheInvalidator, memberSchoolInfoCachePort)
+        val listener = ScoreCacheMemberEventListener(scoreTotalCacheInvalidationPort, memberSchoolInfoCachePort)
 
         beforeEach { clearAllMocks() }
 
@@ -27,8 +27,8 @@ class ScoreCacheMemberEventListenerTest :
                         MemberCohortChangedEvent(setOf(StudentCohort(2, 3), StudentCohort(2, 4))),
                     )
 
-                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidateCohort(2, 3) }
-                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidateCohort(2, 4) }
+                    verify(exactly = 1) { scoreTotalCacheInvalidationPort.invalidateCohort(2, 3) }
+                    verify(exactly = 1) { scoreTotalCacheInvalidationPort.invalidateCohort(2, 4) }
                 }
             }
 
@@ -36,7 +36,7 @@ class ScoreCacheMemberEventListenerTest :
                 Then("반을 null로 넘겨 학년만 무효화한다") {
                     listener.onMemberCohortChanged(MemberCohortChangedEvent(setOf(StudentCohort(1, null))))
 
-                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidateCohort(1, null) }
+                    verify(exactly = 1) { scoreTotalCacheInvalidationPort.invalidateCohort(1, null) }
                 }
             }
         }

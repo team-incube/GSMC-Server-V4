@@ -3,6 +3,7 @@ package team.incube.gsmc.domain.score.service
 import org.springframework.transaction.annotation.Transactional
 import team.incube.gsmc.domain.score.academic.AcademicGradeSheet
 import team.incube.gsmc.domain.score.port.`in`.FetchMyAcademicGradeSheetUseCase
+import team.incube.gsmc.domain.score.service.support.AcademicGradeSheetSupport
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.util.MemberUtil

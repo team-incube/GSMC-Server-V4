@@ -18,12 +18,14 @@ import team.incube.gsmc.domain.score.academic.AcademicGradeEntryCommand
 import team.incube.gsmc.domain.score.academic.Department
 import team.incube.gsmc.domain.score.port.out.AcademicGradeEntryPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.USER_ID
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.academicGradeCategory
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.completeCommands
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.curriculum
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.score
 import team.incube.gsmc.domain.score.service.AcademicGradeTestFixtures.student
+import team.incube.gsmc.domain.score.service.support.AcademicGradeSheetSupport
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
@@ -33,14 +35,14 @@ class ModifyMyAcademicGradeSheetServiceTest :
         val support = mockk<AcademicGradeSheetSupport>()
         val academicGradeEntryPersistencePort = mockk<AcademicGradeEntryPersistencePort>()
         val scorePersistencePort = mockk<ScorePersistencePort>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
             ModifyMyAcademicGradeSheetService(
                 academicGradeSheetSupport = support,
                 academicGradeEntryPersistencePort = academicGradeEntryPersistencePort,
                 scorePersistencePort = scorePersistencePort,
-                scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort = scoreTotalCacheInvalidationPort,
                 memberUtil = memberUtil,
             )
         val savedEntries = slot<List<AcademicGradeEntry>>()
@@ -62,7 +64,7 @@ class ModifyMyAcademicGradeSheetServiceTest :
             every { support.curriculum() } returns curriculum
             every { academicGradeEntryPersistencePort.replaceAll(USER_ID, any(), capture(savedEntries)) } answers
                 { thirdArg() }
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
             givenStudent(1, Department.SOFTWARE)
         }
 
@@ -169,7 +171,7 @@ class ModifyMyAcademicGradeSheetServiceTest :
                     saved.captured.scoreId shouldBe pending.scoreId
                     saved.captured.scoreValue shouldBe 7
                     saved.captured.scoreStatus shouldBe ScoreStatus.PENDING
-                    verify(exactly = 1) { scoreTotalCacheInvalidator.invalidate(USER_ID) }
+                    verify(exactly = 1) { scoreTotalCacheInvalidationPort.invalidate(USER_ID) }
                 }
             }
 

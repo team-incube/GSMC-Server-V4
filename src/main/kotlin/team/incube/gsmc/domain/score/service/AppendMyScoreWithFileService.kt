@@ -10,11 +10,15 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreWithFileUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.ActivityPeriodValidator
+import team.incube.gsmc.domain.score.service.support.AppendScoreSupport
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireSelf
 import java.time.LocalDate
 
 /**
@@ -25,14 +29,14 @@ import java.time.LocalDate
  * 실제 제출된 시험 종류를 [team.incube.gsmc.domain.score.Score.submittedCategoryType]에 감사
  * 추적용으로 남긴다. 당해연도 카테고리는 활동일을 학년별 인정 기간([ActivityPeriodValidator])으로 검증한다.
  * 대회 종류([AwardCompetitionType])는 수상경력에서만 받으며, 다른 카테고리에 입력하면 거부한다. PENDING 상태로 새로 생성되므로 해당 학생의 반/학년 백분위 캐시
- * ([ScoreTotalCacheInvalidator])를 무효화한다.
+ * ([ScoreTotalCacheInvalidationPort])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
 class AppendMyScoreWithFileService(
     private val appendScoreSupport: AppendScoreSupport,
     private val scorePersistencePort: ScorePersistencePort,
     private val filePersistencePort: FilePersistencePort,
-    private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val scoreTotalCacheInvalidationPort: ScoreTotalCacheInvalidationPort,
     private val activityPeriodValidator: ActivityPeriodValidator,
     private val memberUtil: MemberUtil,
 ) : AppendMyScoreWithFileUseCase {
@@ -51,7 +55,7 @@ class AppendMyScoreWithFileService(
         }
 
         val file = filePersistencePort.findById(fileId) ?: throw GsmcException(ErrorCode.FILE_NOT_FOUND)
-        if (file.userId != userId) throw GsmcException(ErrorCode.FORBIDDEN)
+        memberUtil.requireSelf(file.userId)
 
         val scoreValue =
             if (category.calculationType ==
@@ -90,7 +94,7 @@ class AppendMyScoreWithFileService(
         if (oldFile?.fileId != fileId) {
             filePersistencePort.linkToScore(fileId, saved.scoreId)
         }
-        scoreTotalCacheInvalidator.invalidate(userId)
+        scoreTotalCacheInvalidationPort.invalidate(userId)
 
         return saved.copy(file = file)
     }

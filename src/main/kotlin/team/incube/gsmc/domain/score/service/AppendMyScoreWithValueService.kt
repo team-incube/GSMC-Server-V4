@@ -7,6 +7,9 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.AppendMyScoreWithValueUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.ActivityPeriodValidator
+import team.incube.gsmc.domain.score.service.support.AppendScoreSupport
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
@@ -20,13 +23,13 @@ import java.time.LocalDate
  * 카테고리에 대해 숫자 값을 입력해 점수를 신청한다. 교과성적([CategoryType.ACADEMIC_GRADE])은 평균을 직접 입력받지 않고
  * 과목별 입력표로만 신청하므로([AppendMyAcademicGradeScoreService]) 여기서는 거부한다. 당해연도 카테고리는
  * 활동일을 학년별 인정 기간([ActivityPeriodValidator])으로 검증한다. PENDING 상태로 새로 생성되므로
- * 해당 학생의 반/학년 백분위 캐시([ScoreTotalCacheInvalidator])를 무효화한다.
+ * 해당 학생의 반/학년 백분위 캐시([ScoreTotalCacheInvalidationPort])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
 class AppendMyScoreWithValueService(
     private val appendScoreSupport: AppendScoreSupport,
     private val scorePersistencePort: ScorePersistencePort,
-    private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val scoreTotalCacheInvalidationPort: ScoreTotalCacheInvalidationPort,
     private val activityPeriodValidator: ActivityPeriodValidator,
     private val memberUtil: MemberUtil,
 ) : AppendMyScoreWithValueUseCase {
@@ -57,7 +60,7 @@ class AppendMyScoreWithValueService(
                     activityPeriodPolicyVersion = policyVersion,
                 ),
             )
-        scoreTotalCacheInvalidator.invalidate(userId)
+        scoreTotalCacheInvalidationPort.invalidate(userId)
         return saved
     }
 }

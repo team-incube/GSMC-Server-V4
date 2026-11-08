@@ -32,6 +32,8 @@ import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.ActivityPeriodValidator
 import team.incube.gsmc.domain.user.User
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
@@ -69,7 +71,7 @@ class SubmitProjectParticipationServiceTest :
         val evidencePersistencePort = mockk<EvidencePersistencePort>()
         val filePersistencePort = mockk<FilePersistencePort>()
         val memberPersistencePort = mockk<MemberPersistencePort>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberUtil = mockk<MemberUtil>()
         val transactionManager = TestTransactionManager()
         val service =
@@ -80,7 +82,7 @@ class SubmitProjectParticipationServiceTest :
                 evidencePersistencePort = evidencePersistencePort,
                 filePersistencePort = filePersistencePort,
                 memberPersistencePort = memberPersistencePort,
-                scoreTotalCacheInvalidator = scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort = scoreTotalCacheInvalidationPort,
                 activityPeriodValidator = ActivityPeriodValidator(memberPersistencePort),
                 memberUtil = memberUtil,
                 transactionManager = transactionManager,
@@ -91,7 +93,7 @@ class SubmitProjectParticipationServiceTest :
             TransactionSynchronizationManager.clear()
             transactionManager.commitCount = 0
             transactionManager.rollbackCount = 0
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
         }
 
         val userId = 1L
@@ -463,7 +465,7 @@ class SubmitProjectParticipationServiceTest :
                     transactionManager.commitCount shouldBe 0
                     transactionManager.rollbackCount shouldBe 1
                     verify(exactly = 0) { scorePersistencePort.save(any()) }
-                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                    verify(exactly = 0) { scoreTotalCacheInvalidationPort.invalidate(any()) }
                 }
             }
 
@@ -484,7 +486,7 @@ class SubmitProjectParticipationServiceTest :
 
                     transactionManager.commitCount shouldBe 0
                     transactionManager.rollbackCount shouldBe 1
-                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                    verify(exactly = 0) { scoreTotalCacheInvalidationPort.invalidate(any()) }
                 }
             }
         }

@@ -3,6 +3,7 @@ package team.incube.gsmc.domain.score.port.out
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreCalculationRow
+import team.incube.gsmc.domain.score.SearchPendingScoresQuery
 
 /**
  * 점수 요청 영속성을 추상화하는 아웃바운드 포트 인터페이스입니다.
@@ -62,7 +63,7 @@ interface ScorePersistencePort {
      *
      * 비누적 카테고리는 승인 대기 중인 건이 사용자당 1건뿐이라 결과가 유일하다. 누적 카테고리는
      * 여러 건이 존재할 수 있어 결과가 임의의 1건이 되므로 호출하지 않는다
-     * ([team.incube.gsmc.domain.score.service.AppendScoreSupport] 참고).
+     * ([team.incube.gsmc.domain.score.service.support.AppendScoreSupport] 참고).
      *
      * @param userId 조회할 사용자 ID
      * @param categoryType 조회할 카테고리 유형
@@ -109,6 +110,23 @@ interface ScorePersistencePort {
      * @return 해당 프로젝트로 제출된 점수 요청 목록
      */
     fun findAllByDgProjectId(dgProjectId: Long): List<Score>
+
+    /**
+     * 조건에 맞는 심사 대기(PENDING) 점수를 최근 수정 순으로 한 페이지 조회한다.
+     * 수정 시각이 같으면 점수 ID 내림차순으로 정렬해 페이지 사이 순서를 고정한다.
+     *
+     * @param query 검색 조건과 페이지 정보
+     * @return 해당 페이지의 심사 대기 점수 목록
+     */
+    fun findAllPendingBySearchCondition(query: SearchPendingScoresQuery): List<Score>
+
+    /**
+     * 조건에 맞는 심사 대기(PENDING) 점수의 전체 개수를 조회한다.
+     *
+     * @param query 검색 조건 (페이지 정보는 무시한다)
+     * @return 조건에 맞는 전체 개수
+     */
+    fun countPendingBySearchCondition(query: SearchPendingScoresQuery): Long
 
     /** 특정 사용자가 내부 Project에 연결한 점수 요청을 조회한다. */
     fun findByUserIdAndProjectId(

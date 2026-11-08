@@ -6,12 +6,12 @@ import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByCategoryUseCase
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
-import team.incube.gsmc.domain.user.isTeacherOrAbove
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireTeacherOrAbove
 
 /**
  * 특정 사용자 카테고리별 점수 조회 유스케이스 구현 클래스입니다.
@@ -27,9 +27,7 @@ class FetchScoresByCategoryService(
         memberId: Long,
         status: ScoreStatus?,
     ): List<ScoreCategoryGroup> {
-        if (!memberUtil.getCurrentUserRole().isTeacherOrAbove()) {
-            throw GsmcException(ErrorCode.FORBIDDEN)
-        }
+        memberUtil.requireTeacherOrAbove()
         val member = memberPersistencePort.findByUserId(memberId) ?: throw GsmcException(ErrorCode.USER_NOT_FOUND)
 
         val scores = scorePersistencePort.findAllByUserId(memberId)

@@ -1,4 +1,4 @@
-package team.incube.gsmc.domain.score.service
+package team.incube.gsmc.domain.score.adapter.out.cache
 
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
@@ -35,7 +35,7 @@ class ScoreTotalCacheInvalidatorTest :
                     memberPersistencePort,
                     scoreTotalCachePort,
                     taskScheduler,
-                    ScoreTotalCacheSingleFlight(),
+                    ScoreTotalCacheSingleFlight(scoreTotalCachePort),
                 )
         }
 

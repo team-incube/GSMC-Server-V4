@@ -22,6 +22,7 @@ import team.incube.gsmc.domain.file.port.`in`.RemoveSupersededFileUseCase
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
@@ -34,7 +35,7 @@ class ApproveScoreServiceTest :
         val alertPersistencePort = mockk<AlertPersistencePort>()
         val alertEventPublisherPort = mockk<AlertEventPublisherPort>()
         val removeSupersededFileUseCase = mockk<RemoveSupersededFileUseCase>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
             ApproveScoreService(
@@ -42,13 +43,13 @@ class ApproveScoreServiceTest :
                 alertPersistencePort,
                 alertEventPublisherPort,
                 removeSupersededFileUseCase,
-                scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort,
                 memberUtil,
             )
 
         beforeEach {
             clearAllMocks()
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
         }
 
         fun score(status: ScoreStatus) =
@@ -127,7 +128,7 @@ class ApproveScoreServiceTest :
                     verify(exactly = 0) { scorePersistencePort.deleteById(any()) }
                     verify(exactly = 0) { alertPersistencePort.save(any()) }
                     verify(exactly = 0) { alertEventPublisherPort.publish(any()) }
-                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                    verify(exactly = 0) { scoreTotalCacheInvalidationPort.invalidate(any()) }
                 }
             }
 

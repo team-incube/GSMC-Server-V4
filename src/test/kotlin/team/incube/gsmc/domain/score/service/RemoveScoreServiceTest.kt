@@ -19,6 +19,7 @@ import team.incube.gsmc.domain.file.port.out.FilePersistencePort
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
@@ -30,20 +31,20 @@ class RemoveScoreServiceTest :
         val scorePersistencePort = mockk<ScorePersistencePort>()
         val filePersistencePort = mockk<FilePersistencePort>()
         val alertPersistencePort = mockk<AlertPersistencePort>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
             RemoveScoreService(
                 scorePersistencePort,
                 filePersistencePort,
                 alertPersistencePort,
-                scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort,
                 memberUtil,
             )
 
         beforeEach {
             clearAllMocks()
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
         }
 
         fun approvedScore(file: File? = null) =

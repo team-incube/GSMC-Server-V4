@@ -20,6 +20,7 @@ import team.incube.gsmc.domain.category.ScoreCalculationType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
@@ -31,20 +32,20 @@ class RejectScoreServiceTest :
         val scorePersistencePort = mockk<ScorePersistencePort>()
         val alertPersistencePort = mockk<AlertPersistencePort>()
         val alertEventPublisherPort = mockk<AlertEventPublisherPort>()
-        val scoreTotalCacheInvalidator = mockk<ScoreTotalCacheInvalidator>()
+        val scoreTotalCacheInvalidationPort = mockk<ScoreTotalCacheInvalidationPort>()
         val memberUtil = mockk<MemberUtil>()
         val service =
             RejectScoreService(
                 scorePersistencePort,
                 alertPersistencePort,
                 alertEventPublisherPort,
-                scoreTotalCacheInvalidator,
+                scoreTotalCacheInvalidationPort,
                 memberUtil,
             )
 
         beforeEach {
             clearAllMocks()
-            every { scoreTotalCacheInvalidator.invalidate(any()) } just runs
+            every { scoreTotalCacheInvalidationPort.invalidate(any()) } just runs
         }
 
         fun score(status: ScoreStatus) =
@@ -125,7 +126,7 @@ class RejectScoreServiceTest :
                     }
                     verify(exactly = 0) { alertPersistencePort.save(any()) }
                     verify(exactly = 0) { alertEventPublisherPort.publish(any()) }
-                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                    verify(exactly = 0) { scoreTotalCacheInvalidationPort.invalidate(any()) }
                 }
             }
 
@@ -142,7 +143,7 @@ class RejectScoreServiceTest :
                     verify(exactly = 0) { scorePersistencePort.save(any()) }
                     verify(exactly = 0) { alertPersistencePort.save(any()) }
                     verify(exactly = 0) { alertEventPublisherPort.publish(any()) }
-                    verify(exactly = 0) { scoreTotalCacheInvalidator.invalidate(any()) }
+                    verify(exactly = 0) { scoreTotalCacheInvalidationPort.invalidate(any()) }
                 }
             }
 

@@ -7,12 +7,13 @@ import team.incube.gsmc.domain.alert.port.out.AlertPersistencePort
 import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.RejectScoreUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
-import team.incube.gsmc.domain.user.isTeacherOrAbove
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireTeacherOrAbove
 
 private const val MAX_REJECTION_REASON_LENGTH = 500
 
@@ -32,7 +33,7 @@ class RejectScoreService(
     private val scorePersistencePort: ScorePersistencePort,
     private val alertPersistencePort: AlertPersistencePort,
     private val alertEventPublisherPort: AlertEventPublisherPort,
-    private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val scoreTotalCacheInvalidationPort: ScoreTotalCacheInvalidationPort,
     private val memberUtil: MemberUtil,
 ) : RejectScoreUseCase {
     @Transactional
@@ -40,9 +41,7 @@ class RejectScoreService(
         scoreId: Long,
         rejectionReason: String,
     ): Boolean {
-        if (!memberUtil.getCurrentUserRole().isTeacherOrAbove()) {
-            throw GsmcException(ErrorCode.FORBIDDEN)
-        }
+        memberUtil.requireTeacherOrAbove()
         if (rejectionReason.isBlank() || rejectionReason.length > MAX_REJECTION_REASON_LENGTH) {
             throw GsmcException(ErrorCode.INVALID_REJECTION_REASON)
         }
@@ -57,7 +56,7 @@ class RejectScoreService(
 
         scorePersistencePort.save(score.copy(scoreStatus = ScoreStatus.REJECTED, rejectionReason = rejectionReason))
 
-        scoreTotalCacheInvalidator.invalidate(score.userId)
+        scoreTotalCacheInvalidationPort.invalidate(score.userId)
         val savedAlert =
             alertPersistencePort.save(
                 Alert.rejected(

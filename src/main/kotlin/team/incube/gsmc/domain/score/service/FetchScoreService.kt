@@ -3,12 +3,12 @@ package team.incube.gsmc.domain.score.service
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.port.`in`.FetchScoreUseCase
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
-import team.incube.gsmc.domain.user.isTeacherOrAbove
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireSelfOrTeacherOrAbove
 
 /**
  * 점수 단건 조회 유스케이스 구현 클래스입니다.
@@ -22,10 +22,7 @@ class FetchScoreService(
     override fun execute(scoreId: Long): Score {
         val score = scorePersistencePort.findById(scoreId) ?: throw GsmcException(ErrorCode.SCORE_NOT_FOUND)
 
-        val currentUserId = memberUtil.getCurrentUserId()
-        if (score.userId != currentUserId && !memberUtil.getCurrentUserRole().isTeacherOrAbove()) {
-            throw GsmcException(ErrorCode.FORBIDDEN)
-        }
+        memberUtil.requireSelfOrTeacherOrAbove(score.userId)
 
         return score
     }

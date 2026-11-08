@@ -7,13 +7,14 @@ import team.incube.gsmc.domain.score.port.`in`.FetchMyPercentInClassUseCase
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.MemberSchoolInfoCachePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheLoadPort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
-import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireStudent
 
 /**
  * 학급 내 백분위 조회 유스케이스 구현 클래스입니다.
@@ -27,14 +28,12 @@ class FetchMyPercentInClassService(
     private val scorePersistencePort: ScorePersistencePort,
     private val memberPersistencePort: MemberPersistencePort,
     private val scoreTotalCachePort: ScoreTotalCachePort,
-    private val scoreTotalCacheSingleFlight: ScoreTotalCacheSingleFlight,
+    private val scoreTotalCacheLoadPort: ScoreTotalCacheLoadPort,
     private val memberSchoolInfoCachePort: MemberSchoolInfoCachePort,
     private val memberUtil: MemberUtil,
 ) : FetchMyPercentInClassUseCase {
     override fun execute(includeApprovedOnly: Boolean): Percentile {
-        if (memberUtil.getCurrentUserRole() != UserRole.STUDENT) {
-            throw GsmcException(ErrorCode.FORBIDDEN)
-        }
+        memberUtil.requireStudent()
 
         val userId = memberUtil.getCurrentUserId()
         val me =
@@ -47,41 +46,25 @@ class FetchMyPercentInClassService(
         val cached = scoreTotalCachePort.findClassTotals(userGrade, userClassNumber, includeApprovedOnly)
         val totalScoreByUserId =
             cached?.takeIf { userId in it }
-                ?: scoreTotalCacheSingleFlight.load(
-                    key =
-                        ScoreTotalCacheSingleFlight.CacheKey.classTotals(
-                            userGrade,
-                            userClassNumber,
+                ?: scoreTotalCacheLoadPort.loadClassTotals(userGrade, userClassNumber, includeApprovedOnly) {
+                    val classmateIds =
+                        memberPersistencePort
+                            .findAllStudentsByUserGradeAndUserClassNumber(userGrade, userClassNumber)
+                            .map { it.userId }
+                            .toSet() + userId
+                    val scoresByUserId =
+                        scorePersistencePort
+                            .findCalculationRowsByUserIdIn(
+                                classmateIds.toList(),
+                            ).groupBy { it.userId }
+                    classmateIds.associateWith { id ->
+                        ScoreAggregator.totalScoreOf(
+                            scoresByUserId[id] ?: emptyList(),
                             includeApprovedOnly,
-                        ),
-                    compute = {
-                        val classmateIds =
-                            memberPersistencePort
-                                .findAllStudentsByUserGradeAndUserClassNumber(userGrade, userClassNumber)
-                                .map { it.userId }
-                                .toSet() + userId
-                        val scoresByUserId =
-                            scorePersistencePort
-                                .findCalculationRowsByUserIdIn(
-                                    classmateIds.toList(),
-                                ).groupBy { it.userId }
-                        classmateIds.associateWith { id ->
-                            ScoreAggregator.totalScoreOf(
-                                scoresByUserId[id] ?: emptyList(),
-                                includeApprovedOnly,
-                                userGrade,
-                            )
-                        }
-                    },
-                    save = { computed ->
-                        scoreTotalCachePort.saveClassTotals(
                             userGrade,
-                            userClassNumber,
-                            includeApprovedOnly,
-                            computed,
                         )
-                    },
-                )
+                    }
+                }
 
         return ScoreAggregator.percentileOf(userId, totalScoreByUserId)
     }

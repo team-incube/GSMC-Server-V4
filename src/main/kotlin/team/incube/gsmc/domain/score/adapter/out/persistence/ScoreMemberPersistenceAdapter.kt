@@ -18,6 +18,11 @@ class ScoreMemberPersistenceAdapter(
 ) : MemberPersistencePort {
     override fun findByUserId(userId: Long): User? = userJpaRepository.findById(userId).orElse(null)?.toDomain()
 
+    override fun findAllByUserIdIn(userIds: List<Long>): List<User> {
+        if (userIds.isEmpty()) return emptyList()
+        return userJpaRepository.findAllById(userIds).map { it.toDomain() }
+    }
+
     override fun findAllStudentsByUserGrade(userGrade: Int): List<User> =
         userJpaRepository.findAllByUserRoleAndUserGrade(UserRole.STUDENT, userGrade).map { it.toDomain() }
 

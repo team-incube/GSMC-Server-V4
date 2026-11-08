@@ -15,12 +15,15 @@ import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.`in`.SubmitProjectParticipationUseCase
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
-import team.incube.gsmc.domain.user.UserRole
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheInvalidationPort
+import team.incube.gsmc.domain.score.service.support.ActivityPeriodValidator
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireSelf
+import team.incube.gsmc.global.util.requireStudent
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -33,7 +36,7 @@ private const val MINIMUM_PARTICIPANT_COUNT = 2
  * 처리한다. 기존 `REJECTED` 제출이 있으면 그 근거 자료를 갈아끼워 재사용한다(§8.4 패턴을
  * dgProjectId 스코프로 확장). 프로젝트 참여는 당해연도 카테고리이므로 활동일을 제출 시점 학년의 인정 기간
  * ([ActivityPeriodValidator])으로 검증하며, 재제출 시에도 새로 입력한 활동일로 다시 검증한다. PENDING 상태로 저장되므로 해당 학생의 반/학년 백분위 캐시
- * ([ScoreTotalCacheInvalidator])를 무효화한다.
+ * ([ScoreTotalCacheInvalidationPort])를 무효화한다.
  */
 @Port(direction = PortDirection.INBOUND)
 class SubmitProjectParticipationService(
@@ -43,7 +46,7 @@ class SubmitProjectParticipationService(
     private val evidencePersistencePort: EvidencePersistencePort,
     private val filePersistencePort: FilePersistencePort,
     private val memberPersistencePort: MemberPersistencePort,
-    private val scoreTotalCacheInvalidator: ScoreTotalCacheInvalidator,
+    private val scoreTotalCacheInvalidationPort: ScoreTotalCacheInvalidationPort,
     private val activityPeriodValidator: ActivityPeriodValidator,
     private val memberUtil: MemberUtil,
     transactionManager: PlatformTransactionManager,
@@ -56,9 +59,7 @@ class SubmitProjectParticipationService(
         fileIds: List<Long>,
         activityDate: LocalDate?,
     ): Score {
-        if (memberUtil.getCurrentUserRole() != UserRole.STUDENT) {
-            throw GsmcException(ErrorCode.FORBIDDEN)
-        }
+        memberUtil.requireStudent()
         val userId = memberUtil.getCurrentUserId()
         val user = memberPersistencePort.findByUserId(userId) ?: throw GsmcException(ErrorCode.USER_NOT_FOUND)
 
@@ -107,7 +108,7 @@ class SubmitProjectParticipationService(
         val filesById = filePersistencePort.findAllByIdIn(uniqueFileIds).associateBy { it.fileId }
         uniqueFileIds.forEach { fileId ->
             val file = filesById[fileId] ?: throw GsmcException(ErrorCode.FILE_NOT_FOUND)
-            if (file.userId != userId) throw GsmcException(ErrorCode.FORBIDDEN)
+            memberUtil.requireSelf(file.userId)
         }
 
         val existing = scorePersistencePort.findByUserIdAndDgProjectId(userId, dgProjectId)
@@ -176,7 +177,7 @@ class SubmitProjectParticipationService(
                     activityPeriodPolicyVersion = policyVersion,
                 ),
             )
-        scoreTotalCacheInvalidator.invalidate(userId)
+        scoreTotalCacheInvalidationPort.invalidate(userId)
         return saved
     }
 }

@@ -7,13 +7,14 @@ import team.incube.gsmc.domain.score.port.`in`.FetchMyPercentInGradeUseCase
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.MemberSchoolInfoCachePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
+import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheLoadPort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
-import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 import team.incube.gsmc.global.util.MemberUtil
+import team.incube.gsmc.global.util.requireStudent
 
 /**
  * 학년 내 백분위 조회 유스케이스 구현 클래스입니다.
@@ -27,14 +28,12 @@ class FetchMyPercentInGradeService(
     private val scorePersistencePort: ScorePersistencePort,
     private val memberPersistencePort: MemberPersistencePort,
     private val scoreTotalCachePort: ScoreTotalCachePort,
-    private val scoreTotalCacheSingleFlight: ScoreTotalCacheSingleFlight,
+    private val scoreTotalCacheLoadPort: ScoreTotalCacheLoadPort,
     private val memberSchoolInfoCachePort: MemberSchoolInfoCachePort,
     private val memberUtil: MemberUtil,
 ) : FetchMyPercentInGradeUseCase {
     override fun execute(includeApprovedOnly: Boolean): Percentile {
-        if (memberUtil.getCurrentUserRole() != UserRole.STUDENT) {
-            throw GsmcException(ErrorCode.FORBIDDEN)
-        }
+        memberUtil.requireStudent()
 
         val userId = memberUtil.getCurrentUserId()
         val me =
@@ -46,31 +45,25 @@ class FetchMyPercentInGradeService(
         val cached = scoreTotalCachePort.findGradeTotals(userGrade, includeApprovedOnly)
         val totalScoreByUserId =
             cached?.takeIf { userId in it }
-                ?: scoreTotalCacheSingleFlight.load(
-                    key = ScoreTotalCacheSingleFlight.CacheKey.gradeTotals(userGrade, includeApprovedOnly),
-                    compute = {
-                        val gradeMateIds =
-                            memberPersistencePort
-                                .findAllStudentsByUserGrade(userGrade)
-                                .map { it.userId }
-                                .toSet() + userId
-                        val scoresByUserId =
-                            scorePersistencePort
-                                .findCalculationRowsByUserIdIn(
-                                    gradeMateIds.toList(),
-                                ).groupBy { it.userId }
-                        gradeMateIds.associateWith { id ->
-                            ScoreAggregator.totalScoreOf(
-                                scoresByUserId[id] ?: emptyList(),
-                                includeApprovedOnly,
-                                userGrade,
-                            )
-                        }
-                    },
-                    save = { computed ->
-                        scoreTotalCachePort.saveGradeTotals(userGrade, includeApprovedOnly, computed)
-                    },
-                )
+                ?: scoreTotalCacheLoadPort.loadGradeTotals(userGrade, includeApprovedOnly) {
+                    val gradeMateIds =
+                        memberPersistencePort
+                            .findAllStudentsByUserGrade(userGrade)
+                            .map { it.userId }
+                            .toSet() + userId
+                    val scoresByUserId =
+                        scorePersistencePort
+                            .findCalculationRowsByUserIdIn(
+                                gradeMateIds.toList(),
+                            ).groupBy { it.userId }
+                    gradeMateIds.associateWith { id ->
+                        ScoreAggregator.totalScoreOf(
+                            scoresByUserId[id] ?: emptyList(),
+                            includeApprovedOnly,
+                            userGrade,
+                        )
+                    }
+                }
 
         return ScoreAggregator.percentileOf(userId, totalScoreByUserId)
     }
