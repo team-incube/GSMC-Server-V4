@@ -1,5 +1,6 @@
 package team.incube.gsmc.domain.auth.adapter.out.persistence
 
+import org.springframework.dao.DataAccessException
 import org.springframework.data.redis.core.RedisTemplate
 import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.global.annotation.PortDirection
@@ -15,9 +16,9 @@ import java.util.concurrent.TimeUnit
  * TTL은 [JwtProperties]의 accessTokenExpiry 설정값을 따르며, 이후 발급되는 토큰과 비교해
  * 무효화 시점 이전에 발급된 토큰만 만료된 것으로 판단합니다.
  * 이 조회는 모든 인증 요청의 필터에서 호출되므로, Redis 장애가 전체 API 실패로 번지지 않도록
- * 조회 실패는 무효화되지 않은 것으로 보고 통과시킨다. 이 경우 로그아웃된 토큰이 액세스 토큰
+ * Redis 접근 실패([DataAccessException])는 무효화되지 않은 것으로 보고 통과시킨다. 이 경우 로그아웃된 토큰이 액세스 토큰
  * 만료 시각까지 쓰일 수 있다는 점을 감수한 선택이다. Redis가 응답하지 않을 때 요청마다 타임아웃을 기다리지 않도록
- * [RedisCircuitBreaker]를 거쳐 조회한다.
+ * [RedisCircuitBreaker]를 거쳐 조회한다. 저장값이 손상된 경우와 Redis 접근이 아닌 예외는 통과시키지 않는다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class TokenInvalidationRedisAdapter(
@@ -48,16 +49,25 @@ class TokenInvalidationRedisAdapter(
      *
      * @param userId 확인할 사용자 ID
      * @param issuedAt 토큰의 발급 시각 (epoch millis)
-     * @return 무효화 기준 시각이 없거나 조회에 실패하면 false, 있으면 발급 시각과 비교한 결과
+     * @return 무효화 기준 시각이 없거나 Redis 접근에 실패하면 false, 저장값이 손상됐으면 true,
+     * 그 외에는 발급 시각과 비교한 결과
      */
     override fun isInvalidated(
         userId: Long,
         issuedAt: Long,
-    ): Boolean =
-        runCatching {
-            val invalidatedAt =
+    ): Boolean {
+        val invalidatedAt =
+            try {
                 redisCircuitBreaker.call(whenOpen = null) { redisTemplate.opsForValue().get(KEY_PREFIX + userId) }
-            invalidatedAt != null && invalidatedAt.toLong() > issuedAt
-        }.onFailure { logger().warn("토큰 무효화 조회 실패, 무효화되지 않은 것으로 처리 (userId={})", userId, it) }
-            .getOrDefault(false)
+            } catch (e: DataAccessException) {
+                logger().warn("토큰 무효화 조회 실패, 무효화되지 않은 것으로 처리 (userId={})", userId, e)
+                return false
+            } ?: return false
+        val invalidatedAtMillis =
+            invalidatedAt.toLongOrNull() ?: run {
+                logger().warn("토큰 무효화 기준 시각이 손상됨, 무효화된 것으로 처리 (userId={})", userId)
+                return true
+            }
+        return invalidatedAtMillis > issuedAt
+    }
 }
