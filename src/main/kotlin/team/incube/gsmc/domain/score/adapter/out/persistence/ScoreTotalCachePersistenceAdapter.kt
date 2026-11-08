@@ -17,7 +17,9 @@ import java.util.concurrent.TimeUnit
  * 점수 변경 시점마다 무효화되지만, 무효화를 놓치는 경로에 대한 안전장치로 짧은 TTL을 함께 둔다.
  * 캐시는 순수 성능 최적화이므로 Redis 장애나 캐시 값 손상이 백분위 API 실패로 이어지지 않도록,
  * 조회 실패는 캐시 미스(null)로 처리해 DB 재계산으로 폴백하고 저장 실패는 로그만 남기고 삼킨다.
- * Redis가 응답하지 않을 때 요청마다 타임아웃을 기다리지 않도록 모든 호출은 [RedisCircuitBreaker]를 거친다.
+ * Redis가 응답하지 않을 때 요청마다 타임아웃을 기다리지 않도록 조회와 저장은 [RedisCircuitBreaker]를 거친다.
+ * 무효화는 차단 중에도 항상 Redis에 시도한다. 건너뛰면 그 사이 바뀐 점수의 캐시가 복구 뒤에도 TTL까지 남기 때문이다.
+ * 무효화는 요청 스레드가 아니라 디바운스 스케줄러에서 실행되므로 기다려도 응답 지연으로 번지지 않는다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class ScoreTotalCachePersistenceAdapter(
@@ -48,10 +50,8 @@ class ScoreTotalCachePersistenceAdapter(
         userGrade: Int,
         userClassNumber: Int,
     ) {
-        redisCircuitBreaker.call<Unit>(whenOpen = Unit) {
-            redisTemplate.delete(classKey(userGrade, userClassNumber, true))
-            redisTemplate.delete(classKey(userGrade, userClassNumber, false))
-        }
+        redisTemplate.delete(classKey(userGrade, userClassNumber, true))
+        redisTemplate.delete(classKey(userGrade, userClassNumber, false))
     }
 
     override fun findGradeTotals(
@@ -66,10 +66,8 @@ class ScoreTotalCachePersistenceAdapter(
     ) = save(gradeKey(userGrade, includeApprovedOnly), totals)
 
     override fun evictGradeTotals(userGrade: Int) {
-        redisCircuitBreaker.call<Unit>(whenOpen = Unit) {
-            redisTemplate.delete(gradeKey(userGrade, true))
-            redisTemplate.delete(gradeKey(userGrade, false))
-        }
+        redisTemplate.delete(gradeKey(userGrade, true))
+        redisTemplate.delete(gradeKey(userGrade, false))
     }
 
     private fun find(key: String): Map<Long, Int>? =

@@ -5,6 +5,8 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import org.springframework.data.redis.core.types.Expiration
@@ -51,6 +53,23 @@ class ScoreTotalCachePersistenceAdapterTest :
                         RuntimeException("redis timeout")
 
                     shouldNotThrowAny { adapter.saveClassTotals(1, 2, true, mapOf(1L to 100)) }
+                }
+            }
+        }
+
+        Given("Redis 장애로 차단기가 열려 있을 때") {
+            When("반 캐시를 무효화하면") {
+                Then("차단 중에도 Redis 삭제를 시도한다") {
+                    val breakerOpenAdapter =
+                        ScoreTotalCachePersistenceAdapter(redisTemplate, objectMapper, RedisCircuitBreaker())
+                    every { valueOperations.get(any()) } throws RedisConnectionFailureException("down")
+                    every { redisTemplate.delete(any<String>()) } returns true
+                    breakerOpenAdapter.findClassTotals(1, 2, true)
+
+                    breakerOpenAdapter.evictClassTotals(1, 2)
+
+                    verify { redisTemplate.delete("score:class-total:1:2:true") }
+                    verify { redisTemplate.delete("score:class-total:1:2:false") }
                 }
             }
         }
