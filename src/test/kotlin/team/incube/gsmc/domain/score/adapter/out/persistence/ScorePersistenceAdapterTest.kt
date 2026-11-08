@@ -1,7 +1,9 @@
 package team.incube.gsmc.domain.score.adapter.out.persistence
 
 import com.querydsl.core.Tuple
+import com.querydsl.core.types.EntityPath
 import com.querydsl.core.types.Expression
+import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.core.types.Predicate
 import com.querydsl.jpa.impl.JPADeleteClause
 import com.querydsl.jpa.impl.JPAQuery
@@ -30,6 +32,7 @@ import team.incube.gsmc.domain.file.adapter.out.persistence.entity.QFileJpaEntit
 import team.incube.gsmc.domain.file.adapter.out.persistence.repository.FileJpaRepository
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreStatus
+import team.incube.gsmc.domain.score.SearchPendingScoresQuery
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreJpaEntity.scoreJpaEntity
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreUniqueSlotJpaEntity.scoreUniqueSlotJpaEntity
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.ScoreJpaEntity
@@ -715,6 +718,272 @@ class ScorePersistenceAdapterTest :
                     adapter.unlinkProject(7L)
 
                     verify(exactly = 1) { scoreJpaRepository.unlinkProject(7L) }
+                }
+            }
+        }
+
+        /** 목록 조회 시 `where`/`orderBy`에 넘어간 인자를 캡처해 문자열로 보관한다. */
+        class CapturedListQuery(
+            val where: List<String>,
+            val orderBy: List<String>,
+        )
+
+        fun captureListQuery(query: SearchPendingScoresQuery): CapturedListQuery {
+            var where: List<String> = emptyList()
+            var orderBy: List<String> = emptyList()
+            val jpaQuery = mockk<JPAQuery<ScoreJpaEntity>>()
+            every { queryFactory.selectFrom(scoreJpaEntity) } returns jpaQuery
+            every { jpaQuery.join(scoreJpaEntity.user) } returns jpaQuery
+            every { jpaQuery.join(scoreJpaEntity.category) } returns jpaQuery
+            every { jpaQuery.leftJoin(scoreJpaEntity.evidence) } returns jpaQuery
+            every { jpaQuery.fetchJoin() } returns jpaQuery
+            // MockK는 vararg 인자를 slot으로 캡처하지 못해 answers에서 배열 인자를 직접 꺼낸다.
+            every { jpaQuery.where(*anyVararg<Predicate>()) } answers {
+                where = (args[0] as Array<*>).map { it.toString() }
+                jpaQuery
+            }
+            every { jpaQuery.orderBy(*anyVararg<OrderSpecifier<*>>()) } answers {
+                orderBy = (args[0] as Array<*>).map { it.toString() }
+                jpaQuery
+            }
+            every { jpaQuery.offset(any()) } returns jpaQuery
+            every { jpaQuery.limit(any()) } returns jpaQuery
+            every { jpaQuery.fetch() } returns emptyList()
+
+            adapter.findAllPendingBySearchCondition(query)
+
+            return CapturedListQuery(where, orderBy)
+        }
+
+        fun captureCountWhere(query: SearchPendingScoresQuery): List<String> {
+            var where: List<String> = emptyList()
+            val countQuery = mockk<JPAQuery<Long>>()
+            every { queryFactory.select(any<Expression<Long>>()) } returns countQuery
+            every { countQuery.from(any<EntityPath<*>>()) } returns countQuery
+            every { countQuery.join(scoreJpaEntity.user) } returns countQuery
+            every { countQuery.join(scoreJpaEntity.category) } returns countQuery
+            every { countQuery.where(*anyVararg<Predicate>()) } answers {
+                where = (args[0] as Array<*>).map { it.toString() }
+                countQuery
+            }
+            every { countQuery.fetchOne() } returns 0L
+
+            adapter.countPendingBySearchCondition(query)
+
+            return where
+        }
+
+        fun pendingQueryOf(
+            grade: Int? = null,
+            classNumber: Int? = null,
+            name: String? = null,
+            categoryType: CategoryType? = null,
+        ) = SearchPendingScoresQuery(
+            grade = grade,
+            classNumber = classNumber,
+            name = name,
+            categoryType = categoryType,
+            limit = 20,
+            page = 0,
+        )
+
+        val pendingCondition = "scoreJpaEntity.scoreStatus = PENDING"
+        val toeicCondition =
+            "scoreJpaEntity.category.categoryType = TOEIC && scoreJpaEntity.submittedCategoryType is null"
+
+        Given("심사 대기 점수 목록을 검색 조건으로 조회할 때") {
+            When("조건에 맞는 점수가 없으면") {
+                Then("파일 조회 없이 빈 리스트를 반환한다") {
+                    val query = mockk<JPAQuery<ScoreJpaEntity>>()
+                    every { queryFactory.selectFrom(scoreJpaEntity) } returns query
+                    every { query.join(scoreJpaEntity.user) } returns query
+                    every { query.join(scoreJpaEntity.category) } returns query
+                    every { query.leftJoin(scoreJpaEntity.evidence) } returns query
+                    every { query.fetchJoin() } returns query
+                    every { query.where(*anyVararg<Predicate>()) } returns query
+                    every { query.orderBy(*anyVararg<OrderSpecifier<*>>()) } returns query
+                    every { query.offset(any()) } returns query
+                    every { query.limit(any()) } returns query
+                    every { query.fetch() } returns emptyList()
+
+                    adapter.findAllPendingBySearchCondition(
+                        pendingQueryOf(grade = 1, categoryType = CategoryType.JLPT),
+                    ) shouldBe
+                        emptyList()
+
+                    verify(exactly = 0) { queryFactory.selectFrom(fileJpaEntity) }
+                    verify(exactly = 0) { fileJpaRepository.findAllByEvidenceEvidenceIdIn(any()) }
+                }
+            }
+
+            When("필터가 없으면") {
+                Then("PENDING 조건 1개만 where에 들어간다") {
+                    captureListQuery(pendingQueryOf()).where shouldBe listOf(pendingCondition)
+                }
+            }
+
+            When("학년만 지정하면") {
+                Then("학년 조건이 추가된다") {
+                    captureListQuery(pendingQueryOf(grade = 1)).where shouldBe
+                        listOf(pendingCondition, "scoreJpaEntity.user.userGrade = 1")
+                }
+            }
+
+            When("반만 지정하면") {
+                Then("반 조건이 추가된다") {
+                    captureListQuery(pendingQueryOf(classNumber = 2)).where shouldBe
+                        listOf(pendingCondition, "scoreJpaEntity.user.userClassNumber = 2")
+                }
+            }
+
+            When("이름만 지정하면") {
+                Then("이름 조건이 추가된다") {
+                    captureListQuery(pendingQueryOf(name = "홍길동")).where shouldBe
+                        listOf(pendingCondition, "scoreJpaEntity.user.userName = 홍길동")
+                }
+            }
+
+            When("JLPT 카테고리를 지정하면") {
+                Then("submittedCategoryType = JLPT 조건만 추가된다") {
+                    captureListQuery(pendingQueryOf(categoryType = CategoryType.JLPT)).where shouldBe
+                        listOf(pendingCondition, "scoreJpaEntity.submittedCategoryType = JLPT")
+                }
+            }
+
+            When("JPT 카테고리를 지정하면") {
+                Then("submittedCategoryType = JPT 조건만 추가된다") {
+                    captureListQuery(pendingQueryOf(categoryType = CategoryType.JPT)).where shouldBe
+                        listOf(pendingCondition, "scoreJpaEntity.submittedCategoryType = JPT")
+                }
+            }
+
+            When("TOEIC 카테고리를 지정하면") {
+                Then("category.categoryType = TOEIC 이고 submittedCategoryType이 null인 조건이 추가된다") {
+                    captureListQuery(pendingQueryOf(categoryType = CategoryType.TOEIC)).where shouldBe
+                        listOf(pendingCondition, toeicCondition)
+                }
+            }
+
+            When("AWARD 카테고리를 지정하면") {
+                Then("category.categoryType = AWARD 조건만 추가되고 submittedCategoryType 조건은 없다") {
+                    val where = captureListQuery(pendingQueryOf(categoryType = CategoryType.AWARD)).where
+
+                    where shouldBe listOf(pendingCondition, "scoreJpaEntity.category.categoryType = AWARD")
+                    where.none { it.contains("submittedCategoryType") } shouldBe true
+                }
+            }
+
+            When("모든 필터를 함께 지정하면") {
+                Then("조건이 필터 순서대로 모두 들어간다") {
+                    captureListQuery(
+                        pendingQueryOf(grade = 1, classNumber = 2, name = "홍길동", categoryType = CategoryType.JLPT),
+                    ).where shouldBe
+                        listOf(
+                            pendingCondition,
+                            "scoreJpaEntity.user.userGrade = 1",
+                            "scoreJpaEntity.user.userClassNumber = 2",
+                            "scoreJpaEntity.user.userName = 홍길동",
+                            "scoreJpaEntity.submittedCategoryType = JLPT",
+                        )
+                }
+            }
+
+            When("목록을 정렬하면") {
+                Then("updatedAt 내림차순, scoreId 내림차순으로 정렬한다") {
+                    captureListQuery(pendingQueryOf()).orderBy shouldBe
+                        listOf("scoreJpaEntity.updatedAt DESC", "scoreJpaEntity.scoreId DESC")
+                }
+            }
+        }
+
+        Given("심사 대기 점수 전체 개수를 조회할 때") {
+            fun mockCountQuery(result: Long?) {
+                val countQuery = mockk<JPAQuery<Long>>()
+                every { queryFactory.select(any<Expression<Long>>()) } returns countQuery
+                every { countQuery.from(any<EntityPath<*>>()) } returns countQuery
+                every { countQuery.join(scoreJpaEntity.user) } returns countQuery
+                every { countQuery.join(scoreJpaEntity.category) } returns countQuery
+                every { countQuery.where(*anyVararg<Predicate>()) } returns countQuery
+                every { countQuery.fetchOne() } returns result
+            }
+
+            When("조회 결과가 있으면") {
+                Then("건수를 반환한다") {
+                    mockCountQuery(7L)
+
+                    adapter.countPendingBySearchCondition(pendingQueryOf()) shouldBe 7L
+                }
+            }
+
+            When("count 결과가 null이면") {
+                Then("0을 반환한다") {
+                    mockCountQuery(null)
+
+                    adapter.countPendingBySearchCondition(pendingQueryOf()) shouldBe 0L
+                }
+            }
+
+            When("필터가 없으면") {
+                Then("PENDING 조건 1개만 where에 들어간다") {
+                    captureCountWhere(pendingQueryOf()) shouldBe listOf(pendingCondition)
+                }
+            }
+
+            When("학년·반·이름 필터를 지정하면") {
+                Then("각 조건이 where에 들어간다") {
+                    captureCountWhere(pendingQueryOf(grade = 1, classNumber = 2, name = "홍길동")) shouldBe
+                        listOf(
+                            pendingCondition,
+                            "scoreJpaEntity.user.userGrade = 1",
+                            "scoreJpaEntity.user.userClassNumber = 2",
+                            "scoreJpaEntity.user.userName = 홍길동",
+                        )
+                }
+            }
+
+            When("JLPT, JPT 카테고리를 지정하면") {
+                Then("submittedCategoryType 조건이 들어간다") {
+                    captureCountWhere(pendingQueryOf(categoryType = CategoryType.JLPT)) shouldBe
+                        listOf(pendingCondition, "scoreJpaEntity.submittedCategoryType = JLPT")
+                    captureCountWhere(pendingQueryOf(categoryType = CategoryType.JPT)) shouldBe
+                        listOf(pendingCondition, "scoreJpaEntity.submittedCategoryType = JPT")
+                }
+            }
+
+            When("TOEIC 카테고리를 지정하면") {
+                Then("category.categoryType = TOEIC 이고 submittedCategoryType이 null인 조건이 들어간다") {
+                    captureCountWhere(pendingQueryOf(categoryType = CategoryType.TOEIC)) shouldBe
+                        listOf(pendingCondition, toeicCondition)
+                }
+            }
+
+            When("AWARD 카테고리를 지정하면") {
+                Then("category.categoryType = AWARD 조건만 들어가고 submittedCategoryType 조건은 없다") {
+                    val where = captureCountWhere(pendingQueryOf(categoryType = CategoryType.AWARD))
+
+                    where shouldBe listOf(pendingCondition, "scoreJpaEntity.category.categoryType = AWARD")
+                    where.none { it.contains("submittedCategoryType") } shouldBe true
+                }
+            }
+        }
+
+        Given("같은 검색 조건으로 목록과 개수를 조회할 때") {
+            val inputs =
+                listOf(
+                    pendingQueryOf(),
+                    pendingQueryOf(grade = 1, classNumber = 2, name = "홍길동"),
+                    pendingQueryOf(categoryType = CategoryType.JLPT),
+                    pendingQueryOf(categoryType = CategoryType.JPT),
+                    pendingQueryOf(categoryType = CategoryType.TOEIC),
+                    pendingQueryOf(categoryType = CategoryType.AWARD),
+                    pendingQueryOf(grade = 3, name = "김", categoryType = CategoryType.TOEIC),
+                )
+
+            When("목록과 개수 쿼리의 where를 각각 캡처하면") {
+                Then("모든 입력에서 같은 조건이 들어간다") {
+                    inputs.forEach { input ->
+                        captureListQuery(input).where shouldBe captureCountWhere(input)
+                    }
                 }
             }
         }

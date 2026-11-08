@@ -1,6 +1,7 @@
 package team.incube.gsmc.domain.score.adapter.out.persistence
 
 import com.querydsl.core.types.Predicate
+import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager
 import org.springframework.dao.DataIntegrityViolationException
@@ -15,6 +16,7 @@ import team.incube.gsmc.domain.project.adapter.out.persistence.entity.ProjectJpa
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
+import team.incube.gsmc.domain.score.SearchPendingScoresQuery
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreJpaEntity.scoreJpaEntity
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.QScoreUniqueSlotJpaEntity.scoreUniqueSlotJpaEntity
 import team.incube.gsmc.domain.score.adapter.out.persistence.entity.ScoreJpaEntity
@@ -94,6 +96,66 @@ class ScorePersistenceAdapter(
 
         return toDomainsWithFiles(entities)
     }
+
+    override fun findAllPendingBySearchCondition(query: SearchPendingScoresQuery): List<Score> {
+        val entities =
+            queryFactory
+                .selectFrom(scoreJpaEntity)
+                .join(scoreJpaEntity.user)
+                .fetchJoin()
+                .join(scoreJpaEntity.category)
+                .fetchJoin()
+                .leftJoin(scoreJpaEntity.evidence)
+                .fetchJoin()
+                .where(*buildPendingConditions(query).toTypedArray())
+                .orderBy(scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
+                .offset(query.page.toLong() * query.limit)
+                .limit(query.limit.toLong())
+                .fetch()
+
+        return toDomainsWithFiles(entities)
+    }
+
+    override fun countPendingBySearchCondition(query: SearchPendingScoresQuery): Long =
+        queryFactory
+            .select(scoreJpaEntity.count())
+            .from(scoreJpaEntity)
+            .join(scoreJpaEntity.user)
+            .join(scoreJpaEntity.category)
+            .where(*buildPendingConditions(query).toTypedArray())
+            .fetchOne() ?: 0L
+
+    /**
+     * 심사 대기 점수 검색 조건을 QueryDSL의 동적 WHERE 조건 목록으로 변환한다. 값이 null인 조건은 제외된다.
+     *
+     * JLPT/JPT는 TOEIC 카테고리 행을 공유하고 실제 종류만 `submittedCategoryType`에 남으므로 그 값으로 거른다.
+     * TOEIC은 JLPT/JPT를 제외하기 위해 `submittedCategoryType`이 null인 행만 대상으로 한다.
+     */
+    private fun buildPendingConditions(query: SearchPendingScoresQuery): List<BooleanExpression> =
+        listOfNotNull(
+            scoreJpaEntity.scoreStatus.eq(ScoreStatus.PENDING),
+            query.grade?.let { scoreJpaEntity.user.userGrade.eq(it) },
+            query.classNumber?.let { scoreJpaEntity.user.userClassNumber.eq(it) },
+            query.name?.let { scoreJpaEntity.user.userName.eq(it) },
+            query.categoryType?.let { categoryTypeCondition(it) },
+        )
+
+    private fun categoryTypeCondition(categoryType: CategoryType): BooleanExpression =
+        when (categoryType) {
+            CategoryType.JLPT, CategoryType.JPT -> {
+                scoreJpaEntity.submittedCategoryType.eq(categoryType)
+            }
+
+            CategoryType.TOEIC -> {
+                scoreJpaEntity.category.categoryType
+                    .eq(CategoryType.TOEIC)
+                    .and(scoreJpaEntity.submittedCategoryType.isNull)
+            }
+
+            else -> {
+                scoreJpaEntity.category.categoryType.eq(categoryType)
+            }
+        }
 
     override fun findCalculationRowsByUserIdIn(userIds: List<Long>): List<ScoreCalculationRow> {
         if (userIds.isEmpty()) return emptyList()

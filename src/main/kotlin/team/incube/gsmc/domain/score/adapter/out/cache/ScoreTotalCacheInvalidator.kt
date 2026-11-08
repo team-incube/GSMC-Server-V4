@@ -38,7 +38,7 @@ import java.util.concurrent.ScheduledFuture
  * 호출되어 여기서 예외가 새어나가면 캐시 문제로 점수 상태 변경 자체가 롤백되기 때문이다. 예약된
  * Runnable 내부(실제 [ScoreTotalCachePort] 무효화 호출)의 예외도 별도로 삼키는데, 그러지 않으면
  * `pendingGradeEvictions`/`pendingClassEvictions`에서 해당 키가 제거되지 않아 그 학년/반의 무효화가
- * 프로세스 재시작 전까지 영구히 멈추기 때문이다(Redis 순단 등으로 한 번 실행이 실패해도 다음 쓰기부터는
+ * 프로세스 재시작 전까지 영구히 멈추기 때문이다(캐시 오류 등으로 한 번 실행이 실패해도 다음 쓰기부터는
  * 다시 정상적으로 디바운스·무효화되어야 한다).
  */
 @Adapter(direction = PortDirection.OUTBOUND)
