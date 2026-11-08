@@ -7,6 +7,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import team.incube.gsmc.global.redis.RedisCircuitBreaker
 import team.incube.gsmc.global.security.jwt.JwtProperties
 
 class TokenInvalidationRedisAdapterTest :
@@ -14,7 +15,7 @@ class TokenInvalidationRedisAdapterTest :
         val redisTemplate = mockk<RedisTemplate<String, String>>()
         val valueOperations = mockk<ValueOperations<String, String>>()
         val jwtProperties = mockk<JwtProperties>()
-        val adapter = TokenInvalidationRedisAdapter(redisTemplate, jwtProperties)
+        val adapter = TokenInvalidationRedisAdapter(redisTemplate, jwtProperties, RedisCircuitBreaker())
 
         every { redisTemplate.opsForValue() } returns valueOperations
 

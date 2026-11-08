@@ -4,6 +4,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import team.incube.gsmc.domain.auth.port.out.TokenInvalidationPort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
+import team.incube.gsmc.global.redis.RedisCircuitBreaker
 import team.incube.gsmc.global.security.jwt.JwtProperties
 import team.themoment.sdk.logging.logger.logger
 import java.util.concurrent.TimeUnit
@@ -15,12 +16,14 @@ import java.util.concurrent.TimeUnit
  * 무효화 시점 이전에 발급된 토큰만 만료된 것으로 판단합니다.
  * 이 조회는 모든 인증 요청의 필터에서 호출되므로, Redis 장애가 전체 API 실패로 번지지 않도록
  * 조회 실패는 무효화되지 않은 것으로 보고 통과시킨다. 이 경우 로그아웃된 토큰이 액세스 토큰
- * 만료 시각까지 쓰일 수 있다는 점을 감수한 선택이다.
+ * 만료 시각까지 쓰일 수 있다는 점을 감수한 선택이다. Redis가 응답하지 않을 때 요청마다 타임아웃을 기다리지 않도록
+ * [RedisCircuitBreaker]를 거쳐 조회한다.
  */
 @Adapter(direction = PortDirection.OUTBOUND)
 class TokenInvalidationRedisAdapter(
     private val redisTemplate: RedisTemplate<String, String>,
     private val jwtProperties: JwtProperties,
+    private val redisCircuitBreaker: RedisCircuitBreaker,
 ) : TokenInvalidationPort {
     companion object {
         private const val KEY_PREFIX = "token:invalidated-before:"
@@ -52,7 +55,8 @@ class TokenInvalidationRedisAdapter(
         issuedAt: Long,
     ): Boolean =
         runCatching {
-            val invalidatedAt = redisTemplate.opsForValue().get(KEY_PREFIX + userId)
+            val invalidatedAt =
+                redisCircuitBreaker.call(whenOpen = null) { redisTemplate.opsForValue().get(KEY_PREFIX + userId) }
             invalidatedAt != null && invalidatedAt.toLong() > issuedAt
         }.onFailure { logger().warn("토큰 무효화 조회 실패, 무효화되지 않은 것으로 처리 (userId={})", userId, it) }
             .getOrDefault(false)

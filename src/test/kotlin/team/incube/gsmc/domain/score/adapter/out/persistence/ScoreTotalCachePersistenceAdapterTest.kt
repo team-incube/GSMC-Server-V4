@@ -8,6 +8,7 @@ import io.mockk.mockk
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import org.springframework.data.redis.core.types.Expiration
+import team.incube.gsmc.global.redis.RedisCircuitBreaker
 import tools.jackson.databind.ObjectMapper
 
 class ScoreTotalCachePersistenceAdapterTest :
@@ -15,7 +16,7 @@ class ScoreTotalCachePersistenceAdapterTest :
         val redisTemplate = mockk<RedisTemplate<String, String>>()
         val valueOperations = mockk<ValueOperations<String, String>>()
         val objectMapper = ObjectMapper()
-        val adapter = ScoreTotalCachePersistenceAdapter(redisTemplate, objectMapper)
+        val adapter = ScoreTotalCachePersistenceAdapter(redisTemplate, objectMapper, RedisCircuitBreaker())
 
         every { redisTemplate.opsForValue() } returns valueOperations
 
