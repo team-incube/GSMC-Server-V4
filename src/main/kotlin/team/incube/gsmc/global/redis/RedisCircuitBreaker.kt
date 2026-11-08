@@ -37,7 +37,9 @@ class RedisCircuitBreaker(
         if (openUntil == CLOSED) return run(action)
         if (nanoTime() - openUntil < 0 || !probing.compareAndSet(false, true)) return whenOpen
         return try {
-            run(action)
+            // 탐색권을 얻기 전에 읽은 값은 그 사이 다른 탐색이 실패해 연장됐을 수 있으므로 다시 확인한다.
+            val current = openUntilNanos.get()
+            if (current != CLOSED && nanoTime() - current < 0) whenOpen else run(action)
         } finally {
             probing.set(false)
         }

@@ -129,4 +129,52 @@ class RedisCircuitBreakerTest :
                 }
             }
         }
+
+        Given("여러 요청이 차단 만료를 함께 본 뒤 첫 탐색이 실패하면") {
+            When("뒤이어 탐색권을 얻은 요청은") {
+                Then("연장된 차단을 다시 확인해 Redis를 호출하지 않는다") {
+                    val firstProbeFailed = CountDownLatch(1)
+                    val lateReadDone = CountDownLatch(1)
+                    var late: Thread? = null
+                    var clock = 1_000L
+                    val breaker =
+                        RedisCircuitBreaker(openDuration) {
+                            if (Thread.currentThread() == late && lateReadDone.count > 0) {
+                                lateReadDone.countDown()
+                                firstProbeFailed.await()
+                            }
+                            clock
+                        }
+                    runCatching {
+                        breaker.call(
+                            whenOpen = "fallback",
+                        ) { throw RedisConnectionFailureException("down") }
+                    }
+                    clock += openDuration.toNanos()
+                    val lateCalls = AtomicInteger()
+                    var lateResult: String? = null
+                    late =
+                        thread(start = false) {
+                            lateResult =
+                                breaker.call(whenOpen = "fallback") {
+                                    lateCalls.incrementAndGet()
+                                    "value"
+                                }
+                        }
+                    late!!.start()
+                    lateReadDone.await()
+
+                    runCatching {
+                        breaker.call(
+                            whenOpen = "fallback",
+                        ) { throw RedisConnectionFailureException("down") }
+                    }
+                    firstProbeFailed.countDown()
+                    late!!.join()
+
+                    lateResult shouldBe "fallback"
+                    lateCalls.get() shouldBe 0
+                }
+            }
+        }
     })
