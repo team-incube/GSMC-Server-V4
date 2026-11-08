@@ -187,6 +187,22 @@ class FetchPendingScoresServiceTest :
             }
         }
 
+        Given("점수 소유자를 찾을 수 없을 때") {
+            When("교사가 조회하면") {
+                Then("USER_NOT_FOUND 예외가 발생한다") {
+                    every { memberUtil.getCurrentUserRole() } returns UserRole.TEACHER
+                    every { scorePersistencePort.findAllPendingBySearchCondition(any()) } returns
+                        listOf(scoreOf(1L, 10L))
+                    every { scorePersistencePort.countPendingBySearchCondition(any()) } returns 1L
+                    every { memberPersistencePort.findAllByUserIdIn(any()) } returns emptyList()
+
+                    val exception = shouldThrow<GsmcException> { service.execute(query()) }
+
+                    exception.errorCode shouldBe ErrorCode.USER_NOT_FOUND
+                }
+            }
+        }
+
         Given("전체 21건에 limit이 20일 때") {
             When("교사가 조회하면") {
                 Then("totalPages는 2다") {
