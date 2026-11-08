@@ -1,5 +1,6 @@
 package team.incube.gsmc.domain.score.service
 
+import org.springframework.transaction.annotation.Transactional
 import team.incube.gsmc.domain.score.PendingScoreItem
 import team.incube.gsmc.domain.score.PendingScoreSearchResult
 import team.incube.gsmc.domain.score.SearchPendingScoresQuery
@@ -26,6 +27,7 @@ class FetchPendingScoresService(
     private val memberPersistencePort: MemberPersistencePort,
     private val memberUtil: MemberUtil,
 ) : FetchPendingScoresUseCase {
+    @Transactional(readOnly = true)
     override fun execute(query: SearchPendingScoresQuery): PendingScoreSearchResult {
         memberUtil.requireTeacherOrAbove()
         if (query.page < 0) throw GsmcException(ErrorCode.INVALID_PAGE)
