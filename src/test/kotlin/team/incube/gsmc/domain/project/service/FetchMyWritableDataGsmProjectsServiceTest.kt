@@ -9,6 +9,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import team.incube.gsmc.domain.project.DataGsmProject
 import team.incube.gsmc.domain.project.DataGsmProjectStatus
+import team.incube.gsmc.domain.project.WritableDataGsmProject
 import team.incube.gsmc.domain.project.port.out.DataGsmProjectApiPort
 import team.incube.gsmc.domain.project.port.out.ProjectMemberPersistencePort
 import team.incube.gsmc.domain.score.ScoreStatus
@@ -52,6 +53,7 @@ class FetchMyWritableDataGsmProjectsServiceTest :
                                 DataGsmProjectStatus.ACTIVE,
                                 null,
                                 emptyList(),
+                                "https://cdn.datagsm.kr/project-icons/icon.png",
                             ),
                         )
                     every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
@@ -64,7 +66,8 @@ class FetchMyWritableDataGsmProjectsServiceTest :
 
                     val result = service.execute()
 
-                    result shouldBe projects.map { it.copy(myScoreStatus = ScoreStatus.APPROVED) }
+                    result shouldBe projects.map { WritableDataGsmProject(it, ScoreStatus.APPROVED) }
+                    result.single().logoUrl shouldBe projects.single().logoUrl
                 }
             }
         }
@@ -82,7 +85,7 @@ class FetchMyWritableDataGsmProjectsServiceTest :
                     every { scorePersistencePort.findStatusesByUserIdAndDgProjectIds(userId, listOf(1L)) } returns
                         emptyMap()
 
-                    service.execute() shouldBe listOf(project)
+                    service.execute() shouldBe listOf(WritableDataGsmProject(project, null))
                 }
             }
         }

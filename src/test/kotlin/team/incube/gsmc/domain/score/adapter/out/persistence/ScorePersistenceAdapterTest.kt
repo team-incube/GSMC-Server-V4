@@ -638,7 +638,7 @@ class ScorePersistenceAdapterTest :
                 verify(exactly = 0) { queryFactory.select(*anyVararg<Expression<*>>()) }
             }
 
-            Then("중복된 프로젝트 점수에서는 최신 상태를 사용한다") {
+            Then("중복된 프로젝트 점수에서는 승인 상태를 우선한다") {
                 val rows =
                     listOf(
                         mockk<Tuple> {

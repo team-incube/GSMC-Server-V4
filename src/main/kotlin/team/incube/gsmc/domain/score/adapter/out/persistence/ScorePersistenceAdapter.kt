@@ -2,6 +2,7 @@ package team.incube.gsmc.domain.score.adapter.out.persistence
 
 import com.querydsl.core.types.Predicate
 import com.querydsl.core.types.dsl.BooleanExpression
+import com.querydsl.core.types.dsl.CaseBuilder
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager
 import org.springframework.dao.DataIntegrityViolationException
@@ -32,6 +33,16 @@ import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.adapter.Adapter
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
+
+private val projectScorePriority =
+    CaseBuilder()
+        .`when`(scoreJpaEntity.scoreStatus.eq(ScoreStatus.APPROVED))
+        .then(0)
+        .`when`(scoreJpaEntity.scoreStatus.eq(ScoreStatus.PENDING))
+        .then(1)
+        .`when`(scoreJpaEntity.scoreStatus.eq(ScoreStatus.INCOMPLETE))
+        .then(2)
+        .otherwise(3)
 
 /**
  * 점수 요청 영속성 처리를 담당하는 아웃바운드 어댑터 클래스입니다.
@@ -68,9 +79,8 @@ class ScorePersistenceAdapter(
                 .from(scoreJpaEntity)
                 .where(
                     scoreJpaEntity.user.userId.eq(userId),
-                    scoreJpaEntity.category.categoryType.eq(CategoryType.PROJECT_PARTICIPATION),
                     scoreJpaEntity.dgProjectId.`in`(dgProjectIds),
-                ).orderBy(scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
+                ).orderBy(projectScorePriority.asc(), scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
                 .fetch()
 
         val statuses = mutableMapOf<Long, ScoreStatus>()
@@ -237,7 +247,7 @@ class ScorePersistenceAdapter(
                 .where(
                     scoreJpaEntity.user.userId.eq(userId),
                     scoreJpaEntity.dgProjectId.eq(dgProjectId),
-                ).orderBy(scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
+                ).orderBy(projectScorePriority.asc(), scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
                 .fetchFirst() ?: return null
 
         return entity.toDomain(findFileByScoreId(entity.scoreId), findEvidenceFiles(entity))
