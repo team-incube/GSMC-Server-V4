@@ -3,6 +3,7 @@ package team.incube.gsmc.domain.score.port.out
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreCalculationRow
+import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.SearchPendingScoresQuery
 
 /**
@@ -11,6 +12,12 @@ import team.incube.gsmc.domain.score.SearchPendingScoresQuery
  * 증빙·첨부 파일을 싣지 않는 [findCalculationRowsByUserIdIn]을 사용한다.
  */
 interface ScorePersistencePort {
+    /** 프로젝트 참여 카드에 필요한 현재 사용자의 점수 상태만 조회합니다. */
+    fun findStatusesByUserIdAndDgProjectIds(
+        userId: Long,
+        dgProjectIds: List<Long>,
+    ): Map<Long, ScoreStatus>
+
     /**
      * ID로 점수 요청을 조회한다.
      *

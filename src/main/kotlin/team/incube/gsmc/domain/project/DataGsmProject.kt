@@ -1,5 +1,7 @@
 package team.incube.gsmc.domain.project
 
+import team.incube.gsmc.domain.score.ScoreStatus
+
 /**
  * DataGSM 프로젝트 도메인 모델
  *
@@ -25,4 +27,6 @@ data class DataGsmProject(
     val status: DataGsmProjectStatus,
     val club: DataGsmClub?,
     val participants: List<DataGsmProjectParticipant>,
+    val logoUrl: String? = null,
+    val myScoreStatus: ScoreStatus? = null,
 )

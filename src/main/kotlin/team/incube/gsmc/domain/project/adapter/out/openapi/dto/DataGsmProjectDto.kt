@@ -17,6 +17,7 @@ data class DataGsmProjectDto(
     val status: String,
     val club: DataGsmClubDto? = null,
     val participants: List<DataGsmProjectParticipantDto> = emptyList(),
+    val iconUrl: String? = null,
 )
 
 /**
@@ -35,4 +36,5 @@ fun DataGsmProjectDto.toDomain(): DataGsmProject =
                 ?: DataGsmProjectStatus.ENDED,
         club = club?.toDomain(),
         participants = participants.map { it.toDomain() },
+        logoUrl = iconUrl,
     )

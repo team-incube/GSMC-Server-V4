@@ -56,6 +56,32 @@ class ScorePersistenceAdapter(
     private val fileJpaRepository: FileJpaRepository,
     private val entityManager: EntityManager,
 ) : ScorePersistencePort {
+    override fun findStatusesByUserIdAndDgProjectIds(
+        userId: Long,
+        dgProjectIds: List<Long>,
+    ): Map<Long, ScoreStatus> {
+        if (dgProjectIds.isEmpty()) return emptyMap()
+
+        val rows =
+            queryFactory
+                .select(scoreJpaEntity.dgProjectId, scoreJpaEntity.scoreStatus)
+                .from(scoreJpaEntity)
+                .where(
+                    scoreJpaEntity.user.userId.eq(userId),
+                    scoreJpaEntity.category.categoryType.eq(CategoryType.PROJECT_PARTICIPATION),
+                    scoreJpaEntity.dgProjectId.`in`(dgProjectIds),
+                ).orderBy(scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
+                .fetch()
+
+        val statuses = mutableMapOf<Long, ScoreStatus>()
+        rows.forEach { row ->
+            val projectId = row.get(scoreJpaEntity.dgProjectId) ?: return@forEach
+            val status = row.get(scoreJpaEntity.scoreStatus) ?: return@forEach
+            statuses.putIfAbsent(projectId, status)
+        }
+        return statuses
+    }
+
     override fun findById(scoreId: Long): Score? {
         val entity =
             queryFactory
@@ -211,7 +237,8 @@ class ScorePersistenceAdapter(
                 .where(
                     scoreJpaEntity.user.userId.eq(userId),
                     scoreJpaEntity.dgProjectId.eq(dgProjectId),
-                ).fetchFirst() ?: return null
+                ).orderBy(scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
+                .fetchFirst() ?: return null
 
         return entity.toDomain(findFileByScoreId(entity.scoreId), findEvidenceFiles(entity))
     }

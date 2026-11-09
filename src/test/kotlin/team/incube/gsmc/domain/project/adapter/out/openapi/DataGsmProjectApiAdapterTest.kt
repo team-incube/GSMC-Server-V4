@@ -22,6 +22,7 @@ import team.incube.gsmc.domain.project.adapter.out.openapi.dto.DataGsmApiRespons
 import team.incube.gsmc.domain.project.adapter.out.openapi.dto.DataGsmProjectDto
 import team.incube.gsmc.domain.project.adapter.out.openapi.dto.DataGsmProjectPageDto
 import team.incube.gsmc.domain.project.adapter.out.openapi.dto.DataGsmProjectParticipantDto
+import team.incube.gsmc.domain.project.adapter.out.openapi.dto.toDomain
 import team.incube.gsmc.domain.project.port.out.DataGsmProjectCachePort
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
@@ -86,6 +87,13 @@ class DataGsmProjectApiAdapterTest :
             every { cachePort.saveParticipantIndex(any()) } just runs
             every { participantIndexSingleFlight.load(any()) } answers {
                 firstArg<() -> List<DataGsmProject>?>().invoke()
+            }
+        }
+
+        Given("DataGSM 프로젝트에 아이콘 URL이 있을 때") {
+            Then("로고 URL로 변환한다") {
+                projectDto.copy(iconUrl = "https://cdn.datagsm.kr/project-icons/icon.png").toDomain().logoUrl shouldBe
+                    "https://cdn.datagsm.kr/project-icons/icon.png"
             }
         }
 
