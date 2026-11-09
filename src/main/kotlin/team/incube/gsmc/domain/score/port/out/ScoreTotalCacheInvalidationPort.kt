@@ -2,7 +2,7 @@ package team.incube.gsmc.domain.score.port.out
 
 /**
  * 점수 상태가 바뀔 때 반/학년 총점 캐시([ScoreTotalCachePort])를 무효화하는 아웃바운드 포트 인터페이스입니다.
- * 커밋 이후 실행, 디바운스, 진행 중인 재계산과의 세대 관리 같은 실행 방식은 구현체가 책임진다.
+ * 커밋 이후 실행 같은 실행 방식은 구현체가 책임진다.
  * 캐시 무효화는 성능 최적화일 뿐이므로 구현체는 예외를 호출자에게 전파하지 않는다.
  */
 interface ScoreTotalCacheInvalidationPort {

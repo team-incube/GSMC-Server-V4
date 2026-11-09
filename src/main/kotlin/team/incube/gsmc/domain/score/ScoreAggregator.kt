@@ -70,6 +70,19 @@ object ScoreAggregator {
             }
     }
 
+    /** [userIds] 각 학생의 총점 맵을 만든다. 점수 행이 없는 학생은 0점으로 포함한다. */
+    fun totalsOf(
+        userIds: Set<Long>,
+        rows: List<ScoreCalculationRow>,
+        includeApprovedOnly: Boolean,
+        userGrade: Int,
+    ): Map<Long, Int> {
+        val rowsByUserId = rows.groupBy { it.userId }
+        return userIds.associateWith { id ->
+            totalScoreOf(rowsByUserId[id].orEmpty(), includeApprovedOnly, userGrade)
+        }
+    }
+
     fun percentileOf(
         myUserId: Long,
         totalScoreByUserId: Map<Long, Int>,

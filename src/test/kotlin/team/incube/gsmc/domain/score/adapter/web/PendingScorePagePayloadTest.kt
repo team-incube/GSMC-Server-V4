@@ -6,6 +6,7 @@ import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
 import team.incube.gsmc.domain.category.EvidenceType
 import team.incube.gsmc.domain.category.ScoreCalculationType
+import team.incube.gsmc.domain.member.adapter.web.MemberPayload
 import team.incube.gsmc.domain.score.PendingScoreItem
 import team.incube.gsmc.domain.score.PendingScoreSearchResult
 import team.incube.gsmc.domain.score.Score
@@ -95,7 +96,7 @@ class PendingScorePagePayloadTest :
 
                 Then("점수 소유자가 MemberPayload 형태로 매핑된다") {
                     payload.items[0].member shouldBe
-                        PendingScoreMemberPayload(
+                        MemberPayload(
                             id = 10L,
                             name = "학생10",
                             email = "student10@gsm.hs.kr",

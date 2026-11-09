@@ -138,7 +138,6 @@ class ScorePersistenceAdapter(
             queryFactory
                 .selectFrom(scoreJpaEntity)
                 .join(scoreJpaEntity.user)
-                .fetchJoin()
                 .join(scoreJpaEntity.category)
                 .fetchJoin()
                 .leftJoin(scoreJpaEntity.evidence)

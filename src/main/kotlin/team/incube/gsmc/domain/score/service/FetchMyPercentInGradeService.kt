@@ -7,7 +7,6 @@ import team.incube.gsmc.domain.score.port.`in`.FetchMyPercentInGradeUseCase
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.MemberSchoolInfoCachePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
-import team.incube.gsmc.domain.score.port.out.ScoreTotalCacheLoadPort
 import team.incube.gsmc.domain.score.port.out.ScoreTotalCachePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
@@ -28,7 +27,6 @@ class FetchMyPercentInGradeService(
     private val scorePersistencePort: ScorePersistencePort,
     private val memberPersistencePort: MemberPersistencePort,
     private val scoreTotalCachePort: ScoreTotalCachePort,
-    private val scoreTotalCacheLoadPort: ScoreTotalCacheLoadPort,
     private val memberSchoolInfoCachePort: MemberSchoolInfoCachePort,
     private val memberUtil: MemberUtil,
 ) : FetchMyPercentInGradeUseCase {
@@ -42,28 +40,13 @@ class FetchMyPercentInGradeService(
             } ?: throw GsmcException(ErrorCode.USER_NOT_FOUND)
         val userGrade = requireNotNull(me.userGrade) { "학생은 userGrade가 null일 수 없습니다." }
 
-        val cached = scoreTotalCachePort.findGradeTotals(userGrade, includeApprovedOnly)
         val totalScoreByUserId =
-            cached?.takeIf { userId in it }
-                ?: scoreTotalCacheLoadPort.loadGradeTotals(userGrade, includeApprovedOnly) {
-                    val gradeMateIds =
-                        memberPersistencePort
-                            .findAllStudentsByUserGrade(userGrade)
-                            .map { it.userId }
-                            .toSet() + userId
-                    val scoresByUserId =
-                        scorePersistencePort
-                            .findCalculationRowsByUserIdIn(
-                                gradeMateIds.toList(),
-                            ).groupBy { it.userId }
-                    gradeMateIds.associateWith { id ->
-                        ScoreAggregator.totalScoreOf(
-                            scoresByUserId[id] ?: emptyList(),
-                            includeApprovedOnly,
-                            userGrade,
-                        )
-                    }
-                }
+            scoreTotalCachePort.loadGradeTotals(userGrade, includeApprovedOnly, userId) {
+                val gradeMateIds =
+                    memberPersistencePort.findAllStudentsByUserGrade(userGrade).map { it.userId }.toSet() + userId
+                val rows = scorePersistencePort.findCalculationRowsByUserIdIn(gradeMateIds.toList())
+                ScoreAggregator.totalsOf(gradeMateIds, rows, includeApprovedOnly, userGrade)
+            }
 
         return ScoreAggregator.percentileOf(userId, totalScoreByUserId)
     }
