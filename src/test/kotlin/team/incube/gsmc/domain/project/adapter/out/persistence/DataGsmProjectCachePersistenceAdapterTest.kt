@@ -49,10 +49,10 @@ class DataGsmProjectCachePersistenceAdapterTest :
         Given("활성 참여자 인덱스가 존재할 때") {
             Then("해당 참여자의 작은 목록만 역직렬화하고 전체 캐시는 읽지 않는다") {
                 val field = DataGsmProjectParticipantIndex.participantField("student@example.com")
-                every { valueOperations.get("dg-project:participant-index:active") } returns "generation"
+                every { valueOperations.get("dg-project:v2:participant-index:active") } returns "generation"
                 every {
                     hashOperations.multiGet(
-                        "dg-project:participant-index:generation",
+                        "dg-project:v2:participant-index:generation",
                         listOf("__ready__", field),
                     )
                 } returns listOf("1", "participant-json")
@@ -65,15 +65,15 @@ class DataGsmProjectCachePersistenceAdapterTest :
 
                 adapter.findByParticipantEmail("student@example.com") shouldBe projects
 
-                verify(exactly = 0) { valueOperations.get("dg-project:active-all") }
+                verify(exactly = 0) { valueOperations.get("dg-project:v2:active-all") }
             }
 
             Then("참여 프로젝트가 없는 이메일도 캐시 적중인 빈 목록으로 처리한다") {
                 val field = DataGsmProjectParticipantIndex.participantField("none@example.com")
-                every { valueOperations.get("dg-project:participant-index:active") } returns "generation"
+                every { valueOperations.get("dg-project:v2:participant-index:active") } returns "generation"
                 every {
                     hashOperations.multiGet(
-                        "dg-project:participant-index:generation",
+                        "dg-project:v2:participant-index:generation",
                         listOf("__ready__", field),
                     )
                 } returns listOf("1", null)
@@ -88,7 +88,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
 
         Given("참여자 인덱스가 없거나 손상됐을 때") {
             Then("인덱스 미스로 처리한다") {
-                every { valueOperations.get("dg-project:participant-index:active") } returns null
+                every { valueOperations.get("dg-project:v2:participant-index:active") } returns null
 
                 adapter.findByParticipantEmail("student@example.com") shouldBe null
                 adapter.isParticipantIndexAvailable() shouldBe false
@@ -96,10 +96,10 @@ class DataGsmProjectCachePersistenceAdapterTest :
 
             Then("잘못된 JSON의 활성 포인터를 조건부로 무효화한다") {
                 val field = DataGsmProjectParticipantIndex.participantField("student@example.com")
-                every { valueOperations.get("dg-project:participant-index:active") } returns "generation"
+                every { valueOperations.get("dg-project:v2:participant-index:active") } returns "generation"
                 every {
                     hashOperations.multiGet(
-                        "dg-project:participant-index:generation",
+                        "dg-project:v2:participant-index:generation",
                         listOf("__ready__", field),
                     )
                 } returns listOf("1", "broken")
@@ -112,7 +112,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
                 every {
                     redisTemplate.execute(
                         any<RedisScript<Long>>(),
-                        listOf("dg-project:participant-index:active"),
+                        listOf("dg-project:v2:participant-index:active"),
                         "generation",
                     )
                 } returns 1L
@@ -122,7 +122,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
                 verify(exactly = 1) {
                     redisTemplate.execute(
                         any<RedisScript<Long>>(),
-                        listOf("dg-project:participant-index:active"),
+                        listOf("dg-project:v2:participant-index:active"),
                         "generation",
                     )
                 }
@@ -131,7 +131,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
 
         Given("전체 프로젝트 캐시가 존재할 때") {
             Then("저장된 전체 목록을 반환한다") {
-                every { valueOperations.get("dg-project:active-all") } returns "json"
+                every { valueOperations.get("dg-project:v2:active-all") } returns "json"
                 every {
                     objectMapper.readValue("json", any<tools.jackson.core.type.TypeReference<List<DataGsmProject>>>())
                 } returns projects
@@ -154,8 +154,8 @@ class DataGsmProjectCachePersistenceAdapterTest :
                         any<RedisScript<Long>>(),
                         match { keys ->
                             keys.size == 3 &&
-                                keys[0] == "dg-project:active-all" &&
-                                keys[2] == "dg-project:participant-index:active"
+                                keys[0] == "dg-project:v2:active-all" &&
+                                keys[2] == "dg-project:v2:participant-index:active"
                         },
                         "full-json",
                         TimeUnit.HOURS.toMillis(24).toString(),
@@ -177,7 +177,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
 
         Given("기존 전체 캐시만 존재할 때") {
             Then("전체 캐시의 남은 TTL로 참여자 인덱스를 활성화한다") {
-                every { redisTemplate.getExpire("dg-project:active-all", TimeUnit.MILLISECONDS) } returnsMany
+                every { redisTemplate.getExpire("dg-project:v2:active-all", TimeUnit.MILLISECONDS) } returnsMany
                     listOf(60_000L, 55_000L)
                 every { objectMapper.writeValueAsString(projects) } returnsMany
                     listOf("full-json", "participant-json")
@@ -191,8 +191,8 @@ class DataGsmProjectCachePersistenceAdapterTest :
                         any<RedisScript<Long>>(),
                         match { keys ->
                             keys.size == 3 &&
-                                keys[0] == "dg-project:active-all" &&
-                                keys[2] == "dg-project:participant-index:active"
+                                keys[0] == "dg-project:v2:active-all" &&
+                                keys[2] == "dg-project:v2:participant-index:active"
                         },
                         "55000",
                         any(),
@@ -202,7 +202,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
             }
 
             Then("세대 구성 실패 시 활성 포인터를 바꾸지 않는다") {
-                every { redisTemplate.getExpire("dg-project:active-all", TimeUnit.MILLISECONDS) } returns 60_000L
+                every { redisTemplate.getExpire("dg-project:v2:active-all", TimeUnit.MILLISECONDS) } returns 60_000L
                 every { objectMapper.writeValueAsString(projects) } returnsMany
                     listOf("full-json", "participant-json")
                 every { redisTemplate.execute(any<RedisScript<Long>>(), any(), *anyVararg()) } returns 1L
@@ -222,7 +222,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
 
         Given("Redis 조회 또는 저장에 실패할 때") {
             Then("예외를 외부로 전파하지 않고 캐시 미스 또는 저장 실패로 처리한다") {
-                every { valueOperations.get("dg-project:active-all") } throws RuntimeException("Redis 장애")
+                every { valueOperations.get("dg-project:v2:active-all") } throws RuntimeException("Redis 장애")
                 adapter.findAll() shouldBe null
 
                 every { objectMapper.writeValueAsString(projects) } throws RuntimeException("직렬화 실패")

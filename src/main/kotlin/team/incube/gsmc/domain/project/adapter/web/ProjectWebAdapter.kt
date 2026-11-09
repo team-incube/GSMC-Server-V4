@@ -6,13 +6,13 @@ import org.springframework.graphql.data.method.annotation.QueryMapping
 import org.springframework.graphql.data.method.annotation.SchemaMapping
 import org.springframework.stereotype.Controller
 import team.incube.gsmc.domain.file.port.`in`.GenerateFileAccessUrlUseCase
-import team.incube.gsmc.domain.project.DataGsmProject
 import team.incube.gsmc.domain.project.Project
 import team.incube.gsmc.domain.project.ProjectDraft
 import team.incube.gsmc.domain.project.ProjectFile
 import team.incube.gsmc.domain.project.ProjectScoreAndEvidence
 import team.incube.gsmc.domain.project.ProjectSearchResult
 import team.incube.gsmc.domain.project.ProjectSummary
+import team.incube.gsmc.domain.project.WritableDataGsmProject
 import team.incube.gsmc.domain.project.port.`in`.AppendProjectDraftUseCase
 import team.incube.gsmc.domain.project.port.`in`.AppendProjectUseCase
 import team.incube.gsmc.domain.project.port.`in`.FetchMyProjectDraftUseCase
@@ -46,7 +46,7 @@ class ProjectWebAdapter(
 ) {
     /** 현재 사용자가 참여자로 등록된 DataGSM 활성 프로젝트를 조회합니다. */
     @QueryMapping
-    fun myWritableDataGsmProjects(): List<DataGsmProject> = fetchMyWritableDataGsmProjectsUseCase.execute()
+    fun myWritableDataGsmProjects(): List<WritableDataGsmProject> = fetchMyWritableDataGsmProjectsUseCase.execute()
 
     /** 현재 사용자가 소유하거나 참여한 프로젝트 목록을 조회합니다. */
     @QueryMapping

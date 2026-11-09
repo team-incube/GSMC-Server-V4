@@ -50,6 +50,10 @@ type DataGsmProject {
     club: DataGsmClub
     # 외부 프로젝트 참여자 목록입니다.
     participants: [DataGsmProjectParticipant!]!
+    # DataGSM 프로젝트 아이콘 URL입니다. 아이콘이 없으면 null입니다.
+    logoUrl: String
+    # 현재 사용자의 프로젝트 참여 점수 상태입니다. 미작성 상태는 null입니다.
+    myScoreStatus: ScoreStatus
 }
 
 """내부 프로젝트 목록에서 사용하는 요약 정보입니다."""

@@ -141,11 +141,11 @@ class DataGsmProjectCachePersistenceAdapter(
     private fun participantIndexKey(generation: String): String = "$PARTICIPANT_INDEX_PREFIX:$generation"
 
     private companion object {
-        const val CACHE_KEY = "dg-project:active-all"
+        const val CACHE_KEY = "dg-project:v2:active-all"
         const val CACHE_TTL_HOURS = 24L
         val CACHE_TTL_MILLIS = TimeUnit.HOURS.toMillis(CACHE_TTL_HOURS)
-        const val PARTICIPANT_INDEX_ACTIVE_KEY = "dg-project:participant-index:active"
-        const val PARTICIPANT_INDEX_PREFIX = "dg-project:participant-index"
+        const val PARTICIPANT_INDEX_ACTIVE_KEY = "dg-project:v2:participant-index:active"
+        const val PARTICIPANT_INDEX_PREFIX = "dg-project:v2:participant-index"
         const val INDEX_READY_FIELD = "__ready__"
         const val INDEX_READY_VALUE = "1"
         const val INDEX_WRITE_BATCH_SIZE = 250
