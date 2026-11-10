@@ -16,7 +16,7 @@ RUN cp $(ls build/libs/*.jar | grep -v -- '-plain' | head -n 1) /app/app.jar
 FROM eclipse-temurin:25-jre-jammy
 WORKDIR /app
 
-COPY --from=builder /app/build/libs/app.jar app.jar
+COPY --from=builder /app/app.jar app.jar
 
 
 EXPOSE 8080
