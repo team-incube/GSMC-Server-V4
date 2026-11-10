@@ -11,6 +11,7 @@ RUN --mount=type=cache,target=/home/gradle/.gradle \
 COPY . .
 RUN --mount=type=cache,target=/home/gradle/.gradle \
     gradle bootJar --no-daemon -x test
+RUN cp $(ls build/libs/*.jar | grep -v -- '-plain' | heat -n 1) /app/app.jar
 
 FROM eclipse-temurin:25-jre-jammy
 WORKDIR /app
