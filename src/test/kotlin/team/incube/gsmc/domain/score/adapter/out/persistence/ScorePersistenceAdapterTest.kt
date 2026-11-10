@@ -202,6 +202,7 @@ class ScorePersistenceAdapterTest :
             // where(Predicate)가 predicate 1개로 호출되면 MockK의 anyVararg 매처가 이를 잡지 못해 별도로 등록한다.
             every { query.where(any<Predicate>()) } returns query
             every { query.where(*anyVararg<Predicate>()) } returns query
+            every { query.orderBy(*anyVararg<OrderSpecifier<*>>()) } returns query
             every { query.fetchOne() } returns result
             every { query.fetchFirst() } returns result
         }
@@ -628,6 +629,36 @@ class ScorePersistenceAdapterTest :
                     verify(exactly = 0) { queryFactory.selectFrom(scoreJpaEntity) }
                     verify(exactly = 0) { queryFactory.selectFrom(fileJpaEntity) }
                 }
+            }
+        }
+
+        Given("프로젝트별 점수 상태를 조회할 때") {
+            Then("프로젝트가 없으면 DB를 조회하지 않는다") {
+                adapter.findStatusesByUserIdAndDgProjectIds(userId, emptyList()) shouldBe emptyMap()
+                verify(exactly = 0) { queryFactory.select(*anyVararg<Expression<*>>()) }
+            }
+
+            Then("중복된 프로젝트 점수에서는 승인 상태를 우선한다") {
+                val rows =
+                    listOf(
+                        mockk<Tuple> {
+                            every { get(scoreJpaEntity.dgProjectId) } returns 100L
+                            every { get(scoreJpaEntity.scoreStatus) } returns ScoreStatus.APPROVED
+                        },
+                        mockk<Tuple> {
+                            every { get(scoreJpaEntity.dgProjectId) } returns 100L
+                            every { get(scoreJpaEntity.scoreStatus) } returns ScoreStatus.REJECTED
+                        },
+                    )
+                val query = mockk<JPAQuery<Tuple>>()
+                every { queryFactory.select(*anyVararg<Expression<*>>()) } returns query
+                every { query.from(scoreJpaEntity) } returns query
+                every { query.where(*anyVararg<Predicate>()) } returns query
+                every { query.orderBy(*anyVararg<OrderSpecifier<*>>()) } returns query
+                every { query.fetch() } returns rows
+
+                adapter.findStatusesByUserIdAndDgProjectIds(userId, listOf(100L)) shouldBe
+                    mapOf(100L to ScoreStatus.APPROVED)
             }
         }
 

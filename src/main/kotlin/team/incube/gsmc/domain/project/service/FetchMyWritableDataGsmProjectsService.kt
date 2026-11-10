@@ -1,9 +1,11 @@
 package team.incube.gsmc.domain.project.service
 
-import team.incube.gsmc.domain.project.DataGsmProject
+import org.springframework.transaction.annotation.Transactional
+import team.incube.gsmc.domain.project.WritableDataGsmProject
 import team.incube.gsmc.domain.project.port.`in`.FetchMyWritableDataGsmProjectsUseCase
 import team.incube.gsmc.domain.project.port.out.DataGsmProjectApiPort
 import team.incube.gsmc.domain.project.port.out.ProjectMemberPersistencePort
+import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.domain.user.UserRole
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
@@ -19,10 +21,12 @@ import team.incube.gsmc.global.util.MemberUtil
 class FetchMyWritableDataGsmProjectsService(
     private val dataGsmProjectApiPort: DataGsmProjectApiPort,
     private val projectMemberPersistencePort: ProjectMemberPersistencePort,
+    private val scorePersistencePort: ScorePersistencePort,
     private val memberUtil: MemberUtil,
 ) : FetchMyWritableDataGsmProjectsUseCase {
     /** 학생 권한과 DataGSM 참여자 정보를 확인한 뒤 작성 가능한 활성 프로젝트를 조회합니다. */
-    override fun execute(): List<DataGsmProject> {
+    @Transactional(readOnly = true)
+    override fun execute(): List<WritableDataGsmProject> {
         if (memberUtil.getCurrentUserRole() != UserRole.STUDENT) {
             throw GsmcException(ErrorCode.FORBIDDEN)
         }
@@ -31,6 +35,14 @@ class FetchMyWritableDataGsmProjectsService(
             projectMemberPersistencePort.findByUserId(memberUtil.getCurrentUserId())
                 ?: throw GsmcException(ErrorCode.USER_NOT_FOUND)
 
-        return dataGsmProjectApiPort.findActiveProjectsByParticipantEmail(user.userEmail)
+        val projects = dataGsmProjectApiPort.findActiveProjectsByParticipantEmail(user.userEmail)
+        if (projects.isEmpty()) return emptyList()
+
+        val statuses =
+            scorePersistencePort.findStatusesByUserIdAndDgProjectIds(
+                user.userId,
+                projects.map { it.dgProjectId },
+            )
+        return projects.map { WritableDataGsmProject(it, statuses[it.dgProjectId]) }
     }
 }

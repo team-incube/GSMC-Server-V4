@@ -5,9 +5,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.clearAllMocks
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
 import io.mockk.verify
 import team.incube.gsmc.domain.category.Category
 import team.incube.gsmc.domain.category.CategoryType
@@ -17,7 +15,6 @@ import team.incube.gsmc.domain.score.MemberSchoolInfo
 import team.incube.gsmc.domain.score.Percentile
 import team.incube.gsmc.domain.score.ScoreCalculationRow
 import team.incube.gsmc.domain.score.ScoreStatus
-import team.incube.gsmc.domain.score.adapter.out.cache.ScoreTotalCacheSingleFlight
 import team.incube.gsmc.domain.score.port.out.MemberPersistencePort
 import team.incube.gsmc.domain.score.port.out.MemberSchoolInfoCachePort
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
@@ -35,21 +32,19 @@ class FetchMyPercentInClassServiceTest :
         val memberPersistencePort = mockk<MemberPersistencePort>()
         val scoreTotalCachePort = mockk<ScoreTotalCachePort>()
         val memberUtil = mockk<MemberUtil>()
-        val scoreTotalCacheSingleFlight = ScoreTotalCacheSingleFlight(scoreTotalCachePort)
         val service =
             FetchMyPercentInClassService(
                 scorePersistencePort,
                 memberPersistencePort,
                 scoreTotalCachePort,
-                scoreTotalCacheSingleFlight,
                 PassThroughMemberSchoolInfoCachePort(),
                 memberUtil,
             )
 
         beforeEach {
             clearAllMocks()
-            every { scoreTotalCachePort.findClassTotals(any(), any(), any()) } returns null
-            every { scoreTotalCachePort.saveClassTotals(any(), any(), any(), any()) } just runs
+            every { scoreTotalCachePort.loadClassTotals(any(), any(), any(), any(), any()) } answers
+                { lastArg<() -> Map<Long, Int>>().invoke() }
         }
 
         fun percentileOf(
@@ -244,7 +239,7 @@ class FetchMyPercentInClassServiceTest :
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
                     every { memberPersistencePort.findByUserId(1L) } returns userOf(1L, 2, UserRole.STUDENT, 3)
-                    every { scoreTotalCachePort.findClassTotals(2, 3, true) } returns
+                    every { scoreTotalCachePort.loadClassTotals(2, 3, true, 1L, any()) } returns
                         mapOf(1L to 2, 2L to 1, 3L to 4, 4L to 3)
 
                     val result = service.execute(true)
@@ -257,24 +252,6 @@ class FetchMyPercentInClassServiceTest :
                 }
             }
 
-            When("캐시에 내 userId가 없으면") {
-                Then("캐시 미스로 간주하고 다시 계산한다") {
-                    val classmates = listOf(userOf(2L, 2, UserRole.STUDENT, 3))
-                    val allScores = listOf(scoreOf(1L, ScoreStatus.APPROVED, CategoryType.TOEIC))
-
-                    every { memberUtil.getCurrentUserId() } returns 1L
-                    every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
-                    every { memberPersistencePort.findByUserId(1L) } returns userOf(1L, 2, UserRole.STUDENT, 3)
-                    every { scoreTotalCachePort.findClassTotals(2, 3, true) } returns mapOf(2L to 1)
-                    every { memberPersistencePort.findAllStudentsByUserGradeAndUserClassNumber(2, 3) } returns
-                        classmates
-                    every { scorePersistencePort.findCalculationRowsByUserIdIn(any()) } returns allScores
-
-                    val result = service.execute(true)
-
-                    result shouldBe percentileOf(100, 50)
-                }
-            }
             When("학년·반이 캐시돼 있으면") {
                 Then("회원 조회 없이 캐시된 학년·반으로 백분위를 계산한다") {
                     val schoolInfoCachePort = mockk<MemberSchoolInfoCachePort>()
@@ -283,14 +260,14 @@ class FetchMyPercentInClassServiceTest :
                             scorePersistencePort,
                             memberPersistencePort,
                             scoreTotalCachePort,
-                            scoreTotalCacheSingleFlight,
                             schoolInfoCachePort,
                             memberUtil,
                         )
                     every { memberUtil.getCurrentUserId() } returns 1L
                     every { memberUtil.getCurrentUserRole() } returns UserRole.STUDENT
                     every { schoolInfoCachePort.load(1L, any()) } returns MemberSchoolInfo(2, 3)
-                    every { scoreTotalCachePort.findClassTotals(2, 3, any()) } returns mapOf(1L to 2, 2L to 1)
+                    every { scoreTotalCachePort.loadClassTotals(2, 3, any(), 1L, any()) } returns
+                        mapOf(1L to 2, 2L to 1)
 
                     cachedService.execute(true)
 

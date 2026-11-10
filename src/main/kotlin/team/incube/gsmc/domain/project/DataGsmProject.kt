@@ -14,6 +14,7 @@ package team.incube.gsmc.domain.project
  * @param status 운영 상태
  * @param club 소유 동아리 정보, 없으면 null
  * @param participants 참여자 목록
+ * @param logoUrl DataGSM 프로젝트 아이콘 URL, 없으면 null
  * @see DataGsmProjectStatus
  */
 data class DataGsmProject(
@@ -25,4 +26,5 @@ data class DataGsmProject(
     val status: DataGsmProjectStatus,
     val club: DataGsmClub?,
     val participants: List<DataGsmProjectParticipant>,
+    val logoUrl: String? = null,
 )

@@ -2,6 +2,7 @@ package team.incube.gsmc.domain.score.adapter.out.persistence
 
 import com.querydsl.core.types.Predicate
 import com.querydsl.core.types.dsl.BooleanExpression
+import com.querydsl.core.types.dsl.CaseBuilder
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager
 import org.springframework.dao.DataIntegrityViolationException
@@ -33,6 +34,16 @@ import team.incube.gsmc.global.annotation.adapter.Adapter
 import team.incube.gsmc.global.exception.ErrorCode
 import team.incube.gsmc.global.exception.GsmcException
 
+private val projectScorePriority =
+    CaseBuilder()
+        .`when`(scoreJpaEntity.scoreStatus.eq(ScoreStatus.APPROVED))
+        .then(0)
+        .`when`(scoreJpaEntity.scoreStatus.eq(ScoreStatus.PENDING))
+        .then(1)
+        .`when`(scoreJpaEntity.scoreStatus.eq(ScoreStatus.INCOMPLETE))
+        .then(2)
+        .otherwise(3)
+
 /**
  * 점수 요청 영속성 처리를 담당하는 아웃바운드 어댑터 클래스입니다.
  * [ScorePersistencePort]를 구현하며, QueryDSL로 user/category/evidence를 fetch join하여 조회합니다.
@@ -56,6 +67,31 @@ class ScorePersistenceAdapter(
     private val fileJpaRepository: FileJpaRepository,
     private val entityManager: EntityManager,
 ) : ScorePersistencePort {
+    override fun findStatusesByUserIdAndDgProjectIds(
+        userId: Long,
+        dgProjectIds: List<Long>,
+    ): Map<Long, ScoreStatus> {
+        if (dgProjectIds.isEmpty()) return emptyMap()
+
+        val rows =
+            queryFactory
+                .select(scoreJpaEntity.dgProjectId, scoreJpaEntity.scoreStatus)
+                .from(scoreJpaEntity)
+                .where(
+                    scoreJpaEntity.user.userId.eq(userId),
+                    scoreJpaEntity.dgProjectId.`in`(dgProjectIds),
+                ).orderBy(projectScorePriority.asc(), scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
+                .fetch()
+
+        val statuses = mutableMapOf<Long, ScoreStatus>()
+        rows.forEach { row ->
+            val projectId = row.get(scoreJpaEntity.dgProjectId) ?: return@forEach
+            val status = row.get(scoreJpaEntity.scoreStatus) ?: return@forEach
+            statuses.putIfAbsent(projectId, status)
+        }
+        return statuses
+    }
+
     override fun findById(scoreId: Long): Score? {
         val entity =
             queryFactory
@@ -102,7 +138,6 @@ class ScorePersistenceAdapter(
             queryFactory
                 .selectFrom(scoreJpaEntity)
                 .join(scoreJpaEntity.user)
-                .fetchJoin()
                 .join(scoreJpaEntity.category)
                 .fetchJoin()
                 .leftJoin(scoreJpaEntity.evidence)
@@ -211,7 +246,8 @@ class ScorePersistenceAdapter(
                 .where(
                     scoreJpaEntity.user.userId.eq(userId),
                     scoreJpaEntity.dgProjectId.eq(dgProjectId),
-                ).fetchFirst() ?: return null
+                ).orderBy(projectScorePriority.asc(), scoreJpaEntity.updatedAt.desc(), scoreJpaEntity.scoreId.desc())
+                .fetchFirst() ?: return null
 
         return entity.toDomain(findFileByScoreId(entity.scoreId), findEvidenceFiles(entity))
     }
