@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop
+      - fix/Dockerfile-cache
   workflow_dispatch:
 
 # 같은 운영 서버를 조작하는 배포는 한 번에 하나만 실행한다.
