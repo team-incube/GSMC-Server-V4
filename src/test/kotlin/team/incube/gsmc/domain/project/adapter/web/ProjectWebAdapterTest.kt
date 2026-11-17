@@ -14,6 +14,7 @@ import team.incube.gsmc.domain.project.ProjectSearchResult
 import team.incube.gsmc.domain.project.ProjectSummary
 import team.incube.gsmc.domain.project.port.`in`.AppendProjectDraftUseCase
 import team.incube.gsmc.domain.project.port.`in`.AppendProjectUseCase
+import team.incube.gsmc.domain.project.port.`in`.FetchDataGsmProjectUseCase
 import team.incube.gsmc.domain.project.port.`in`.FetchMyProjectDraftUseCase
 import team.incube.gsmc.domain.project.port.`in`.FetchMyProjectScoreAndEvidenceUseCase
 import team.incube.gsmc.domain.project.port.`in`.FetchMyProjectsUseCase
@@ -27,6 +28,7 @@ import team.incube.gsmc.domain.project.port.`in`.SearchProjectsUseCase
 class ProjectWebAdapterTest :
     BehaviorSpec({
         val fetchDataGsm = mockk<FetchMyWritableDataGsmProjectsUseCase>()
+        val fetchDataGsmProject = mockk<FetchDataGsmProjectUseCase>()
         val fetchMyProjects = mockk<FetchMyProjectsUseCase>()
         val searchProjects = mockk<SearchProjectsUseCase>()
         val fetchDraft = mockk<FetchMyProjectDraftUseCase>()
@@ -41,6 +43,7 @@ class ProjectWebAdapterTest :
         val adapter =
             ProjectWebAdapter(
                 fetchDataGsm,
+                fetchDataGsmProject,
                 fetchMyProjects,
                 searchProjects,
                 fetchDraft,
