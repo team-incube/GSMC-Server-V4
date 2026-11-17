@@ -183,6 +183,11 @@ extend type Query {
     myProjectScoreAndEvidence(projectId: ID!): ProjectScoreAndEvidence!
     """학생인 현재 사용자가 참여자로 등록된 DataGSM 활성 프로젝트 목록입니다."""
     myWritableDataGsmProjects: [DataGsmProject!]!
+    """
+    교사 이상 권한으로 DataGSM 프로젝트 상세를 조회합니다. 종료된 프로젝트도 조회하며, 없으면 NOT_FOUND 오류입니다.
+    응답의 myScoreStatus는 현재 사용자 기준 필드라 항상 null입니다.
+    """
+    dataGsmProject(dgProjectId: ID!): DataGsmProject!
 }
 
 extend type Mutation {
