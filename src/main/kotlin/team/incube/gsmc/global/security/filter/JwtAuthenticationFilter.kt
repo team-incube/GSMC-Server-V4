@@ -25,8 +25,10 @@ class JwtAuthenticationFilter(
         filterChain: FilterChain,
     ) {
         val token = extractToken(request)
-        val claims = token?.let(authTokenPort::parseTokenClaims)
-        if (isInvalidGraphQlToken(request, token, claims)) {
+        val parsed = token?.let(authTokenPort::parseTokenClaims)
+        // 무효화된 토큰은 모든 경로에서 인증하지 않는다. 즉시 401은 기존대로 /graphql에만 준다
+        val claims = parsed?.takeUnless { tokenInvalidationPort.isInvalidated(it.userId, it.issuedAt) }
+        if (request.servletPath == GRAPHQL_PATH && token != null && claims == null) {
             jwtAuthenticationEntryPoint.commence(
                 request,
                 response,
@@ -54,15 +56,6 @@ class JwtAuthenticationFilter(
             .getHeader("Authorization")
             ?.takeIf { it.startsWith("Bearer ") }
             ?.substring(7)
-
-    private fun isInvalidGraphQlToken(
-        request: HttpServletRequest,
-        token: String?,
-        claims: TokenClaims?,
-    ): Boolean =
-        request.servletPath == GRAPHQL_PATH &&
-            token != null &&
-            (claims == null || tokenInvalidationPort.isInvalidated(claims.userId, claims.issuedAt))
 
     companion object {
         private const val MDC_USER_ID_KEY = "userId"
