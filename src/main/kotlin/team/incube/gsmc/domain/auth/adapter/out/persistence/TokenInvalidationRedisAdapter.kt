@@ -38,7 +38,8 @@ class TokenInvalidationRedisAdapter(
     override fun invalidate(userId: Long) {
         redisTemplate.opsForValue().set(
             KEY_PREFIX + userId,
-            System.currentTimeMillis().toString(),
+            // JWT iat는 초 단위로 잘리므로 같은 초에 재발급된 토큰이 거부되지 않게 초 단위로 내림한다
+            (System.currentTimeMillis() / 1000 * 1000).toString(),
             jwtProperties.accessTokenExpiry,
             TimeUnit.SECONDS,
         )
