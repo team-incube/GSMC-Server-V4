@@ -105,8 +105,11 @@ class AppendScoreSupport(
         category: Category,
     ): Score {
         if (!category.isAccumulated) {
+            // 조회 후 교사가 승인했을 수 있으므로 행을 잠그고 다시 확인한다. 승인됐으면 새 행을 만든다
             scorePersistencePort
                 .findUnapprovedByUserIdAndCategoryType(userId, category.categoryType)
+                ?.let { scorePersistencePort.findByIdForUpdate(it.scoreId) }
+                ?.takeIf { it.scoreStatus != ScoreStatus.APPROVED }
                 ?.let { return it }
         }
 

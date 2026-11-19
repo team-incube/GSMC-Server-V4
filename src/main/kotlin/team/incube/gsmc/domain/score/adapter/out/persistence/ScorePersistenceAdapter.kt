@@ -110,6 +110,8 @@ class ScorePersistenceAdapter(
 
     override fun findByIdForUpdate(scoreId: Long): Score? {
         val entity = scoreJpaRepository.findByIdForUpdate(scoreId) ?: return null
+        // 같은 트랜잭션에서 먼저 읽어 둔 엔티티면 락 쿼리가 옛 상태를 그대로 돌려주므로, 락을 잡은 뒤 다시 읽는다
+        entityManager.refresh(entity)
         return entity.toDomain(findFileByScoreId(scoreId), findEvidenceFiles(entity))
     }
 
