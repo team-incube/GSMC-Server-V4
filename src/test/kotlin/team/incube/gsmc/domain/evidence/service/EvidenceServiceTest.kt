@@ -148,7 +148,7 @@ class EvidenceServiceTest :
                 Then("Evidence, 파일 연결, Score 연결을 처리한다") {
                     val created = evidence(100L)
                     every { memberUtil.getCurrentUserId() } returns userId
-                    every { scorePersistencePort.findById(10L) } returns score()
+                    every { scorePersistencePort.findByIdForUpdate(10L) } returns score()
                     every { filePersistencePort.findAllByIdIn(setOf(20L, 21L)) } returns listOf(file(20L), file(21L))
                     every { evidencePersistencePort.save(any()) } returns created
                     every { filePersistencePort.linkToEvidence(any(), 100L) } just runs
@@ -181,15 +181,21 @@ class EvidenceServiceTest :
             When("생성을 시도하면") {
                 Then("Score를 찾을 수 없거나 충돌 오류를 반환한다") {
                     every { memberUtil.getCurrentUserId() } returns userId
-                    every { scorePersistencePort.findById(10L) } returns score(ownerId = 2L)
+                    every { scorePersistencePort.findByIdForUpdate(10L) } returns score(ownerId = 2L)
                     shouldThrow<GsmcException> {
                         appendService.execute(10L, "제목", "c".repeat(300), emptyList())
                     }.errorCode shouldBe ErrorCode.SCORE_NOT_FOUND
 
-                    every { scorePersistencePort.findById(11L) } returns score(evidence = evidence(50L))
+                    every { scorePersistencePort.findByIdForUpdate(11L) } returns score(evidence = evidence(50L))
                     shouldThrow<GsmcException> {
                         appendService.execute(11L, "제목", "c".repeat(300), emptyList())
                     }.errorCode shouldBe ErrorCode.EVIDENCE_ALREADY_CONNECTED
+
+                    every { scorePersistencePort.findByIdForUpdate(12L) } returns
+                        score(id = 12L).copy(scoreStatus = ScoreStatus.APPROVED)
+                    shouldThrow<GsmcException> {
+                        appendService.execute(12L, "제목", "c".repeat(300), emptyList())
+                    }.errorCode shouldBe ErrorCode.SCORE_NOT_MODIFIABLE
                 }
             }
         }
