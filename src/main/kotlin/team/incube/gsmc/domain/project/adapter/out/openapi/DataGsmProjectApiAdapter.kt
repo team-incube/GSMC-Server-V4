@@ -110,7 +110,11 @@ class DataGsmProjectApiAdapter(
                 fetchProjectPage(
                     mapOf("status" to ACTIVE_STATUS, "page" to page, "size" to PAGE_SIZE),
                     deadline,
-                ) ?: break
+                ) ?: if (page == 0) {
+                    break // 첫 페이지 404는 결과 없음으로 본다
+                } else {
+                    throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED) // 일부만 받은 목록이 24시간 캐시되지 않게 한다
+                }
             if (pageDto.totalPages > MAX_PAGES) throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
             result += pageDto.projects.map { it.toDomain() }
 

@@ -249,6 +249,30 @@ class DataGsmProjectApiAdapterTest :
             }
         }
 
+        Given("두 번째 페이지가 404를 반환할 때") {
+            Then("일부 목록을 캐시하지 않고 실패를 반환한다") {
+                every { cachePort.findAll() } returns null
+                every { restClient.get() } returns uriSpec
+                every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
+                every { requestSpec.retrieve() } returns responseSpec
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } returns DataGsmApiResponseDto(data = DataGsmProjectPageDto(2, 2, listOf(projectDto))) andThenThrows
+                    org.springframework.web.client.HttpClientErrorException.create(
+                        org.springframework.http.HttpStatus.NOT_FOUND,
+                        "Not Found",
+                        org.springframework.http.HttpHeaders.EMPTY,
+                        ByteArray(0),
+                        null,
+                    )
+
+                shouldThrow<GsmcException> {
+                    adapter.findActiveProjectsByParticipantEmail("student@gsm.hs.kr")
+                }.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
+                verify(exactly = 0) { cachePort.saveAll(any()) }
+            }
+        }
+
         Given("외부 API가 최대 페이지 수를 넘는 totalPages를 반환할 때") {
             Then("순회를 중단하고 일부 목록을 캐시하지 않는다") {
                 every { cachePort.findAll() } returns null
