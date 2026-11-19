@@ -15,7 +15,9 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.clearAllMocks
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.runs
 import io.mockk.slot
 import io.mockk.verify
 import jakarta.persistence.EntityManager
@@ -433,6 +435,7 @@ class ScorePersistenceAdapterTest :
                 Then("리포지토리의 락 쿼리로 조회해 첨부 파일을 병합한 도메인 객체를 반환한다") {
                     val entity = scoreEntity(10L, ScoreStatus.PENDING)
                     every { scoreJpaRepository.findByIdForUpdate(10L) } returns entity
+                    every { entityManager.refresh(entity) } just runs
                     mockSingleFileQuery(fileEntity(1L, entity))
 
                     val result = adapter.findByIdForUpdate(10L)
@@ -440,6 +443,7 @@ class ScorePersistenceAdapterTest :
                     result?.scoreId shouldBe 10L
                     result?.file?.fileId shouldBe 1L
                     verify(exactly = 1) { scoreJpaRepository.findByIdForUpdate(10L) }
+                    verify(exactly = 1) { entityManager.refresh(entity) }
                     verify(exactly = 0) { queryFactory.selectFrom(scoreJpaEntity) }
                 }
             }

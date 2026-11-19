@@ -4,6 +4,7 @@ import org.springframework.transaction.annotation.Transactional
 import team.incube.gsmc.domain.evidence.Evidence
 import team.incube.gsmc.domain.evidence.port.`in`.AppendEvidenceUseCase
 import team.incube.gsmc.domain.evidence.port.out.EvidencePersistencePort
+import team.incube.gsmc.domain.score.ScoreStatus
 import team.incube.gsmc.domain.score.port.out.ScorePersistencePort
 import team.incube.gsmc.global.annotation.PortDirection
 import team.incube.gsmc.global.annotation.port.Port
@@ -32,9 +33,10 @@ class AppendEvidenceService(
     ): Evidence {
         evidenceServiceSupport.validateFinalContent(title, content)
         val userId = memberUtil.getCurrentUserId()
-        val score = scorePersistencePort.findById(scoreId)
+        val score = scorePersistencePort.findByIdForUpdate(scoreId)
         if (score == null || score.userId != userId) throw GsmcException(ErrorCode.SCORE_NOT_FOUND)
         if (score.evidence != null) throw GsmcException(ErrorCode.EVIDENCE_ALREADY_CONNECTED)
+        if (score.scoreStatus == ScoreStatus.APPROVED) throw GsmcException(ErrorCode.SCORE_NOT_MODIFIABLE)
 
         val uniqueFileIds = fileIds.distinct()
         evidenceServiceSupport.validateAndFindFiles(uniqueFileIds, userId)
