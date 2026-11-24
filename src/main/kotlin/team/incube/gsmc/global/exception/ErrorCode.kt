@@ -25,6 +25,7 @@ enum class ErrorCode(
     // 멤버
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.", "NOT_FOUND"),
     INVALID_PAGE_SIZE(HttpStatus.BAD_REQUEST, "페이지 크기는 1 이상 100 이하이어야 합니다.", "BAD_REQUEST"),
+    INVALID_MEMBER_IDS_SIZE(HttpStatus.BAD_REQUEST, "회원 ID는 1개 이상 250개 이하이어야 합니다.", "BAD_REQUEST"),
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "데이터 제약 조건을 위반했습니다.", "DUPLICATE_RESOURCE"),
 
     // 점수
