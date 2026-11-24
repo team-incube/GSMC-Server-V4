@@ -5,6 +5,7 @@ import org.springframework.graphql.data.method.annotation.MutationMapping
 import org.springframework.graphql.data.method.annotation.QueryMapping
 import org.springframework.stereotype.Controller
 import team.incube.gsmc.domain.category.CategoryType
+import team.incube.gsmc.domain.score.MemberTotalScore
 import team.incube.gsmc.domain.score.Percentile
 import team.incube.gsmc.domain.score.Score
 import team.incube.gsmc.domain.score.ScoreCategoryGroup
@@ -24,6 +25,7 @@ import team.incube.gsmc.domain.score.port.`in`.FetchScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByCategoryUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchScoresByDgProjectIdUseCase
 import team.incube.gsmc.domain.score.port.`in`.FetchTotalScoreUseCase
+import team.incube.gsmc.domain.score.port.`in`.FetchTotalScoresUseCase
 import team.incube.gsmc.domain.score.port.`in`.ModifyMyScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.RejectScoreUseCase
 import team.incube.gsmc.domain.score.port.`in`.RemoveScoreUseCase
@@ -41,6 +43,7 @@ class ScoreWebAdapter(
     private val fetchScoresByCategoryUseCase: FetchScoresByCategoryUseCase,
     private val fetchMyTotalScoreUseCase: FetchMyTotalScoreUseCase,
     private val fetchTotalScoreUseCase: FetchTotalScoreUseCase,
+    private val fetchTotalScoresUseCase: FetchTotalScoresUseCase,
     private val fetchMyPercentInClassUseCase: FetchMyPercentInClassUseCase,
     private val fetchMyPercentInGradeUseCase: FetchMyPercentInGradeUseCase,
     private val fetchScoresByDgProjectIdUseCase: FetchScoresByDgProjectIdUseCase,
@@ -91,6 +94,12 @@ class ScoreWebAdapter(
         @Argument memberId: Long,
         @Argument includeApprovedOnly: Boolean?,
     ): TotalScore = fetchTotalScoreUseCase.execute(memberId, includeApprovedOnly ?: true)
+
+    @QueryMapping
+    fun totalScores(
+        @Argument memberIds: List<Long>,
+        @Argument includeApprovedOnly: Boolean?,
+    ): List<MemberTotalScore> = fetchTotalScoresUseCase.execute(memberIds, includeApprovedOnly ?: true)
 
     @QueryMapping
     fun myPercentInClass(

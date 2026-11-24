@@ -45,6 +45,12 @@ type TotalScore {
     totalScore: Int!
 }
 
+"""회원별 점수 합계 응답입니다."""
+type MemberTotalScore {
+    memberId: ID!
+    totalScore: Int!
+}
+
 """현재 사용자의 상위·하위 백분위입니다."""
 type Percentile {
     topPercentile: Int!
@@ -114,6 +120,8 @@ type Query {
     myTotalScore(includeApprovedOnly: Boolean = true): TotalScore!
     """교사 이상 권한이 지정 회원의 점수 합계를 조회합니다."""
     totalScore(memberId: ID!, includeApprovedOnly: Boolean = true): TotalScore!
+    """교사 이상 권한이 여러 회원의 점수 합계를 한 번에 조회합니다. memberIds는 중복 제거 후 1~250개이며, 요청 순서대로 반환하고 존재하지 않는 회원은 제외합니다."""
+    totalScores(memberIds: [ID!]!, includeApprovedOnly: Boolean = true): [MemberTotalScore!]!
     """교사 이상 권한이 심사 대기 점수를 최근 수정 순으로 점수 소유자 정보와 함께 페이지 단위로 조회합니다."""
     pendingScores(input: SearchPendingScoreInput!): PendingScorePage!
     """학생인 현재 사용자의 반 내 백분위를 반환합니다."""
