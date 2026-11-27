@@ -257,9 +257,24 @@ class AppendScoreSupportTest :
                         every {
                             scorePersistencePort.findUnapprovedByUserIdAndCategoryType(userId, cat.categoryType)
                         } returns existing
+                        every { scorePersistencePort.findByIdForUpdate(existing.scoreId) } returns existing
 
                         support.findOrCreateScore(userId, cat) shouldBe existing
                     }
+                }
+            }
+
+            When("조회 직후 교사가 승인해 락을 잡고 다시 읽은 점수가 APPROVED면") {
+                Then("승인된 점수를 덮어쓰지 않고 새 점수를 반환한다") {
+                    val cat = category(EvidenceType.FILE, ScoreCalculationType.SCORE_BASED, isAccumulated = false)
+                    val stale = existingScore(cat, ScoreStatus.PENDING)
+                    every {
+                        scorePersistencePort.findUnapprovedByUserIdAndCategoryType(userId, cat.categoryType)
+                    } returns stale
+                    every { scorePersistencePort.findByIdForUpdate(stale.scoreId) } returns
+                        stale.copy(scoreStatus = ScoreStatus.APPROVED)
+
+                    support.findOrCreateScore(userId, cat).scoreId shouldBe 0L
                 }
             }
 
