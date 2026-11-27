@@ -66,32 +66,59 @@ class DataGsmProjectCachePersistenceAdapter(
             logger().warn("DataGSM 프로젝트 캐시 조회에 실패하여 외부 API를 조회합니다. key={}", CACHE_KEY, it)
         }.getOrNull()
 
-    override fun saveAll(projects: List<DataGsmProject>) {
+    override fun invalidationVersion(): String? =
+        runCatching { redisTemplate.opsForValue().get(INVALIDATION_VERSION_KEY) }
+            .onFailure { logger().warn("DataGSM 프로젝트 캐시 버전 조회에 실패했습니다.", it) }
+            .getOrNull()
+
+    override fun saveAllIfUnchanged(
+        projects: List<DataGsmProject>,
+        expectedVersion: String?,
+    ): Boolean =
         runCatching {
             val fullJson = objectMapper.writeValueAsString(projects)
             val generation = buildParticipantIndex(projects, CACHE_TTL_MILLIS)
             redisTemplate.execute(
-                activateWithFullCacheScript,
-                listOf(CACHE_KEY, participantIndexKey(generation), PARTICIPANT_INDEX_ACTIVE_KEY),
+                activateIfUnchangedScript,
+                listOf(
+                    INVALIDATION_VERSION_KEY,
+                    CACHE_KEY,
+                    participantIndexKey(generation),
+                    PARTICIPANT_INDEX_ACTIVE_KEY,
+                ),
+                expectedVersion ?: "",
                 fullJson,
                 CACHE_TTL_MILLIS.toString(),
                 generation,
-            )
+                (CACHE_TTL_MILLIS - INDEX_EXPIRY_MARGIN_MILLIS).toString(),
+            ) == 1L
         }.onFailure {
             logger().warn("DataGSM 프로젝트 캐시 저장에 실패했습니다. key={}", CACHE_KEY, it)
-        }
+        }.getOrDefault(true)
+
+    override fun invalidateAll() {
+        redisTemplate.execute(
+            invalidateAllScript,
+            listOf(INVALIDATION_VERSION_KEY, CACHE_KEY, PARTICIPANT_INDEX_ACTIVE_KEY),
+            UUID.randomUUID().toString(),
+        ) ?: throw IllegalStateException("DataGSM 프로젝트 캐시 무효화에 실패했습니다.")
     }
 
     override fun saveParticipantIndex(projects: List<DataGsmProject>) {
         runCatching {
             val initialTtl = redisTemplate.getExpire(CACHE_KEY, TimeUnit.MILLISECONDS)
-            if (initialTtl == null || initialTtl == KEY_NOT_FOUND_TTL) return
+            if (initialTtl == null || initialTtl == KEY_NOT_FOUND_TTL ||
+                initialTtl in 0..INDEX_EXPIRY_MARGIN_MILLIS
+            ) {
+                return
+            }
             val orphanTtl = if (initialTtl > 0) initialTtl else CACHE_TTL_MILLIS
             val expectedFullJson = objectMapper.writeValueAsString(projects)
             val generation = buildParticipantIndex(projects, orphanTtl)
             val remainingTtl = redisTemplate.getExpire(CACHE_KEY, TimeUnit.MILLISECONDS)
             if (remainingTtl == null || remainingTtl == KEY_NOT_FOUND_TTL) return
-            val indexTtl = if (remainingTtl > 0) remainingTtl else CACHE_TTL_MILLIS
+            if (remainingTtl in 0..INDEX_EXPIRY_MARGIN_MILLIS) return
+            val indexTtl = if (remainingTtl > 0) remainingTtl - INDEX_EXPIRY_MARGIN_MILLIS else CACHE_TTL_MILLIS
             redisTemplate.execute(
                 activateBackfilledIndexScript,
                 listOf(CACHE_KEY, participantIndexKey(generation), PARTICIPANT_INDEX_ACTIVE_KEY),
@@ -145,10 +172,12 @@ class DataGsmProjectCachePersistenceAdapter(
         const val CACHE_TTL_HOURS = 24L
         val CACHE_TTL_MILLIS = TimeUnit.HOURS.toMillis(CACHE_TTL_HOURS)
         const val PARTICIPANT_INDEX_ACTIVE_KEY = "dg-project:v2:participant-index:active"
+        const val INVALIDATION_VERSION_KEY = "dg-project:v2:invalidation-version"
         const val PARTICIPANT_INDEX_PREFIX = "dg-project:v2:participant-index"
         const val INDEX_READY_FIELD = "__ready__"
         const val INDEX_READY_VALUE = "1"
         const val INDEX_WRITE_BATCH_SIZE = 250
+        const val INDEX_EXPIRY_MARGIN_MILLIS = 1_000L
         const val KEY_NOT_FOUND_TTL = -2L
 
         val prepareGenerationScript =
@@ -161,13 +190,24 @@ class DataGsmProjectCachePersistenceAdapter(
                 Long::class.java,
             )
 
-        val activateWithFullCacheScript =
+        val activateIfUnchangedScript =
             DefaultRedisScript<Long>(
                 """
-                if redis.call('EXISTS', KEYS[2]) == 0 then return 0 end
-                redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
-                redis.call('PEXPIRE', KEYS[2], ARGV[2])
-                redis.call('SET', KEYS[3], ARGV[3], 'PX', ARGV[2])
+                if (redis.call('GET', KEYS[1]) or '') ~= ARGV[1] then return 0 end
+                if redis.call('EXISTS', KEYS[3]) == 0 then return 0 end
+                redis.call('SET', KEYS[2], ARGV[2], 'PX', ARGV[3])
+                redis.call('PEXPIRE', KEYS[3], ARGV[3])
+                redis.call('SET', KEYS[4], ARGV[4], 'PX', ARGV[5])
+                return 1
+                """.trimIndent(),
+                Long::class.java,
+            )
+
+        val invalidateAllScript =
+            DefaultRedisScript<Long>(
+                """
+                redis.call('SET', KEYS[1], ARGV[1])
+                redis.call('DEL', KEYS[2], KEYS[3])
                 return 1
                 """.trimIndent(),
                 Long::class.java,

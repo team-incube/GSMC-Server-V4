@@ -63,6 +63,7 @@ class SecurityConfig(
                 "/api/auth/authorization-url",
                 "/api/auth/signin",
                 "/api/auth/token/refresh",
+                "/api/events/datagsm/projects",
                 "/actuator/health/liveness",
                 "/actuator/health/readiness",
                 "/swagger-ui.html",

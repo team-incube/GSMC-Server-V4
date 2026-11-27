@@ -32,6 +32,7 @@ private const val MAX_PAGES = 50
 
 /** 일시적 실패에 대해 페이지 1건을 요청하는 최대 횟수입니다(최초 요청 포함). */
 private const val MAX_ATTEMPTS = 2
+private const val MAX_CACHE_GENERATION_ATTEMPTS = 3
 private val RETRY_BACKOFF: Duration = Duration.ofMillis(200)
 
 /**
@@ -87,7 +88,14 @@ class DataGsmProjectApiAdapter(
 
         return dataGsmProjectSingleFlight.load {
             dataGsmProjectCachePort.findAll()
-                ?: fetchAllActiveProjects().also(dataGsmProjectCachePort::saveAll)
+                ?: run {
+                    repeat(MAX_CACHE_GENERATION_ATTEMPTS) {
+                        val version = dataGsmProjectCachePort.invalidationVersion()
+                        val projects = fetchAllActiveProjects()
+                        if (dataGsmProjectCachePort.saveAllIfUnchanged(projects, version)) return@load projects
+                    }
+                    throw GsmcException(ErrorCode.DATAGSM_API_CALL_FAILED)
+                }
         }
     }
 
