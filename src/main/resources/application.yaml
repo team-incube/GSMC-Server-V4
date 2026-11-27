@@ -101,6 +101,7 @@ sdk:
       - "/graphiql/**"
       - "/graphql/**"
       - "/api/alerts/stream"
+      - "/api/events/datagsm/projects"
   response:
     enabled: false
   swagger:
@@ -118,6 +119,8 @@ security:
     refresh-token-expiry: 2592000
 
 datagsm:
+  event:
+    secret: ${DATAGSM_EVENT_SECRET:}
   openapi:
     base-url: ${DATAGSM_OPENAPI_BASE_URL:https://openapi.datagsm.kr}
     api-key: ${DATAGSM_OPENAPI_KEY}

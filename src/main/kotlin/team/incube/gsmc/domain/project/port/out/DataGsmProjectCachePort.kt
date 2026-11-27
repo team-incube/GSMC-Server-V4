@@ -13,8 +13,17 @@ interface DataGsmProjectCachePort {
     /** 캐시된 전체 ACTIVE 프로젝트 목록을 조회한다. 캐시가 없으면 null을 반환한다. */
     fun findAll(): List<DataGsmProject>?
 
-    /** 전체 ACTIVE 프로젝트 목록과 그 목록에서 파생한 참여자 인덱스를 캐시에 저장한다. */
-    fun saveAll(projects: List<DataGsmProject>)
+    /** 변경 이벤트가 갱신한 캐시 버전이다. */
+    fun invalidationVersion(): String?
+
+    /** 조회를 시작한 뒤 변경 이벤트가 없었을 때만 저장한다. 변경되었으면 false를 반환한다. */
+    fun saveAllIfUnchanged(
+        projects: List<DataGsmProject>,
+        expectedVersion: String?,
+    ): Boolean
+
+    /** DataGSM 프로젝트 변경 이벤트를 받으면 전체 목록과 활성 참여자 인덱스를 무효화한다. */
+    fun invalidateAll()
 
     /** 기존 전체 목록 캐시의 남은 TTL 안에서 참여자 인덱스를 구성한다. */
     fun saveParticipantIndex(projects: List<DataGsmProject>)

@@ -146,20 +146,23 @@ class DataGsmProjectCachePersistenceAdapterTest :
                 every { hashOperations.putAll(any(), any()) } just runs
                 every { redisTemplate.execute(any<RedisScript<Long>>(), any(), *anyVararg()) } returns 1L
 
-                adapter.saveAll(projects)
+                adapter.saveAllIfUnchanged(projects, null) shouldBe true
 
                 verify(exactly = 1) { hashOperations.putAll(any(), any()) }
                 verify(exactly = 1) {
                     redisTemplate.execute(
                         any<RedisScript<Long>>(),
                         match { keys ->
-                            keys.size == 3 &&
-                                keys[0] == "dg-project:v2:active-all" &&
-                                keys[2] == "dg-project:v2:participant-index:active"
+                            keys.size == 4 &&
+                                keys[0] == "dg-project:v2:invalidation-version" &&
+                                keys[1] == "dg-project:v2:active-all" &&
+                                keys[3] == "dg-project:v2:participant-index:active"
                         },
+                        "",
                         "full-json",
                         TimeUnit.HOURS.toMillis(24).toString(),
                         any(),
+                        (TimeUnit.HOURS.toMillis(24) - 1_000).toString(),
                     )
                 }
             }
@@ -168,10 +171,58 @@ class DataGsmProjectCachePersistenceAdapterTest :
                 every { objectMapper.writeValueAsString(emptyList<DataGsmProject>()) } returns "[]"
                 every { redisTemplate.execute(any<RedisScript<Long>>(), any(), *anyVararg()) } returns 1L
 
-                adapter.saveAll(emptyList())
+                adapter.saveAllIfUnchanged(emptyList(), null) shouldBe true
 
                 verify(exactly = 2) { redisTemplate.execute(any<RedisScript<Long>>(), any(), *anyVararg()) }
                 verify(exactly = 0) { hashOperations.putAll(any(), any()) }
+            }
+        }
+
+        Given("프로젝트 변경 이벤트를 받을 때") {
+            Then("캐시 버전을 바꾸고 전체 목록과 활성 인덱스를 함께 지운다") {
+                every { redisTemplate.execute(any<RedisScript<Long>>(), any(), *anyVararg()) } returns 1L
+
+                adapter.invalidateAll()
+
+                verify(exactly = 1) {
+                    redisTemplate.execute(
+                        any<RedisScript<Long>>(),
+                        listOf(
+                            "dg-project:v2:invalidation-version",
+                            "dg-project:v2:active-all",
+                            "dg-project:v2:participant-index:active",
+                        ),
+                        any(),
+                    )
+                }
+            }
+        }
+
+        Given("전체 목록 갱신과 변경 이벤트가 겹칠 때") {
+            Then("변경 전 버전의 새 세대를 활성화하지 않는다") {
+                every { objectMapper.writeValueAsString(projects) } returnsMany listOf("full-json", "participant-json")
+                every { hashOperations.putAll(any(), any()) } just runs
+                every { redisTemplate.execute(any<RedisScript<Long>>(), any(), *anyVararg()) } returnsMany
+                    listOf(1L, 0L)
+
+                adapter.saveAllIfUnchanged(projects, "previous-version") shouldBe false
+
+                verify(exactly = 1) {
+                    redisTemplate.execute(
+                        any<RedisScript<Long>>(),
+                        match { keys ->
+                            keys.size == 4 &&
+                                keys[0] == "dg-project:v2:invalidation-version" &&
+                                keys[1] == "dg-project:v2:active-all" &&
+                                keys[3] == "dg-project:v2:participant-index:active"
+                        },
+                        "previous-version",
+                        "full-json",
+                        TimeUnit.HOURS.toMillis(24).toString(),
+                        any(),
+                        (TimeUnit.HOURS.toMillis(24) - 1_000).toString(),
+                    )
+                }
             }
         }
 
@@ -194,7 +245,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
                                 keys[0] == "dg-project:v2:active-all" &&
                                 keys[2] == "dg-project:v2:participant-index:active"
                         },
-                        "55000",
+                        "54000",
                         any(),
                         "full-json",
                     )
@@ -218,6 +269,14 @@ class DataGsmProjectCachePersistenceAdapterTest :
                     )
                 }
             }
+
+            Then("전체 캐시 만료 직전에는 오래 남는 참여자 인덱스를 만들지 않는다") {
+                every { redisTemplate.getExpire("dg-project:v2:active-all", TimeUnit.MILLISECONDS) } returns 500L
+
+                adapter.saveParticipantIndex(projects)
+
+                verify(exactly = 0) { redisTemplate.execute(any<RedisScript<Long>>(), any(), *anyVararg()) }
+            }
         }
 
         Given("Redis 조회 또는 저장에 실패할 때") {
@@ -226,7 +285,7 @@ class DataGsmProjectCachePersistenceAdapterTest :
                 adapter.findAll() shouldBe null
 
                 every { objectMapper.writeValueAsString(projects) } throws RuntimeException("직렬화 실패")
-                adapter.saveAll(projects)
+                adapter.saveAllIfUnchanged(projects, null)
             }
         }
     })

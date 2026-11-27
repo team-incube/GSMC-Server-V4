@@ -85,6 +85,8 @@ class DataGsmProjectApiAdapterTest :
             every { cachePort.findByParticipantEmail(any()) } returns null
             every { cachePort.isParticipantIndexAvailable() } returns false
             every { cachePort.saveParticipantIndex(any()) } just runs
+            every { cachePort.invalidationVersion() } returns null
+            every { cachePort.saveAllIfUnchanged(any(), any()) } returns true
             every { participantIndexSingleFlight.load(any()) } answers {
                 firstArg<() -> List<DataGsmProject>?>().invoke()
             }
@@ -112,7 +114,7 @@ class DataGsmProjectApiAdapterTest :
                 adapter.findActiveProjectsByParticipantEmail("student@gsm.hs.kr") shouldBe listOf(project)
 
                 verify(exactly = 0) { restClient.get() }
-                verify(exactly = 0) { cachePort.saveAll(any()) }
+                verify(exactly = 0) { cachePort.saveAllIfUnchanged(any(), any()) }
             }
 
             Then("서로 다른 이메일 요청도 같은 캐시를 재사용한다") {
@@ -158,7 +160,6 @@ class DataGsmProjectApiAdapterTest :
             Then("모든 페이지를 조회하고 전체 목록을 전역 캐시에 저장한다") {
                 every { cachePort.isParticipantIndexAvailable() } returnsMany listOf(false, true)
                 every { cachePort.findAll() } returns null
-                every { cachePort.saveAll(listOf(project)) } returns Unit
                 every { restClient.get() } returns uriSpec
                 every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
                 every { requestSpec.retrieve() } returns responseSpec
@@ -169,8 +170,97 @@ class DataGsmProjectApiAdapterTest :
                 adapter.findActiveProjectsByParticipantEmail("student@gsm.hs.kr") shouldBe listOf(project)
 
                 verify(exactly = 1) { restClient.get() }
-                verify(exactly = 1) { cachePort.saveAll(listOf(project)) }
+                verify(exactly = 1) { cachePort.saveAllIfUnchanged(listOf(project), null) }
                 verify(exactly = 0) { cachePort.saveParticipantIndex(any()) }
+            }
+        }
+
+        Given("캐시 생성 뒤 DataGSM의 참여자와 설명이 변경될 때") {
+            Then("기존 세대에서는 이전 결과를 반환하고 무효화 뒤 새 목록을 가져온다") {
+                val newParticipant = participant.copy(participantEmail = "new@gsm.hs.kr")
+                val updated = project.copy(description = "새 설명", participants = listOf(newParticipant))
+                val updatedDto =
+                    projectDto.copy(
+                        description = "새 설명",
+                        participants =
+                            listOf(DataGsmProjectParticipantDto(10L, "학생", "new@gsm.hs.kr", 1001L, "소프트웨어", "M")),
+                    )
+                var invalidated = false
+                every { cachePort.findByParticipantEmail(any()) } answers {
+                    if (invalidated) {
+                        null
+                    } else if (firstArg<String>() ==
+                        participant.participantEmail
+                    ) {
+                        listOf(project)
+                    } else {
+                        emptyList()
+                    }
+                }
+                every { cachePort.findAll() } returns null
+                every { restClient.get() } returns uriSpec
+                every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
+                every { requestSpec.retrieve() } returns responseSpec
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } returns DataGsmApiResponseDto(data = DataGsmProjectPageDto(1, 1, listOf(updatedDto)))
+
+                adapter.findActiveProjectsByParticipantEmail(participant.participantEmail) shouldBe listOf(project)
+                adapter.findActiveProjectsByParticipantEmail(newParticipant.participantEmail) shouldBe emptyList()
+                invalidated = true
+                adapter.findActiveProjectsByParticipantEmail(participant.participantEmail) shouldBe emptyList()
+                adapter.findActiveProjectsByParticipantEmail(newParticipant.participantEmail) shouldBe listOf(updated)
+
+                verify(exactly = 2) { restClient.get() }
+            }
+        }
+
+        Given("기존 캐시가 만료될 때") {
+            Then("만료 전에는 이전 설명을 반환하고 만료 뒤에는 새 설명을 반환한다") {
+                val updated = project.copy(description = "새 설명")
+                every { cachePort.findByParticipantEmail(participant.participantEmail) } returnsMany
+                    listOf(listOf(project), null, null)
+                every { cachePort.findAll() } returns null
+                every { restClient.get() } returns uriSpec
+                every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
+                every { requestSpec.retrieve() } returns responseSpec
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } returns
+                    DataGsmApiResponseDto(
+                        data = DataGsmProjectPageDto(1, 1, listOf(projectDto.copy(description = "새 설명"))),
+                    )
+
+                adapter.findActiveProjectsByParticipantEmail(participant.participantEmail) shouldBe listOf(project)
+                adapter.findActiveProjectsByParticipantEmail(participant.participantEmail) shouldBe listOf(updated)
+
+                verify(exactly = 1) { restClient.get() }
+            }
+        }
+
+        Given("변경 이벤트가 전체 목록 조회 도중 도착할 때") {
+            Then("이전 세대를 저장하지 않고 새 목록을 다시 조회한다") {
+                val updated = project.copy(description = "새 설명")
+                val updatedDto = projectDto.copy(description = "새 설명")
+                every { cachePort.findAll() } returns null
+                every { cachePort.invalidationVersion() } returnsMany listOf(null, "new-version")
+                every { cachePort.saveAllIfUnchanged(any(), any()) } returnsMany listOf(false, true)
+                every { restClient.get() } returns uriSpec
+                every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
+                every { requestSpec.retrieve() } returns responseSpec
+                every {
+                    responseSpec.body(any<ParameterizedTypeReference<DataGsmApiResponseDto<DataGsmProjectPageDto>>>())
+                } returnsMany
+                    listOf(
+                        DataGsmApiResponseDto(data = DataGsmProjectPageDto(1, 1, listOf(projectDto))),
+                        DataGsmApiResponseDto(data = DataGsmProjectPageDto(1, 1, listOf(updatedDto))),
+                    )
+
+                adapter.findActiveProjectsByParticipantEmail(participant.participantEmail) shouldBe listOf(updated)
+
+                verify(exactly = 1) { cachePort.saveAllIfUnchanged(listOf(project), null) }
+                verify(exactly = 1) { cachePort.saveAllIfUnchanged(listOf(updated), "new-version") }
+                verify(exactly = 2) { restClient.get() }
             }
         }
 
@@ -212,7 +302,7 @@ class DataGsmProjectApiAdapterTest :
 
                 verify(exactly = 2) { cachePort.findAll() }
                 verify(exactly = 0) { restClient.get() }
-                verify(exactly = 0) { cachePort.saveAll(any()) }
+                verify(exactly = 0) { cachePort.saveAllIfUnchanged(any(), any()) }
             }
         }
 
@@ -230,7 +320,6 @@ class DataGsmProjectApiAdapterTest :
                 val secondProjectDto = projectDto.copy(id = 2L, name = "두 번째 프로젝트", participants = emptyList())
                 val secondProject = project.copy(dgProjectId = 2L, name = "두 번째 프로젝트", participants = emptyList())
                 every { cachePort.findAll() } returns null
-                every { cachePort.saveAll(listOf(project, secondProject)) } returns Unit
                 every { restClient.get() } returns uriSpec
                 every { uriSpec.uri(any<Function<org.springframework.web.util.UriBuilder, URI>>()) } returns requestSpec
                 every { requestSpec.retrieve() } returns responseSpec
@@ -245,7 +334,7 @@ class DataGsmProjectApiAdapterTest :
                 adapter.findActiveProjectsByParticipantEmail("student@gsm.hs.kr") shouldBe listOf(project)
 
                 verify(exactly = 2) { restClient.get() }
-                verify(exactly = 1) { cachePort.saveAll(listOf(project, secondProject)) }
+                verify(exactly = 1) { cachePort.saveAllIfUnchanged(listOf(project, secondProject), null) }
             }
         }
 
@@ -266,7 +355,7 @@ class DataGsmProjectApiAdapterTest :
 
                 exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
                 verify(exactly = 1) { restClient.get() }
-                verify(exactly = 0) { cachePort.saveAll(any()) }
+                verify(exactly = 0) { cachePort.saveAllIfUnchanged(any(), any()) }
             }
         }
 
@@ -304,7 +393,7 @@ class DataGsmProjectApiAdapterTest :
 
                 exception.errorCode shouldBe ErrorCode.DATAGSM_API_CALL_FAILED
                 verify(exactly = 1) { restClient.get() }
-                verify(exactly = 0) { cachePort.saveAll(any()) }
+                verify(exactly = 0) { cachePort.saveAllIfUnchanged(any(), any()) }
             }
         }
 
