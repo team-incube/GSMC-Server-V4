@@ -7,7 +7,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("jacoco")
-    id("org.sonarqube") version "7.5.0.8588"
+    id("org.sonarqube") version "7.6.0.18749"
 }
 
 group = "team.incube"
